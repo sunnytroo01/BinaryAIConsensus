@@ -48,7 +48,7 @@ MODEL_CONFIG = dict(
 )
 
 # --- Training config ---
-BATCH_SIZE = 4096          # B200 has 192 GB, can handle large batches
+BATCH_SIZE = 32768         # B200 has 192 GB, use it
 STEPS_PER_EPOCH = 5000     # ~20M samples per epoch
 EPOCHS = 1000
 LR = 0.0003                # Lower LR for larger model
@@ -79,13 +79,20 @@ def load_text_bytes():
 
 
 def maybe_scrape_data():
-    """If no training data, scrape Grokipedia."""
+    """If not enough training data, scrape Grokipedia."""
     files = glob.glob(os.path.join(DATA_DIR, '*.txt'))
-    if len(files) >= 100:
-        return  # Already have data
+    total_size = sum(os.path.getsize(f) for f in files)
 
-    print("  No training data found. Running Grokipedia scraper...")
-    print("  Target: 1 GB")
+    if total_size >= 500 * 1024 * 1024:  # Need at least 500 MB
+        return  # Already have enough data
+
+    # Delete old small articles (the 200 hand-written ones)
+    if files and total_size < 10 * 1024 * 1024:
+        print(f"  Removing old training data ({len(files)} files, {total_size/1024/1024:.1f} MB)...")
+        for f in files:
+            os.remove(f)
+
+    print("  Scraping 1 GB from Grokipedia (B200 has fast internet)...")
     print()
 
     # Import and run scraper
