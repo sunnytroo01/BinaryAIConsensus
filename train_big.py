@@ -1,8 +1,9 @@
 """
-AGI-NOW Big Training - 10x model on 5070
-Binary Association | Checkpoints every 5 epochs | Generates samples
+AGI-NOW Training - Binary Association Model
+Logs every epoch | Checkpoints every 10 | Resumes from latest checkpoint
+Works on any GPU (5070, B200, A100, etc.)
 """
-import torch, torch.nn as nn, time, random, os, sys, json
+import torch, torch.nn as nn, time, random, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from training_data import DEVICE, TRAINING_TEXT, build_dataset
@@ -50,8 +51,10 @@ def train():
     criterion = nn.BCEWithLogitsLoss()
     ctx = model.context_bytes
     EPOCHS = 30000
-    BATCH = 512
-    CHUNK = 150000
+    # Auto-detect batch size based on GPU memory
+    gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1e9 if torch.cuda.is_available() else 0
+    BATCH = 2048 if gpu_mem > 20 else 512
+    CHUNK = 300000 if gpu_mem > 20 else 150000
 
     # Split into chunks
     chunks = []
@@ -62,7 +65,8 @@ def train():
         chunks = [TRAINING_TEXT]
 
     print(f'Chunks: {len(chunks)} | Epochs: {EPOCHS} | Batch: {BATCH}')
-    print(f'Checkpoints: every 5 epochs')
+    print(f'GPU Memory: {gpu_mem:.0f} GB')
+    print(f'Checkpoints: every 10 epochs')
     print()
 
     warmup = 5
@@ -114,7 +118,7 @@ def train():
             elapsed = time.perf_counter() - t0
 
             # Log every epoch
-            print(f'  Epoch {epoch+1:3d}/{EPOCHS}  loss={avg_loss:.4f}  acc={acc:.1f}%  '
+            print(f'  Epoch {epoch+1:5d}/{EPOCHS}  loss={avg_loss:.4f}  acc={acc:.1f}%  '
                   f'lr={lr:.6f}  time={elapsed:.0f}s  [{total_samples:,} samples]')
             sys.stdout.flush()
 
