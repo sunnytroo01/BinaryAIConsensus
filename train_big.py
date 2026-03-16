@@ -88,9 +88,11 @@ def train():
             for pg in optimizer.param_groups:
                 pg['lr'] = lr
 
-            for chunk in chunks:
+            for ci, chunk in enumerate(chunks):
+                print(f'    Building chunk {ci+1}/{len(chunks)}...', end=' ', flush=True)
                 X_b, X_bp, X_p, X_i, Y = build_dataset(chunk, ctx)
                 N = X_b.shape[0]
+                print(f'{N:,} samples', flush=True)
                 if N < 10: continue
 
                 perm = torch.randperm(N, device=DEVICE)
