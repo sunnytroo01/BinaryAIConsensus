@@ -230,7 +230,19 @@ def train():
     print("=" * 66)
     print()
 
+    # Warmup forward pass (compiles CUDA kernels, can take a minute)
     model.train()
+    print("  Compiling CUDA kernels (first forward pass)...", flush=True)
+    warmup_b = build_batch(text_bytes, 32, MODEL_CONFIG['context_bytes'])
+    with torch.amp.autocast('cuda'):
+        _ = model(warmup_b[0], warmup_b[1], warmup_b[2], warmup_b[3])
+    del warmup_b
+    torch.cuda.empty_cache()
+    vram_used = torch.cuda.memory_allocated() / 1e9
+    vram_total = torch.cuda.get_device_properties(0).total_memory / 1e9
+    print(f"  Ready. VRAM: {vram_used:.1f} / {vram_total:.0f} GB", flush=True)
+    print()
+
     t0 = time.perf_counter()
 
     try:
@@ -265,13 +277,13 @@ def train():
                 total_correct += (preds == y).sum().item()
                 total_samples += BATCH_SIZE
 
-                # Progress every 500 steps
-                if (step + 1) % 500 == 0:
+                # Log step 1 immediately, then every 100 steps
+                if step == 0 or (step + 1) % 100 == 0:
                     step_acc = total_correct / total_samples * 100
                     step_loss = total_loss / (step + 1)
                     elapsed = time.perf_counter() - epoch_t0
-                    steps_per_sec = (step + 1) / elapsed
-                    eta = (STEPS_PER_EPOCH - step - 1) / steps_per_sec
+                    steps_per_sec = (step + 1) / elapsed if elapsed > 0 else 0
+                    eta = (STEPS_PER_EPOCH - step - 1) / max(steps_per_sec, 0.01)
                     print(f"    step {step+1:5d}/{STEPS_PER_EPOCH}  "
                           f"loss={step_loss:.4f}  acc={step_acc:.1f}%  "
                           f"{steps_per_sec:.1f} steps/s  ETA={eta:.0f}s",
