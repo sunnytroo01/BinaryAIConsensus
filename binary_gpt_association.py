@@ -26,10 +26,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__))
-from training_data import (
-    DEVICE, TRAINING_TEXT, EnglishInstinct,
-    build_dataset, bits_to_text
-)
+from training_data import DEVICE, EnglishInstinct
 
 
 # -- Local Pattern Detector ------------------------------------------------
@@ -192,7 +189,117 @@ class GatedFusion(nn.Module):
         return self.proj(merged)
 
 
-# -- Association Model v2 ---------------------------------------------------
+# -- Association Block (for stacking) ----------------------------------------
+class AssociationBlock(nn.Module):
+    """One block of associative processing. Stack these for depth."""
+
+    def __init__(self, embed_dim, num_memories, num_hopfield, num_hops, dropout):
+        super().__init__()
+        self.multi_hop = MultiHopMemory(embed_dim, num_memories, num_hops)
+        self.hopfield = HopfieldLayer(embed_dim, embed_dim, num_hopfield, dropout)
+        self.direct = AssociativeMemoryBank(num_memories, embed_dim, embed_dim)
+        self.fusion = GatedFusion(embed_dim, 3)
+        self.ffn = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(embed_dim * 4, embed_dim),
+            nn.Dropout(dropout),
+        )
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
+
+    def forward(self, x):
+        m = self.multi_hop(x)
+        h = self.hopfield(x)
+        d = self.direct(x)
+        mem = self.fusion(m, h, d)
+        x = self.norm1(x + mem)
+        x = self.norm2(x + self.ffn(x))
+        return x
+
+
+# -- Deep Association Model (2B) --------------------------------------------
+class DeepAssociationBinaryGPT(nn.Module):
+    """
+    "Association Is All You Need" - Deep Edition (2B params).
+
+    Stacks 22 AssociationBlocks, each with its own memory banks.
+    Early blocks learn low-level patterns, later blocks learn
+    high-level semantic associations.
+
+    Same philosophy: REMEMBER patterns, don't just process sequences.
+    """
+
+    def __init__(self, context_bytes=128, embed_dim=2048,
+                 num_memories=1024, num_hopfield=1024,
+                 num_hops=3, num_blocks=22, dropout=0.05):
+        super().__init__()
+        self.context_bytes = context_bytes
+
+        # Byte + position embeddings
+        self.byte_embed = nn.Embedding(128, embed_dim)
+        self.pos_embed = nn.Embedding(context_bytes, embed_dim)
+
+        # Local pattern detection
+        self.pattern_detector = LocalPatternDetector(embed_dim, num_filters=embed_dim // 4)
+
+        # Initial projection: combine embeddings + patterns into query
+        self.input_proj = nn.Sequential(
+            nn.Linear(embed_dim * 2, embed_dim),
+            nn.LayerNorm(embed_dim),
+            nn.GELU(),
+        )
+
+        # Stacked association blocks - the core
+        self.blocks = nn.ModuleList([
+            AssociationBlock(embed_dim, num_memories, num_hopfield, num_hops, dropout)
+            for _ in range(num_blocks)
+        ])
+        self.final_norm = nn.LayerNorm(embed_dim)
+
+        # Bit prediction head
+        head_in = embed_dim + 16 + 7 + EnglishInstinct.FEATURE_SIZE
+        self.bit_pos_embed = nn.Embedding(8, 16)
+        self.head = nn.Sequential(
+            nn.Linear(head_in, embed_dim),
+            nn.LayerNorm(embed_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(embed_dim, embed_dim // 2),
+            nn.GELU(),
+            nn.Linear(embed_dim // 2, 1),
+        )
+
+    def forward(self, ctx_bytes, bit_pos, partial, instinct):
+        positions = torch.arange(self.context_bytes, device=ctx_bytes.device)
+
+        # 1. Embed bytes + positions
+        x = self.byte_embed(ctx_bytes) + self.pos_embed(positions)
+
+        # 2. Detect local patterns
+        patterns = self.pattern_detector(x)
+
+        # 3. Compress to query (last position)
+        combined = torch.cat([x[:, -1, :], patterns[:, -1, :]], dim=-1)
+        query = self.input_proj(combined)
+
+        # 4. Deep associative retrieval (22 blocks of memory lookups)
+        for block in self.blocks:
+            query = block(query)
+
+        query = self.final_norm(query)
+
+        # 5. Predict bit
+        bit_emb = self.bit_pos_embed(bit_pos)
+        final = torch.cat([query, bit_emb, partial, instinct], dim=1)
+        return self.head(final).squeeze(-1)
+
+    def count_params(self):
+        return sum(p.numel() for p in self.parameters())
+
+
+# -- Association Model v2 (small, ~10M) ------------------------------------
 class AssociationBinaryGPT(nn.Module):
     """
     "Association Is All You Need" v2.
@@ -290,6 +397,7 @@ class AssociationBinaryGPT(nn.Module):
 
 # -- Training ---------------------------------------------------------------
 def train(model, text, epochs=200, batch_size=1024, lr=0.001):
+    from training_data import build_dataset
     X_b, X_bp, X_p, X_i, Y = build_dataset(text, model.context_bytes)
     N = X_b.shape[0]
 
@@ -356,6 +464,7 @@ def train_chunked(model, text, epochs=50, batch_size=1024, lr=0.001, chunk_size=
     Each epoch cycles through all chunks.
     """
     import random
+    from training_data import build_dataset
 
     # Split text into overlapping chunks
     ctx = model.context_bytes
@@ -492,6 +601,7 @@ def generate(model, seed="The ", num_chars=100, temperature=0.42):
 
 # -- Main -------------------------------------------------------------------
 def main():
+    from training_data import TRAINING_TEXT
     gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
 
     print()
