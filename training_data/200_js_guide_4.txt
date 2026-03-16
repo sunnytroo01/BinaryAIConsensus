@@ -1,0 +1,176 @@
+JavaScript Classes and Modules. Organizing code for real applications.
+
+Classes provide a template for creating objects with shared behavior.
+
+class User {
+  constructor(name, email) {
+    this.name = name;
+    this.email = email;
+    this.createdAt = new Date();
+  }
+
+  greet() {
+    return `Hello, I am ${this.name}`;
+  }
+
+  getAge() {
+    return Math.floor((Date.now() - this.createdAt) / 86400000) + " days old";
+  }
+}
+
+const alice = new User("Alice", "alice@example.com");
+console.log(alice.greet()); // "Hello, I am Alice"
+
+Inheritance with extends:
+
+class Admin extends User {
+  constructor(name, email, permissions) {
+    super(name, email); // calls parent constructor
+    this.permissions = permissions;
+  }
+
+  canAccess(resource) {
+    return this.permissions.includes(resource);
+  }
+}
+
+const admin = new Admin("Bob", "bob@example.com", ["users", "settings"]);
+admin.greet(); // inherits from User
+admin.canAccess("users"); // true
+
+Static methods belong to the class itself, not instances:
+
+class MathUtils {
+  static clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  static random(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+}
+
+MathUtils.clamp(15, 0, 10); // 10
+MathUtils.random(1, 100); // random number 1-100
+
+Getters and setters:
+
+class Temperature {
+  constructor(celsius) {
+    this._celsius = celsius;
+  }
+
+  get fahrenheit() {
+    return this._celsius * 9/5 + 32;
+  }
+
+  set fahrenheit(f) {
+    this._celsius = (f - 32) * 5/9;
+  }
+
+  get celsius() {
+    return this._celsius;
+  }
+}
+
+const temp = new Temperature(100);
+temp.fahrenheit; // 212
+temp.fahrenheit = 32;
+temp.celsius; // 0
+
+Private fields with the hash prefix:
+
+class BankAccount {
+  #balance = 0;
+
+  constructor(initialBalance) {
+    this.#balance = initialBalance;
+  }
+
+  deposit(amount) {
+    if (amount <= 0) throw new Error("Amount must be positive");
+    this.#balance += amount;
+    return this.#balance;
+  }
+
+  get balance() {
+    return this.#balance;
+  }
+}
+
+const account = new BankAccount(1000);
+account.deposit(500); // 1500
+account.balance; // 1500
+account.#balance; // SyntaxError: private field
+
+Modules. Modern JavaScript organizes code into modules using import and export.
+
+Export from a file (utils.js):
+export function formatDate(date) {
+  return date.toLocaleDateString();
+}
+
+export function formatCurrency(amount) {
+  return "$" + amount.toFixed(2);
+}
+
+export default class Calculator {
+  add(a, b) { return a + b; }
+  subtract(a, b) { return a - b; }
+}
+
+Import in another file:
+import Calculator, { formatDate, formatCurrency } from "./utils.js";
+
+const calc = new Calculator();
+calc.add(2, 3); // 5
+formatCurrency(9.99); // "$9.99"
+
+Named exports use curly braces. Default exports do not. Each module can have one default export and many named exports.
+
+Practical patterns:
+
+Singleton pattern:
+class Database {
+  static instance = null;
+  static getInstance() {
+    if (!Database.instance) {
+      Database.instance = new Database();
+    }
+    return Database.instance;
+  }
+}
+
+Observer pattern:
+class EventEmitter {
+  constructor() { this.listeners = {}; }
+  on(event, callback) {
+    if (!this.listeners[event]) this.listeners[event] = [];
+    this.listeners[event].push(callback);
+  }
+  emit(event, data) {
+    (this.listeners[event] || []).forEach(cb => cb(data));
+  }
+}
+
+const bus = new EventEmitter();
+bus.on("userLogin", user => console.log(`${user.name} logged in`));
+bus.emit("userLogin", { name: "Alice" });
+
+Builder pattern:
+class QueryBuilder {
+  constructor(table) { this.table = table; this.conditions = []; this.orderBy = null; this.limitValue = null; }
+  where(condition) { this.conditions.push(condition); return this; }
+  order(field) { this.orderBy = field; return this; }
+  limit(n) { this.limitValue = n; return this; }
+  build() {
+    let sql = "SELECT * FROM " + this.table;
+    if (this.conditions.length) sql += " WHERE " + this.conditions.join(" AND ");
+    if (this.orderBy) sql += " ORDER BY " + this.orderBy;
+    if (this.limitValue) sql += " LIMIT " + this.limitValue;
+    return sql;
+  }
+}
+
+new QueryBuilder("users").where("age > 18").where("active = 1").order("name").limit(10).build();
+// "SELECT * FROM users WHERE age > 18 AND active = 1 ORDER BY name LIMIT 10"
