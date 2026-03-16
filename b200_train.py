@@ -32,7 +32,7 @@ MODEL_CONFIG = dict(
 )
 
 # Training
-BATCH = 32768
+BATCH = 4096               # 2B model uses ~155 GB, leaves ~23 GB for batch
 STEPS = 5000
 EPOCHS = 1000
 LR = 0.0003
