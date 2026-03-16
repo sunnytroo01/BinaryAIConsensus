@@ -1,14 +1,13 @@
 """
 AGI-NOW B200 Pod Training - 2B Parameter Binary Association Model
 ==================================================================
-Runs directly on RunPod pod with B200 GPU.
-Saves checkpoints to network volume every epoch.
-If no training data found, runs the scraper first.
+1. First run: scrapes 1 GB from Grokipedia, saves to network volume
+2. Future runs: skips scraping, uses existing data
+3. Always resumes from latest checkpoint if one exists
+4. Checkpoints saved to network volume (survives pod restarts)
 
-Usage on pod:
-    cd /workspace/BinaryAIConsensus
-    pip install torch numpy requests
-    python b200_train.py
+Usage:
+    cd /workspace/BinaryAIConsensus && git pull && python -u b200_train.py
 """
 import torch
 import torch.nn as nn
@@ -23,16 +22,9 @@ from binary_gpt_association import DeepAssociationBinaryGPT, generate
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BASE = os.path.dirname(os.path.abspath(__file__))
 
-# Auto-detect paths (RunPod network volume or local)
-if os.path.exists('/workspace'):
-    CKPT_DIR = '/workspace/checkpoints'
-    DATA_DIR = os.path.join(BASE, 'training_data')
-    if not os.path.isdir(DATA_DIR) or len(os.listdir(DATA_DIR)) < 10:
-        DATA_DIR = '/workspace/training_data'
-else:
-    CKPT_DIR = os.path.join(BASE, 'checkpoints')
-    DATA_DIR = os.path.join(BASE, 'training_data')
-
+# Network volume paths (persist across pod restarts)
+CKPT_DIR = '/workspace/checkpoints' if os.path.exists('/workspace') else os.path.join(BASE, 'checkpoints')
+DATA_DIR = '/workspace/training_data' if os.path.exists('/workspace') else os.path.join(BASE, 'training_data')
 os.makedirs(CKPT_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -48,16 +40,67 @@ MODEL_CONFIG = dict(
 )
 
 # --- Training config ---
-BATCH_SIZE = 32768         # B200 has 192 GB, use it
-STEPS_PER_EPOCH = 5000     # ~20M samples per epoch
+BATCH_SIZE = 32768         # B200 has 192 GB VRAM - use it
+STEPS_PER_EPOCH = 5000     # 5000 steps x 32768 batch = 163M samples per epoch
 EPOCHS = 1000
-LR = 0.0003                # Lower LR for larger model
+LR = 0.0003
 WARMUP_EPOCHS = 10
 
 
+# =====================================================================
+# STEP 1: GET TRAINING DATA (scrape once, reuse forever)
+# =====================================================================
+def ensure_training_data():
+    """
+    Check if we already have training data on the network volume.
+    If yes: skip (instant).
+    If no: scrape 1 GB from Grokipedia (one time only).
+    """
+    files = glob.glob(os.path.join(DATA_DIR, '*.txt'))
+    total_size = sum(os.path.getsize(f) for f in files) if files else 0
+
+    if total_size >= 100 * 1024 * 1024:  # Already have 100+ MB
+        print(f"  [DATA] Found {len(files)} articles ({total_size/1024/1024:.0f} MB) - using existing data")
+        return
+
+    print(f"  [DATA] No training data found at {DATA_DIR}")
+    print(f"  [DATA] Scraping 1 GB from Grokipedia (one-time, saves to network volume)...")
+    print()
+
+    # Copy scraper to work with network volume DATA_DIR
+    scraper_path = os.path.join(BASE, 'scrape_grokipedia.py')
+    if not os.path.exists(scraper_path):
+        print("  ERROR: scrape_grokipedia.py not found in repo!")
+        sys.exit(1)
+
+    # Patch the scraper to use our DATA_DIR
+    with open(scraper_path, 'r') as f:
+        code = f.read()
+    code = code.replace(
+        "OUTPUT_DIR = os.path.join(BASE_DIR, 'training_data')",
+        f"OUTPUT_DIR = '{DATA_DIR}'"
+    )
+    patched = os.path.join(BASE, '_scraper_tmp.py')
+    with open(patched, 'w') as f:
+        f.write(code)
+
+    import subprocess
+    subprocess.run([sys.executable, '-u', patched], cwd=BASE)
+    os.remove(patched)
+
+    # Verify
+    files = glob.glob(os.path.join(DATA_DIR, '*.txt'))
+    total_size = sum(os.path.getsize(f) for f in files) if files else 0
+    print(f"  [DATA] Scraping complete: {len(files)} articles ({total_size/1024/1024:.0f} MB)")
+    print()
+
+
+# =====================================================================
+# STEP 2: LOAD DATA INTO MEMORY
+# =====================================================================
 def load_text_bytes():
-    """Load all training .txt files into a single byte tensor."""
-    print("  Loading training data...", end=" ", flush=True)
+    """Load all .txt files into one big byte tensor."""
+    print("  [LOAD] Reading files...", end=" ", flush=True)
     t0 = time.perf_counter()
     all_bytes = []
     file_count = 0
@@ -74,30 +117,19 @@ def load_text_bytes():
     tensor = torch.tensor(all_bytes, dtype=torch.long)
     elapsed = time.perf_counter() - t0
     mb = len(all_bytes) / 1024 / 1024
-    print(f"{file_count} files | {mb:.1f} MB | {elapsed:.1f}s")
+    print(f"done! {file_count} files, {mb:.0f} MB, {elapsed:.1f}s")
     return tensor
 
 
-def maybe_scrape_data():
-    """Check training data exists (should be in git repo)."""
-    files = glob.glob(os.path.join(DATA_DIR, '*.txt'))
-    total_size = sum(os.path.getsize(f) for f in files)
-
-    if len(files) < 10 or total_size < 1000:
-        print(f"  ERROR: No training data in {DATA_DIR}")
-        print(f"  Make sure you did: git pull")
-        sys.exit(1)
-
-
+# =====================================================================
+# STEP 3: BUILD TRAINING BATCHES (vectorized, no slow Python loops)
+# =====================================================================
 def build_batch(text_bytes, batch_size, ctx_len):
-    """Vectorized batch building - no Python loops over samples."""
     N = len(text_bytes)
-
     positions = torch.randint(ctx_len, N, (batch_size,))
     offsets = torch.arange(-ctx_len, 0)
     idx = positions.unsqueeze(1) + offsets.unsqueeze(0)
     ctx = text_bytes[idx]
-
     targets = text_bytes[positions]
     bit_pos = torch.randint(0, 8, (batch_size,))
     y = ((targets >> (7 - bit_pos)) & 1).float()
@@ -141,62 +173,47 @@ def get_lr(epoch):
     return LR * 0.5 * (1 + torch.cos(torch.tensor(progress * 3.14159)).item())
 
 
+# =====================================================================
+# STEP 4: TRAIN
+# =====================================================================
 def train():
     gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'
     gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1e9 if torch.cuda.is_available() else 0
 
     print()
-    print("=" * 66)
-    print("  AGI-NOW - Deep Binary Association Model")
-    print("  2 BILLION PARAMETERS | B200 Training")
-    print("=" * 66)
+    print("=" * 70)
+    print("  AGI-NOW  |  2 BILLION PARAM  |  Binary Association Model")
+    print("=" * 70)
     print()
-    print(f"  GPU: {gpu} ({gpu_mem:.0f} GB VRAM)")
-    print(f"  Device: {DEVICE}")
-    print(f"  Data dir: {DATA_DIR}")
-    print(f"  Checkpoint dir: {CKPT_DIR}")
+    print(f"  GPU:         {gpu} ({gpu_mem:.0f} GB)")
+    print(f"  Data:        {DATA_DIR}")
+    print(f"  Checkpoints: {CKPT_DIR}")
     print()
 
-    # Ensure training data exists
-    maybe_scrape_data()
-
-    # Load data
+    # --- Data ---
+    ensure_training_data()
     text_bytes = load_text_bytes()
-    if len(text_bytes) < 1000:
-        print("  ERROR: Not enough training data!")
-        sys.exit(1)
 
-    # Create 2B model
-    print("  Creating 2B model...", end=" ", flush=True)
+    # --- Model ---
+    print(f"  [MODEL] Creating 2B model...", end=" ", flush=True)
     model = DeepAssociationBinaryGPT(**MODEL_CONFIG).to(DEVICE)
     params = model.count_params()
-    print(f"{params:,} parameters")
-    print()
-    print(f"  Architecture:")
-    print(f"    Context:    {MODEL_CONFIG['context_bytes']} bytes")
-    print(f"    Embed dim:  {MODEL_CONFIG['embed_dim']}")
-    print(f"    Blocks:     {MODEL_CONFIG['num_blocks']}")
-    print(f"    Memories:   {MODEL_CONFIG['num_memories']} per block")
-    print(f"    Hopfield:   {MODEL_CONFIG['num_hopfield']} per block")
-    print(f"    Hops:       {MODEL_CONFIG['num_hops']} per block")
-    print(f"    Total hops: {MODEL_CONFIG['num_blocks'] * MODEL_CONFIG['num_hops']} deep")
-    print()
+    print(f"{params:,} params")
+    model_gb = sum(p.numel() * p.element_size() for p in model.parameters()) / 1024**3
+    print(f"  [MODEL] Size: {model_gb:.1f} GB | {MODEL_CONFIG['num_blocks']} blocks | "
+          f"{MODEL_CONFIG['num_blocks'] * MODEL_CONFIG['num_hops']} total hops")
 
-    # Model size
-    model_mb = sum(p.numel() * p.element_size() for p in model.parameters()) / 1024 / 1024
-    print(f"  Model size:   {model_mb:.0f} MB ({model_mb/1024:.1f} GB)")
-
-    # Optimizer
+    # --- Optimizer ---
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=0.01)
     criterion = nn.BCEWithLogitsLoss()
     scaler = torch.amp.GradScaler('cuda')
 
-    # Resume from checkpoint
+    # --- Resume from checkpoint ---
     start_epoch = 0
     best_acc = 0
     latest_ckpt = os.path.join(CKPT_DIR, 'b200_latest.pt')
     if os.path.exists(latest_ckpt):
-        print(f"  Resuming from checkpoint...", end=" ", flush=True)
+        print(f"  [RESUME] Loading checkpoint...", end=" ", flush=True)
         ckpt = torch.load(latest_ckpt, map_location=DEVICE, weights_only=False)
         model.load_state_dict(ckpt['model'])
         optimizer.load_state_dict(ckpt['optimizer'])
@@ -204,33 +221,36 @@ def train():
         best_acc = ckpt.get('best_acc', 0)
         if 'scaler' in ckpt:
             scaler.load_state_dict(ckpt['scaler'])
-        print(f"epoch {start_epoch}, best acc {best_acc:.1f}%")
+        print(f"resuming from epoch {start_epoch} (best acc: {best_acc:.1f}%)")
+    else:
+        print(f"  [START] Fresh training from epoch 1")
 
+    # --- Print training plan ---
     print()
-    samples_per_epoch = STEPS_PER_EPOCH * BATCH_SIZE
-    print(f"  Training:")
-    print(f"    Epochs:     {EPOCHS}")
-    print(f"    Steps/epoch: {STEPS_PER_EPOCH}")
-    print(f"    Batch size: {BATCH_SIZE}")
-    print(f"    Samples/epoch: {samples_per_epoch:,}")
-    print(f"    LR:         {LR}")
-    print(f"    Warmup:     {WARMUP_EPOCHS} epochs")
-    print(f"    Data:       {len(text_bytes):,} bytes ({len(text_bytes)/1024/1024:.0f} MB)")
-    print()
-    print("=" * 66)
+    print(f"  ---- TRAINING PLAN ----")
+    print(f"  Epochs:          {start_epoch + 1} to {EPOCHS}")
+    print(f"  Steps per epoch: {STEPS_PER_EPOCH:,}")
+    print(f"  Batch size:      {BATCH_SIZE:,}")
+    print(f"  Samples/epoch:   {STEPS_PER_EPOCH * BATCH_SIZE:,}")
+    print(f"  Training data:   {len(text_bytes):,} bytes ({len(text_bytes)/1024/1024:.0f} MB)")
+    print(f"  Learning rate:   {LR} (cosine decay, {WARMUP_EPOCHS} epoch warmup)")
+    print(f"  Saving to:       {latest_ckpt}")
     print()
 
-    # Warmup forward pass (compiles CUDA kernels, can take a minute)
+    # --- Warmup CUDA ---
+    print("  [CUDA] Compiling kernels (first forward pass)...", flush=True)
     model.train()
-    print("  Compiling CUDA kernels (first forward pass)...", flush=True)
-    warmup_b = build_batch(text_bytes, 32, MODEL_CONFIG['context_bytes'])
+    wb = build_batch(text_bytes, 32, MODEL_CONFIG['context_bytes'])
     with torch.amp.autocast('cuda'):
-        _ = model(warmup_b[0], warmup_b[1], warmup_b[2], warmup_b[3])
-    del warmup_b
+        model(wb[0], wb[1], wb[2], wb[3])
+    del wb
     torch.cuda.empty_cache()
-    vram_used = torch.cuda.memory_allocated() / 1e9
-    vram_total = torch.cuda.get_device_properties(0).total_memory / 1e9
-    print(f"  Ready. VRAM: {vram_used:.1f} / {vram_total:.0f} GB", flush=True)
+    vram = torch.cuda.memory_allocated() / 1e9
+    print(f"  [CUDA] Ready! Using {vram:.1f} / {gpu_mem:.0f} GB VRAM")
+    print()
+    print("=" * 70)
+    print("  TRAINING STARTED - logs every 100 steps, checkpoint every epoch")
+    print("=" * 70)
     print()
 
     t0 = time.perf_counter()
@@ -267,32 +287,42 @@ def train():
                 total_correct += (preds == y).sum().item()
                 total_samples += BATCH_SIZE
 
-                # Log step 1 immediately, then every 100 steps
+                # --- Progress log (every 100 steps) ---
                 if step == 0 or (step + 1) % 100 == 0:
-                    step_acc = total_correct / total_samples * 100
-                    step_loss = total_loss / (step + 1)
+                    acc_now = total_correct / total_samples * 100
+                    loss_now = total_loss / (step + 1)
                     elapsed = time.perf_counter() - epoch_t0
-                    steps_per_sec = (step + 1) / elapsed if elapsed > 0 else 0
-                    eta = (STEPS_PER_EPOCH - step - 1) / max(steps_per_sec, 0.01)
-                    print(f"    step {step+1:5d}/{STEPS_PER_EPOCH}  "
-                          f"loss={step_loss:.4f}  acc={step_acc:.1f}%  "
-                          f"{steps_per_sec:.1f} steps/s  ETA={eta:.0f}s",
+                    speed = (step + 1) / elapsed if elapsed > 0 else 0
+                    eta_sec = (STEPS_PER_EPOCH - step - 1) / max(speed, 0.01)
+                    eta_min = eta_sec / 60
+
+                    # Simple progress bar
+                    pct = (step + 1) / STEPS_PER_EPOCH
+                    bar_len = 20
+                    filled = int(bar_len * pct)
+                    bar = '=' * filled + '-' * (bar_len - filled)
+
+                    print(f"    [{bar}] {pct*100:5.1f}%  "
+                          f"step {step+1}/{STEPS_PER_EPOCH}  "
+                          f"loss={loss_now:.4f}  acc={acc_now:.1f}%  "
+                          f"speed={speed:.1f}/s  ETA={eta_min:.1f}min",
                           flush=True)
 
-            # Epoch stats
+            # --- End of epoch ---
             acc = total_correct / total_samples * 100
             avg_loss = total_loss / STEPS_PER_EPOCH
             best_acc = max(best_acc, acc)
             epoch_time = time.perf_counter() - epoch_t0
             total_time = time.perf_counter() - t0
 
-            print(f"  Epoch {epoch+1:4d}/{EPOCHS}  "
-                  f"loss={avg_loss:.4f}  acc={acc:.1f}%  best={best_acc:.1f}%  "
-                  f"lr={lr:.6f}  {epoch_time:.0f}s  "
-                  f"[{total_time/3600:.1f}h total]")
-            sys.stdout.flush()
+            print()
+            print(f"  >>> EPOCH {epoch+1} COMPLETE <<<")
+            print(f"      Accuracy:  {acc:.1f}%  (best ever: {best_acc:.1f}%)")
+            print(f"      Loss:      {avg_loss:.4f}")
+            print(f"      Time:      {epoch_time/60:.1f} min this epoch, {total_time/3600:.1f}h total")
+            print(f"      Saving checkpoint...", end=" ", flush=True)
 
-            # Save checkpoint every epoch
+            # --- Save checkpoint ---
             ckpt_data = {
                 'model': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
@@ -302,30 +332,30 @@ def train():
                 'loss': avg_loss,
                 'config': MODEL_CONFIG,
             }
-
             torch.save(ckpt_data, latest_ckpt)
+            torch.save(model.state_dict(), os.path.join(CKPT_DIR, 'agi_model_2b.pt'))
+            print("saved!")
 
             # Numbered checkpoint every 10 epochs
             if (epoch + 1) % 10 == 0:
                 numbered = os.path.join(CKPT_DIR, f'b200_epoch_{epoch+1:05d}.pt')
                 torch.save(ckpt_data, numbered)
-                print(f"    [SAVED] {numbered}")
+                print(f"      Milestone: {numbered}")
 
-            # Model weights for inference
-            torch.save(model.state_dict(), os.path.join(CKPT_DIR, 'agi_model_2b.pt'))
-
-            # Generate every 10 epochs
+            # Generate sample text every 10 epochs
             if (epoch + 1) % 10 == 0:
                 model.eval()
+                print(f"      --- Sample text ---")
                 for seed in ['The ', 'Hello ', 'Science is ']:
                     text = generate(model, seed, 60, 0.42)
-                    print(f"    [GEN] {seed}{text[:50]}")
+                    print(f"      \"{seed}{text[:50]}\"")
                 model.train()
-                print()
-                sys.stdout.flush()
+
+            print()
+            sys.stdout.flush()
 
     except KeyboardInterrupt:
-        print(f"\n  Stopped at epoch {epoch+1}. Saving...")
+        print(f"\n  [STOPPED] Saving checkpoint at epoch {epoch+1}...")
         torch.save({
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict(),
@@ -334,13 +364,17 @@ def train():
             'best_acc': best_acc,
             'config': MODEL_CONFIG,
         }, latest_ckpt)
+        print(f"  [STOPPED] Saved. Run again to resume from epoch {epoch+1}.")
 
     elapsed = time.perf_counter() - t0
     print()
-    print("=" * 66)
-    print(f"  Done. Best: {best_acc:.1f}% | Time: {elapsed/3600:.1f}h")
-    print(f"  Checkpoints: {CKPT_DIR}/")
-    print("=" * 66)
+    print("=" * 70)
+    print(f"  TRAINING COMPLETE")
+    print(f"  Best accuracy: {best_acc:.1f}%")
+    print(f"  Total time:    {elapsed/3600:.1f} hours")
+    print(f"  Checkpoints:   {CKPT_DIR}/")
+    print(f"  Run again to resume from where you left off.")
+    print("=" * 70)
 
 
 if __name__ == '__main__':
