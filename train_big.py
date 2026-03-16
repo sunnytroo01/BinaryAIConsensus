@@ -113,29 +113,33 @@ def train():
             best_acc = max(best_acc, acc)
             elapsed = time.perf_counter() - t0
 
+            # Log every epoch
             print(f'  Epoch {epoch+1:3d}/{EPOCHS}  loss={avg_loss:.4f}  acc={acc:.1f}%  '
                   f'lr={lr:.6f}  time={elapsed:.0f}s  [{total_samples:,} samples]')
+            sys.stdout.flush()
 
-            # Checkpoint every epoch
-            ckpt_path = os.path.join(CKPT_DIR, f'big_epoch_{epoch+1:03d}.pt')
-            torch.save({
-                'model': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'epoch': epoch,
-                'best_acc': best_acc,
-                'loss': avg_loss,
-            }, ckpt_path)
-            torch.save(model.state_dict(), os.path.join(BASE, 'agi_model.pt'))
-            mb = os.path.getsize(ckpt_path) / 1024 / 1024
-            print(f'    [SAVED] {ckpt_path} ({mb:.0f} MB)')
+            # Checkpoint every 10 epochs
+            if (epoch + 1) % 10 == 0:
+                ckpt_path = os.path.join(CKPT_DIR, f'big_epoch_{epoch+1:05d}.pt')
+                torch.save({
+                    'model': model.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'epoch': epoch,
+                    'best_acc': best_acc,
+                    'loss': avg_loss,
+                }, ckpt_path)
+                torch.save(model.state_dict(), os.path.join(BASE, 'agi_model.pt'))
+                mb = os.path.getsize(ckpt_path) / 1024 / 1024
+                print(f'    [SAVED] {ckpt_path} ({mb:.0f} MB)')
 
-            # Generate sample every epoch
-            model.eval()
-            for seed in ['The Moon is ', 'Hello ', 'The meaning of life ']:
-                text = generate(model, seed, 80, 0.42)
-                print(f'    [GEN] {seed}{text[:60]}')
-            model.train()
-            print()
+                # Generate sample every 10 epochs
+                model.eval()
+                for seed in ['The Moon is ', 'Hello ', 'The meaning of life ']:
+                    text = generate(model, seed, 80, 0.42)
+                    print(f'    [GEN] {seed}{text[:60]}')
+                model.train()
+                print()
+                sys.stdout.flush()
 
     except KeyboardInterrupt:
         print(f'\n  Stopped at epoch {epoch+1}. Saving...')
