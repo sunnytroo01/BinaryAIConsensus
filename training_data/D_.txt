@@ -1,0 +1,263 @@
+D* Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+D*
+ Ara Eve Leo Sal 
+1x
+ D* (Dynamic A*) is an incremental heuristic search algorithm designed for real-time planning of optimal paths through graphs with changing edge costs, particularly suited for mobile robots navigating unknown or dynamic environments where sensor data continuously updates terrain information. Developed by Anthony Stentz at Carnegie Mellon University's Robotics Institute, the original D* algorithm enables efficient replanning by maintaining an open list of states affected by cost changes and propagating updates incrementally from the robot's current position back to the goal, ensuring optimality without full recomputation.
+Subsequent variants have extended D*'s core principles to address specific challenges in pathfinding. The Focussed D* algorithm, introduced in 1995, improves upon the original by incorporating a heuristic function to prioritize state expansions during cost propagation, reducing computation time by a factor of 2 to 3 for initial planning and replanning in large-scale environments. D* Lite, developed by Sven Koenig and Maxim Likhachev in 2002, simplifies the implementation while matching D*'s performance; it adapts the Lifelong Planning A* (LPA*) framework to search from the goal backward, making it more analyzable and extensible for tasks like goal-directed navigation and terrain mapping in unknown spaces. Field D*, proposed by Dave Ferguson and Anthony Stentz in 2006, further enhances the family by integrating linear interpolation over grid cells to generate smooth, continuous paths in non-uniform cost environments, producing trajectories that are nearly as optimal as discrete-grid methods but with more natural headings for robotic motion.
+These algorithms are foundational in robotics and autonomous systems, offering up to hundreds of times faster replanning than traditional methods like full A* recomputation, and have been applied in real-world scenarios such as planetary rovers and unmanned ground vehicles. Their incremental nature allows handling of dynamic obstacles, sensor noise, and environmental changes without sacrificing path optimality, making D* a benchmark for efficient, anytime path replanning.
+
+Introduction
+
+Overview
+
+D* is an informed, incremental heuristic search algorithm that extends the A* algorithm to support real-time replanning in dynamic environments where edge costs may change or portions of the graph remain unknown. It operates on graphs representing traversable spaces, such as those encountered by mobile robots, and uses a heuristic function to guide the search toward promising paths while ensuring efficiency in updating plans as new information becomes available.
+The primary purpose of D* is to compute optimal paths from a robot's current position to a specified goal, reusing computations from prior searches to avoid the overhead of full recomputation in response to environmental changes. This makes it particularly suitable for scenarios involving sensor-based exploration, where the map evolves incrementally as the robot moves and detects obstacles or cost variations.
+Key features of D* include anytime replanning, which allows continuous path updates as new data is acquired; local repairs that limit modifications to affected regions near the robot; support for partial world knowledge through sensor integration; and guarantees of optimality when using a consistent heuristic, assuming the known information is accurate. These attributes enable efficient adaptation without sacrificing path quality, distinguishing D* as a robust solution for dynamic navigation.
+In its basic workflow, D* begins with an initial search resembling A* to find an optimal path from the goal backward to the start using available map data. Subsequent incremental updates occur when the environment changes, such as upon detecting new obstacles, by propagating cost modifications through the search structure to repair only the necessary portions of the path.
+
+History
+
+The D* algorithm was introduced in 1994 by Anthony Stentz at Carnegie Mellon University's Robotics Institute through the technical report titled "The D* Algorithm for Real-Time Planning of Optimal Traverses" (CMU-RI-TR-94-37). This work built upon an earlier preliminary version outlined in Stentz's 1993 technical report (CMU-RI-TR-93-20).
+The algorithm's development was sponsored by the Advanced Research Projects Agency (ARPA) under contracts for "Perception for Outdoor Navigation" (DACA76-89-C-0014) and the "Unmanned Ground Vehicle System" (DAAE07-90-C-RO59), aimed at enabling mobile robot navigation in unknown and dynamic terrains. It addressed the limitations of static path planners, such as A*originally developed in 1968 by Peter Hart, Nils Nilsson, and Bertram Raphaelwhich required full recomputation in changing environments, leading to inefficiencies in real-time scenarios. While drawing from earlier incremental search ideas, D* was the first to support real-time optimal replanning by efficiently propagating cost changes without restarting from scratch.
+Stentz presented the algorithm at the 1994 IEEE International Conference on Robotics and Automation in the paper "Optimal and Efficient Path Planning for Partially-Known Environments," where it was detailed for practical robot applications.
+Early validation demonstrated D*'s efficiency on large-scale terrains, including environments with up to 1,000,000 states, where it achieved speedups of over 300 times compared to brute-force replanning methods, highlighting its scalability for real-world navigation.
+
+Background Concepts
+
+Challenges in Dynamic Pathfinding
+
+Dynamic pathfinding in robotics and autonomous systems often requires real-time replanning to accommodate moving obstacles, sensor updates, or terrain alterations that occur after an initial path is computed. In such scenarios, environments are not static, and changes like unexpected barriers or shifting ground conditions can invalidate portions of a precomputed route, necessitating immediate adjustments to prevent collisions or mission failure. Traditional static planners, if rerun from scratch upon detecting changes, introduce significant delays that are unacceptable in time-critical applications such as unmanned ground vehicles navigating battlefields.
+A core issue arises from partial or evolving knowledge of the environment, where robots must explore unknown areas while updating maps on the fly and repairing paths accordingly. Sensor-equipped systems initially operate with incomplete or inaccurate prior information, discovering new obstacles or traversable regions only as they progress, which demands adaptive strategies to integrate this data without disrupting ongoing motion. This partial observability complicates path validity, as uncharted regions may harbor hazards that render the current plan obsolete, forcing the system to balance exploration with safe progression.
+Computational demands further exacerbate these problems, particularly in large or frequently changing spaces, where full recomputation using methods like repeated A* proves inefficient and leads to delays or reliance on suboptimal interim paths. In expansive environments, such as urban settings or off-road terrains, recalculating entire cost maps from the start consumes excessive processing resources, often exceeding real-time constraints and hindering responsiveness. This inefficiency scales poorly with environment size, resulting in prolonged planning times that can compromise overall mission success.
+The trade-off between optimality and speed poses another significant challenge, as maintaining provably optimal paths in dynamic graphs requires minimizing node expansions while ensuring the route remains the lowest-cost feasible option amid ongoing changes. Algorithms must propagate updates efficiently to avoid excessive computations, yet achieving global optimality often conflicts with the need for rapid local adjustments, leading to potential inconsistencies in path quality.
+Non-incremental algorithms exhibit notable failure modes, including high memory usage for repeated full searches, slow responses to localized changes that affect only small map portions, and divergence from the goal due to outdated plans that fail to incorporate recent sensor data. For instance, brute-force replanning might repair the entire affected map area unnecessarily, wasting resources on unaffected regions and causing the robot to follow inefficient detours. In densely dynamic settings, these methods can also trap the robot in oscillatory behaviors or local minima, further delaying convergence to the target.
+
+Foundations in A*
+
+A* (pronounced "A-star") is an informed best-first search algorithm designed for efficiently finding the shortest path from a start node to a goal node in a weighted graph. Developed in 1968 by Peter E. Hart, Nils J. Nilsson, and Bertram Raphael as an extension of earlier graph search techniques, it incorporates domain-specific heuristic knowledge to guide the search toward promising paths.
+The core of A* lies in its evaluation function for prioritizing nodes: $ f(n) = g(n) + h(n) $, where $ g(n) $ represents the exact path cost from the start node to the current node $ n $, and $ h(n) $ is a heuristic estimate of the remaining cost from $ n $ to the goal. This function balances exploration of known costs with estimated future costs, allowing A* to behave like Dijkstra's algorithm (when $ h(n) = 0 $) or greedy best-first search (when $ g(n) $ is ignored). Key implementation components include an open lista priority queue that holds unexpanded nodes ordered by increasing $ f(n) $and a closed list to avoid re-expanding visited nodes. During execution, A* repeatedly selects and expands the node with the lowest $ f(n) $, generates its successors, updates their $ g $ and $ f $ values if improved, and maintains backpointers to the parent nodes for path reconstruction once the goal is reached.
+A* guarantees optimality in static graphs with known costs when the heuristic $ h(n) $ is admissible, meaning it never overestimates the true cost to the goal, and consistent, satisfying $ h(n) \leq c(n, n') + h(n') $ for any successor $ n' $ and edge cost $ c(n, n') $. Under these conditions, the first path found to the goal is the shortest, making A* particularly effective for problems like route planning in unchanging environments.
+Despite its strengths, A* assumes a fully known and static environment, leading to significant limitations in dynamic settings. Any change to edge costs or the addition of obstacles necessitates a full recomputation of the search from the start, which becomes computationally prohibitive in large graphs or scenarios with frequent updates, such as robotic navigation in uncertain terrains.
+
+Core Algorithm
+
+Data Structures
+
+The D* algorithm employs a set of specialized data structures that extend the basic open and closed lists of A* to enable efficient incremental replanning in dynamic environments.
+Central to state management are tags assigned to each state XXX, denoted as t(X)t(X)t(X), which track processing status: NEW for states that have never been added to the open list, OPEN for states currently in the priority queue awaiting expansion, and CLOSED for states that have been expanded and removed from the queue. To reconstruct paths, every state XXX (except the goal GGG) maintains a backpointer b(X)b(X)b(X) pointing to its immediate successor YYY on the optimal path from XXX to GGG. The algorithm also tracks key cost values: h(G,X)h(G, X)h(G,X) represents the current optimal path cost from XXX to GGG, serving as the primary heuristic for backward search from the goal; in extensions like Focused D*, an additional g(X,R)g(X, R)g(X,R) estimates the path cost from the robot's current position RRR to XXX, aiding in forward-focused replanning.
+The open list functions as a priority queue, ordering states by a composite key k(G,X)=k(G, X) = k(G,X)=, where k1k_1k1 is the minimum of the lowest h(G,X)h(G, X)h(G,X) value observed since the state was added to the list (including pre-modification costs) and the current h(G,X)h(G, X)h(G,X), while k2=h(G,X)k_2 = h(G, X)k2=h(G,X) provides tie-breaking based on the current cost.
+k(G,X)=,k1=min(k(X),h(G,X)),k2=h(G,X)
+k(G, X) = , \quad k_1 = \min(k(X), h(G, X)), \quad k_2 = h(G, X)
+k(G,X)=,k1=min(k(X),h(G,X)),k2=h(G,X)
+This key ensures consistent prioritization during cost updates without full re-expansion. States in the open list are further partitioned into RAISE and LOWER subsets: RAISE states have k(G,X)<h(G,X)k(G, X) < h(G, X)k(G,X)<h(G,X) to propagate cost increases efficiently, while LOWER states satisfy k(G,X)=h(G,X)k(G, X) = h(G, X)k(G,X)=h(G,X) for cost decreases and backpointer adjustments.
+Supporting these are mappings of arc costs c(X,Y)c(X, Y)c(X,Y), which store the traversal cost from successor YYY to predecessor XXX (i.e., the forward direction cost from YYY to XXX) and are updated dynamically as environmental changes are sensed, enabling targeted modifications without global recomputation.
+
+Initialization and Expansion
+
+The initialization phase of the D* algorithm sets the path cost from the goal state G to itself as $ h(G, G) = 0 $ and inserts G into the OPEN list. An initial value for $ h(G, R) $ is set based on a heuristic estimate of the cost from R to G if the environment is partially known (often infinity if unknown). The algorithm then invokes the process-state procedure repeatedly, starting from G on the OPEN list, until R is closed and an optimal path from R to G is established via backpointers.
+In the expansion mechanism, a state X is selected from the OPEN list based on the minimal key value $ k(G, X) $, which prioritizes states according to their estimated path costs from the goal. Successors Y of X are generated, and for each Y, the path cost is updated as $ h(G, Y) = \min( h(G, Y), h(G, X) + c(X, Y) ) $, where $ c(X, Y) $ denotes the cost of the arc from Y to X; backpointers are adjusted if a lower-cost path is found. Updated successors with finite costs are inserted or reinserted into the OPEN list if necessary, and X is then tagged as CLOSED. This process relies on the OPEN list to queue states for expansion.
+A consistent heuristic function guides the expansions by influencing the key values, directing the search toward promising states closer to the goal and avoiding unnecessary exploration. Consequently, CLOSED states are not re-expanded during this phase unless arc costs are modified later, maintaining efficiency. The initial search operates akin to A* conducted backward from the goal, propagating costs outward until the robot state R is reached and the path tree encompasses it.
+
+Cost Modification and Propagation
+
+In the D* algorithm, environmental changes are detected during robot movement through sensor data that reveals discrepancies in the terrain, such as the appearance of an obstacle, which updates the corresponding arc cost to infinity, or the discovery of a traversable path, which assigns a finite cost value. These updates occur incrementally as the robot advances, allowing the algorithm to respond to partial knowledge of the environment without full replanning.
+Upon detection, the MODIFY-COST procedure is invoked for each affected arc (X, Y), updating the arc cost function c(X, Y) to the new value. If the cost increases, the predecessor state X is added to the RAISE list to propagate the higher cost backward; conversely, if the cost decreases, X is added to the LOWER list to facilitate cost reductions and potential redirection of backpointers. This procedure ensures that only directly impacted states are initially flagged for re-evaluation, placing them on the OPEN list if they were previously closed.
+Propagation proceeds by reopening affected states from the OPEN list, which is prioritized by a key function that sorts RAISE states according to their previous path costs and LOWER states by their current path costs. For each reopened state X, the heuristic cost estimate h(G, X)representing the optimal path cost from X to the goal Gis updated as the minimum over its successors:
+h(G,X)=minsucc(X)(h(G,succ(X))+c(X,succ(X)))
+h(G, X) = \min_{\text{succ}(X)} \left( h(G, \text{succ}(X)) + c(X, \text{succ}(X)) \right)
+h(G,X)=succ(X)min(h(G,succ(X))+c(X,succ(X)))
+The state is then reinserted into the OPEN list with its updated key to guide further expansion. This process integrates seamlessly with the state expansion mechanism to propagate changes efficiently.
+The incremental repair in D* focuses re-expansion solely on states where costs have worsened or where better paths may now exist, thereby reusing unchanged portions of the prior search tree and minimizing computational overhead in dynamic environments. This targeted approach avoids exhaustive searches, enabling real-time responsiveness.
+Optimality is preserved throughout propagation because the updated h(G, X) values reflect the current minimum path costs to the goal after all relevant changes have been incorporated, maintaining a monotonic sequence of cost estimates that guarantees the shortest path when the process terminates. The algorithm halts replanning once the minimum key on the OPEN list exceeds the robot's current path cost to the goal.
+
+Deadlock Avoidance
+
+In the D* algorithm, deadlocks during cost propagation can occur due to cycles in cost increases, where a sequence of states mutually raises each other's path costs without resolution, potentially leading to stalled searches or infinite loops. This issue arises particularly when environmental changes, such as newly detected obstacles, invalidate multiple states in a interdependent manner, causing repeated re-evaluations without convergence. To address this, D* detects potential cycles through checks on backpointers during state updates, re-inserting affected states into the OPEN list to break loops and ensure forward progress.
+The primary avoidance strategy involves postponing the processing of RAISE statesthose requiring cost increasesuntil all LOWER states (those allowing cost reductions) have been fully handled and the optimal path to the robot's current state is confirmed, often indicated by the robot state being closed. This prioritization ensures that promising alternative paths are explored first, allowing LOWER propagations to resolve dependencies before RAISE updates risk entangling the search. In the PROCESS-STATE procedure, a critical rule enforces this by expanding a RAISE state X only if its key value k(G, X) is strictly less than its current path cost h(G, X), preventing premature closure and guaranteeing that propagation completes systematically.
+Consider a scenario where an obstacle suddenly blocks the optimal path, triggering a chain of RAISE states along the invalidated route; the algorithm defers processing these increases, instead propagating LOWER updates from potential detours to establish a viable alternative before revisiting the raises. This approach maintains search efficiency while avoiding stagnation. In practice, such deadlocks are rare due to the heuristic's guidance toward the goal, which biases expansions away from cyclic traps, though the mechanism remains essential for theoretical guarantees of termination and optimality.
+
+Pseudocode
+
+Process-State Function
+
+The PROCESS-STATE function serves as the primary mechanism for expanding states and propagating cost updates in the D* algorithm, ensuring that path costs remain optimal amid environmental changes. It operates by selecting states from the OPEN list based on a key function and updating their heuristic estimates and tags accordingly. This procedure is essential for both the initial path computation from the goal backward and for repairing paths when arc costs are modified due to new sensor information.
+The pseudocode for PROCESS-STATE is as follows:
+PROCESS-STATE()
+L1: X = MIN-STATE()
+L2: kold = k(X); DELETE(X)
+L3: if X = NULL then return NO-VAL
+L4: if kold < h(X) then
+L5: for each neighbor Y of X:
+L6: if t(Y) NEW and h(Y) kold and h(X) > h(Y) + c(Y, X) then
+L7: b(X) = Y; h(X) = h(Y) + c(Y, X)
+L8: if t(Y) = NEW or (b(Y) = X and h(Y) h(X) + c(X, Y)) then
+L9: b(Y) = X; INSERT(Y, h(X) + c(X, Y))
+L10: if b(Y) X and h(Y) > h(X) + c(X, Y) and t(X) = CLOSED then
+L11: INSERT(Y, h(Y))
+L12: else
+L13: for each neighbor Y of X:
+L14: if t(Y) = NEW or b(Y) = X then
+L15: b(Y) = X; INSERT(Y, h(X) + c(X, Y))
+L16: if b(Y) X and h(Y) > h(X) + c(X, Y) and kold = h(X) then
+L17: INSERT(Y, h(Y))
+L18: return MIN-VAL()
+This procedure removes the state X with the minimum key value k(X) from the appropriate list (OPEN or RAISE). The variable kold stores k(X) at removal. If kold < h(X), indicating a cost increase since insertion (raise case), it attempts to find a better backpointer b(X) from neighbors Y (predecessors toward the goal) and updates h(X) if a lower-cost path is available; it also updates and inserts successors Y if their costs need adjustment. In the else case (kold = h(X), lower or consistent case), it updates backpointers and inserts new or affected neighbors, ensuring propagation of decreased costs backward and potential insertions forward. The function returns the minimum key value in the lists or NO-VAL if empty.
+The function handles both initial expansion, starting from the goal with h(G) = 0 and expanding outward until the start state is reached, and repair operations triggered by environmental changes, where inconsistent costs are resolved through targeted propagations. It integrates with the overall algorithm by being invoked repeatedly after cost modifications, continuing until the path from the robot's position R to the goal G is optimal, as verified by the condition kmin >= h(R). The OPEN and CLOSED tags, along with the key function k, draw from A* foundations but are adapted for incremental updates, using priority queues sorted by k to focus expansions near the affected regions. In original D*, separate lists (OPEN for cost decreases, RAISE for increases) may be used, with PROCESS-STATE adapted accordingly.
+
+Modify-Cost Procedure
+
+The Modify-Cost procedure updates the cost of an arc from a predecessor state to a successor state in response to environmental changes detected by sensors, ensuring that path cost estimates reflect the current world state without full recomputation. This procedure is central to D*'s incremental replanning capability, allowing the algorithm to handle both cost increases (e.g., newly discovered rough terrain) and decreases (e.g., smoother paths revealed) efficiently. It is invoked during robot execution when the robot moves to a new state and scans its local vicinity for cost discrepancies.
+The pseudocode for the Modify-Cost procedure, as formulated in the original D* algorithm, is as follows:
+MODIFY-COST(X, Y, cval)
+L1: c(X, Y) cval
+L2: if t(X) = CLOSED then
+L3: INSERT(X, h(X))
+L4: return MIN-VAL()
+Here, the procedure sets the arc cost c(X, Y) to the new value cval (from sensor data). If the predecessor X is closed (previously expanded with consistent costs), it is inserted into the appropriate list (OPEN or RAISE, depending on whether the change is a decrease or increase) with its current h(X) to initiate propagation. Infinite costs for obstacles are handled by setting cval to a large value, triggering raise propagation. The return value MIN-VAL() is the minimum key in the lists, used in the outer loop. Unlike more complex variants, original D* does not include explicit local consistency checks or separate raise/lower queuing within MODIFY-COST; these are handled during PROCESS-STATE executions.
+This procedure integrates with the broader D* framework by queuing affected states for processing, thereby triggering a chain of PROCESS-STATE invocations that repair the path only in impacted regions. By inserting the predecessor, it optimizes propagation: cost increases spread forward through successors, while decreases allow backward updates via backpointer revisions. In usage, Modify-Cost is called for each changed arc after a robot step, followed by an iterative loop: do { kmin = PROCESS-STATE() } while (kmin < h(R) && kmin != NO-VAL), enabling real-time adaptation in partially known environments like planetary rovers.
+
+Variants
+
+Focused D*
+
+Focused D* is an extension of the original D* algorithm, introduced by Anthony Stentz in 1995 to enhance real-time path replanning in dynamic environments by directing search efforts toward the robot's current position. This variant builds on the data structures of Basic D*, such as the OPEN and CLOSED lists, but introduces mechanisms to prioritize expansions along the most relevant path segments, reducing computational overhead in large state spaces.
+The core innovation in Focused D* is the incorporation of a forward heuristic, denoted as $ g(X, R) $, which estimates the cost from a state $ X $ to the robot's current location $ R $. This heuristic guides the search by focusing on states that are both close to the goal and accessible from the robot, thereby avoiding expansions in irrelevant regions of the search space. To implement this, the algorithm modifies the priority for states on the OPEN list, sorting them based on the key $ f(X) = h(G, X) + g(X, R) $, where $ h(G, X) $ represents the estimated cost from $ X $ to the goal $ G $. Additionally, a bias mechanism incrementally adjusts these keys as the robot moves, updating the focal point without requiring a full recomputation of $ g(X, R) $ for all states; this adjustment affects fewer than 2% of states in typical scenarios, maintaining efficiency during motion.
+In experimental evaluations on terrains with up to 100,000 states, Focused D* demonstrated significant performance gains, achieving speedups of 2 to 3 times compared to Basic D* and up to 300 times faster than brute-force replanning methods for online computations. These benefits stem from the reduced number of unnecessary state expansions, particularly in partially known or changing environments where only path-relevant areas need replanning. However, the variant incurs a drawback in the form of slightly higher initial computation time, especially when using full initialization to precompute heuristics across the entire space.
+
+D* Lite
+
+D* Lite is an incremental heuristic search algorithm developed in 2002 by Sven Koenig of the Georgia Institute of Technology and Maxim Likhachev of Carnegie Mellon University. Presented at the 18th National Conference on Artificial Intelligence (AAAI-02), it adapts the Lifelong Planning A* (LPA*) framework for efficient path replanning in dynamic environments, such as robot navigation in unknown terrain. The algorithm achieves this by performing a backward search from the goal to the start while simulating forward search through reversal of edge costs, thereby reducing the complexity of maintaining multiple data structures.
+A key innovation in D* Lite is the use of the right-hand side function, denoted as rhs(X)\mathrm{rhs}(X)rhs(X), to handle inconsistent labels for vertices XXX, which simplifies inconsistency detection compared to prior variants. Vertices are prioritized in a single priority queue using a key defined as the pair \bigl, where g(X)g(X)g(X) is the current best-known path cost from the start to XXX, h(X)h(X)h(X) is a consistent heuristic estimate from XXX to the goal, and the semicolon separates the primary and secondary sorting criteria. This structure allows the algorithm to propagate changes incrementally without re-expanding unchanged vertices, maintaining optimality under admissible heuristics.
+D* Lite offers several advantages over earlier D* variants, including easier theoretical analysis, fewer required data structures, and seamless interpolation between A* (for static environments) and LPA* (for repeated replanning). It is algorithmically equivalent to Focused D* in terms of behavior and performance but provides a cleaner, more straightforward implementation. Owing to its simplicity and lower computational overheadsuch as avoiding priority queue reorderingD* Lite has become the preferred choice in many modern robotics applications for real-time path planning in partially known environments.
+
+Theoretical Analysis
+
+Minimum Cost versus Current Cost
+
+In the D* algorithm, the minimum cost k(G,x)k(G, x)k(G,x) for a state xxx represents the lowest estimate of the optimal path cost from xxx to the goal GGG observed during prior searches, serving as a baseline before any environmental modifications. This value is computed as the minimum of the path cost estimate h(G,x)h(G, x)h(G,x) prior to the most recent modification and all subsequent values of h(G,x)h(G, x)h(G,x) since xxx was added to the OPEN list. By tracking this historical minimum, k(G,x)k(G, x)k(G,x) ensures that the algorithm retains knowledge of potentially better paths discovered earlier, even as the environment changes.
+In contrast, the current cost h(G,x)h(G, x)h(G,x) denotes the updated estimate of the optimal path cost from xxx to GGG after incorporating recent changes to arc costs, which may result in an increase due to obstacles or terrain degradation. This value is dynamically revised during the PROCESS-STATE procedure by evaluating neighboring states and setting h(G,x)=c(x,y)+h(G,y)h(G, x) = c(x, y) + h(G, y)h(G,x)=c(x,y)+h(G,y) if a lower-cost path through neighbor yyy is found, where c(x,y)c(x, y)c(x,y) is the arc cost between states. The distinction arises because environmental updates can invalidate previous paths, making h(G,x)k(G,x)h(G, x) \geq k(G, x)h(G,x)k(G,x), with equality holding only if no cost increases have affected the state.
+The key mechanism leverages these costs for efficient prioritization and reopening of states on the OPEN list. In the original D*, states are ordered by k(G,x)k(G, x)k(G,x), processing those with the smallest key first to focus on regions likely containing the optimal path. For the Focused D* variant, the key is a pair , where k1=min(k(G,x),h(G,x))+g(R,x)k_1 = \min(k(G, x), h(G, x)) + g(R, x)k1=min(k(G,x),h(G,x))+g(R,x) and k2=min(k(G,x),h(G,x))k_2 = \min(k(G, x), h(G, x))k2=min(k(G,x),h(G,x)), with g(R,x)g(R, x)g(R,x) estimating the cost from the robot's current position RRR to xxx (often using a heuristic like Euclidean distance). This formulation prioritizes states closer to the robot while accounting for cost changes:
+k=
+k = \begin{bmatrix} \min(c_{\min}, c_{\text{current}}) + h \\ \min(c_{\min}, c_{\text{current}}) \end{bmatrix}
+k=
+Here, cminc_{\min}cmin corresponds to the minimum cost baseline, ccurrentc_{\text{current}}ccurrent to the updated cost, and hhh to the robot-to-state heuristic when applicable. States are reopened only if their current cost exceeds the minimum, targeting degraded paths for repair without unnecessary re-expansion of unaffected regions.
+This design ensures completeness and optimality by propagating only essential changes: if k(G,x)<h(G,x)k(G, x) < h(G, x)k(G,x)<h(G,x), the state is a RAISE state, indicating a cost increase that must be propagated to avoid suboptimal paths; otherwise, it is a LOWER state, allowing cost reductions to refine the solution. The algorithm terminates when the minimum key on the OPEN list equals or exceeds the current path cost to the robot, guaranteeing that all lower-cost alternatives have been considered without overlooking viable paths due to partial updates.
+
+Computational Complexity
+
+The worst-case time complexity of the D* algorithm is the same as that of A*, which is O((V+E)logV)O((|V| + |E|) \log |V|)O((V+E)logV) using a binary heap for the priority queue, simplifying to O(VlogV)O(|V| \log |V|)O(VlogV) for sparse graphs, as D* may require re-expanding a significant portion of the graph in the presence of extensive cost changes. However, its incremental nature limits expansions to affected regions in practice, reducing average-case performance to near the scale of local modifications rather than full replanning.
+Space complexity is O(V)O(|V|)O(V), primarily due to the open list, closed list, and backpointers storing vertex information, which is comparable to A* but empirically about 50% of the memory required by brute-force replanning methods that store full search trees. Key factors influencing efficiency include the quality of the heuristicadmissible and consistent heuristics guide expansions more effectivelyand the locality of changes, where isolated obstacles ideally propagate costs to only O(1)O(1)O(1) states, minimizing replanning overhead.
+Experimental evaluations on environments with 100,000 states demonstrated Basic D* completing offline planning in 37.34 seconds, compared to 50.63 minutes for a brute-force replanner running online. The Focused D* variant achieved up to 300 times speedup over brute-force in dynamic scenarios with up to 10610^6106 states, with significantly reduced online times using minimal initialization.
+Asymptotically, D* offers no polynomial-time guarantees for optimality in arbitrary graphs but proves empirically efficient for real-time applications due to its repair-focused expansions. The D* Lite variant provides a simpler analysis, expanding each vertex at most twice across all replans, yielding comparable or better performance with easier priority maintenance. Relative to repeated A* invocations, D* improves efficiency by a factor proportional to the number of changes by avoiding complete recomputations, though it incurs higher initial overhead than a single static A* run.
+
+Applications
+
+Robotics
+
+D* has been primarily applied in robotics for enabling autonomous mobile robots to navigate unknown or dynamic terrains, where environmental costs change due to new sensor observations or unforeseen obstacles. Developed in the context of ARPA-funded projects at Carnegie Mellon University's Robotics Institute, the algorithm was designed for unmanned ground vehicles (UGVs) to perform real-time path replanning during traverses over rough, off-road environments. In particular, Anthony Stentz's seminal 1994 work demonstrated D* on military UGVs, where it efficiently repaired paths as terrain costs varied, such as when soft soil or debris altered traversability. Experiments involved simulated and real-robot tests across large state spaces equivalent to kilometer-scale terrains (up to 1,000,000 grid cells), achieving up to 300-fold speedups in replanning compared to full recomputation methods, allowing robots to maintain optimal paths without halting.
+A prominent example of D*'s influence in space robotics is its variant, Field D*, which was integrated into NASA's Mars Exploration Rovers (Spirit and Opportunity) for hazard avoidance and long-range planning. Deployed in 2006, Field D* enabled the rovers to generate smooth, low-cost paths through uneven Martian terrain by interpolating cost maps derived from onboard stereo cameras and hazard detection software, allowing drives of up to 100 meters per sol while avoiding rocks and slopes. This capability was critical for missions requiring autonomy in communication-limited environments, and it later informed navigation systems on the Curiosity and Perseverance rovers, including ongoing operations in Jezero Crater as of 2025. In terrestrial applications, D* variants have supported DARPA-inspired challenges for off-road autonomous vehicles, facilitating obstacle avoidance in unstructured settings like desert races.
+In modern robotic systems, D* integrates seamlessly with sensors such as LIDAR and sonar to update cost maps in real-time, enabling reactive navigation as new data reveals environmental changes. For instance, LIDAR scans feed into the algorithm's graph to adjust edge costs dynamically, while combinations with Simultaneous Localization and Mapping (SLAM) techniques allow robots to build and refine maps on-the-fly during exploration. This integration is evident in warehouse automation, where D* handles moving obstacles like human workers or shifting inventory to compute safe, optimal paths for automated guided vehicles (AGVs). Similarly, in search-and-rescue operations, it supports robots in disaster zones by adapting to debris or structural collapses.
+The algorithm's strength in robotics lies in its ability to manage uncertainties like wheel slip on loose surfaces or dynamic threats such as approaching vehicles, by propagating cost changes incrementally without global recomputation. Wheel slip, for example, can be modeled as increased terrain costs based on odometry discrepancies or traction sensors, prompting rapid path adjustments to prevent immobilization. In search-and-rescue scenarios, this enables efficient coverage of large areas while avoiding hazards, as demonstrated in deployments where D* reduced navigation time in cluttered environments by prioritizing low-risk routes. Overall, these features make D* a cornerstone for safe, adaptive robotic mobility in high-stakes, real-world settings.
+
+Other Domains
+
+In video games, the D* Lite variant of the D* algorithm facilitates efficient pathfinding for non-player characters (NPCs) in dynamic environments, where obstacles or world states change due to player actions or events. For instance, in the RPG Maker MV-based game "Anak Negeri," D* Lite enables NPCs to navigate mazes by incrementally updating paths using heuristic searches like Manhattan distance, achieving 3-7 times faster computation than alternatives such as Generalized Adaptive A* while avoiding both static and dynamic obstacles. This adaptability makes D* Lite suitable for real-time NPC behaviors in open-world or strategy games, reducing replanning overhead in large, evolving maps.
+In logistics, D* supports warehouse automation and drone routing by enabling real-time replanning around variable obstacles, such as moving inventory or temporary blockages. For autonomous unmanned aerial vehicles (UAVs) in delivery systems, D* optimizes 3D paths in urban settings, incorporating sensor data for dynamic obstacle avoidance and improving route efficiency by up to 92% while reducing collision rates by 5% compared to A* or RRT*.
+D* finds use in simulations for military planning and traffic modeling, where it handles real-time updates to environmental changes. In military contexts, extensions of D* address the Dynamic Military Unit Path Finding Problem (DMUPFP), integrating constraint programming to coordinate unit movements across terrains with risks like enemy positions or difficult passages, outperforming static planners in adaptive scenarios. For traffic modeling, D* enables incremental shortest path computations in dynamic transportation networks, reusing prior search data to simulate evolving conditions like congestion or road closures, thus supporting scalable urban flow predictions.
+Adaptations of D* extend its utility to large-scale graphs through parallel processing and heuristic enhancements. GPU-accelerated implementations parallelize priority queue operations inherent to D*, allowing efficient handling of expansive dynamic graphs in simulations, though primarily demonstrated via related algorithms like parallel A* variants that inform D* optimizations. Integration with machine learning improves D*'s heuristics by training neural networks on grid-based data to predict better distance estimates, reducing search expansions in complex environments akin to those in pathfinding benchmarks.
+In the 2020s, D* variants like D* Lite have been incorporated into autonomous driving software stacks for local path replanning amid uncertain traffic. For example, hybrid approaches combining D* Lite with sampling methods such as RRT* generate feasible trajectories in real-time, enhancing safety in dynamic road scenarios by quickly adapting to detected changes. These extensions appear in perception-planning pipelines, borrowing D*'s incremental updates to balance computational efficiency and optimality in urban navigation.
+
+References
+
+ The D*Algorithm for Real-Time Planning of Optimal Traverses
+
+ The Focussed D* Algonthm for Real-Time Replanning - IJCAI
+
+ D* Lite - Donald Bren School of Information and Computer Sciences
+
+ The Field D* Algorithm for Improved Path Planning and Replanning ...
+
+ Optimal and Efficient Path Planning for Unknown and Dynamic ...
+
+ astar.pdf - Stanford AI Lab
+
+https://ieeexplore.ieee.org/document/351061
+
+None
+
+ D* Lite - The Association for the Advancement of Artificial Intelligence
+
+A Survey of Path Planning Algorithms for Mobile Robots - MDPI
+
+ Global Path Planning on Board the Mars Exploration Rovers
+
+D-Star Panorama by Opportunity - NASA Science
+
+Path Planning for Autonomous Mobile Robots: A Review - MDPI
+
+ DEVELOPMENT OF PATHFINDING USING A-STAR AND D-STAR ...
+
+Optimizing Autonomous UAV Navigation with D* Algorithm for ...
+
+A Constraint Programming Solution for the Military Unit Path Finding ...
+
+ Shortest Path Algorithms for Dynamic Transportation Networks
+
+ Massively Parallel A* Search on a GPU
+
+ Learning heuristics for A* - arXiv
+
+Efficient path planning for autonomous vehicles based on RRT* with ...
+
+Path planning algorithms in the autonomous driving system
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

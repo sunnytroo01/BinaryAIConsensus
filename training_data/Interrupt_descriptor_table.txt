@@ -1,0 +1,288 @@
+Interrupt descriptor table Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Interrupt descriptor table
+ Ara Eve Leo Sal 
+1x
+ The Interrupt Descriptor Table (IDT) was introduced with the Intel 80286 microprocessor in 1982 to support protected mode interrupt handling. It is a system data structure in the x86 architecture used by the processor to handle interrupts and exceptions, associating each of the 256 possible interrupt vectors (numbered 0 through 255) with a specific handler routine or task through descriptors that specify the segment selector, offset, and attributes for control transfer. In protected mode and IA-32e mode, the IDT resides in memory and is accessed via the IDTR register, which stores the table's base address and limit; it supports up to 256 entries of 8 bytes each (totaling 2 KB) in protected mode or 16 bytes each in 64-bit mode to accommodate 64-bit offsets.
+The IDT's primary purpose is to provide an efficient mechanism for the operating system to manage hardware interrupts (such as from devices), software interrupts (invoked via instructions like INT n), processor-detected exceptions (like page faults), and traps, enabling the processor to transfer control to the appropriate memory-resident procedure or task upon event occurrence. Vectors 0 through 31 are reserved for processor exceptions and non-maskable interrupts (NMI, at vector 2), while vectors 32 through 255 are available for maskable hardware interrupts, software interrupts, or use by the Advanced Programmable Interrupt Controller (APIC). The table must be initialized by the operating system using the LIDT instruction (requiring current privilege level 0) before interrupts are enabled, with empty or unused entries required to have the present (P) flag cleared to 0 to prevent general-protection exceptions (#GP) on invalid vector references.
+Each IDT entry is a gate descriptor, of which there are three types: interrupt gates, which transfer control to a handler and automatically clear the interrupt flag (IF) to disable further maskable interrupts; trap gates, which perform the transfer without affecting IF and are used for debugging or certain exceptions; and task gates, which initiate a task switch via a Task State Segment (TSS) but are not supported in IA-32e mode. Descriptors include privilege controls via the descriptor privilege level (DPL) for security checks, support for inter-privilege-level calls with stack switching, and alignment on an 8-byte boundary, with the limit set to 8N 1 for N entries. In real mode, a simpler Interrupt Vector Table (IVT) at physical address 0 is used for interrupt handling, while the IDT extends these capabilities in protected mode for segmented memory and larger address spaces.
+
+Introduction
+
+Definition and Purpose
+
+The Interrupt Descriptor Table (IDT) is a system data structure in the x86 architecture, consisting of an array of up to 256 entries that map interrupt vectors numbered from 0 to 255 to corresponding gate descriptors. Each entry in the IDT defines the segment selector, offset, and attributes for an interrupt or exception handler procedure or task, allowing the processor to reference these descriptors during event processing. The table's location and size are specified by the Interrupt Descriptor Table Register (IDTR), which holds the base linear address and limit of the IDT.
+The primary purpose of the IDT is to provide a mechanism for the processor to locate and invoke appropriate service routines in response to interrupts and exceptions, ensuring orderly handling of system events. It supports hardware interrupts from external devices, software interrupts initiated by the INT instruction, and processor-generated exceptions including faults, traps, and aborts. By associating each vector with a gate descriptorsuch as an interrupt gate, trap gate, or task gatethe IDT enables controlled transfers of execution while enforcing protection rules like privilege levels.
+In the x86 architecture, the IDT has been central to protected-mode interrupt handling since its introduction with the Intel 80286 processor, where it superseded the simpler real-mode Interrupt Vector Table by incorporating segmented addressing and privilege checks. Upon occurrence of an interrupt or exception, the processor uses the event's vector number as an index into the IDT (multiplied by 8 to locate the entry), retrieves the associated descriptor, and transfers control to the specified handler or task accordingly. This process maintains system integrity by validating the descriptor's presence and attributes before execution.
+
+Historical Context
+
+The Interrupt Vector Table (IVT) originated with the Intel 8086 microprocessor in 1978, serving as the foundational mechanism for interrupt handling in real mode. It occupied a fixed memory region from physical address 0x0000 to 0x03FF, comprising 256 entries of four bytes eacha 16-bit offset followed by a 16-bit code segment selectorenabling direct jumps to interrupt service routines within the 1 MB address space.
+The Interrupt Descriptor Table (IDT) emerged with the Intel 80286 in 1982, marking a pivotal shift to protected mode and addressing the IVT's limitations in supporting advanced operating system features. Unlike the IVT's static location, the IDT's base address and limit were managed dynamically via the IDTR register, with each of its 256 entries expanded to eight bytes to incorporate gate types (task, interrupt, and trap) and segment selectors, facilitating segmented memory addressing and privilege-level checks. This evolution was primarily driven by the demand for memory protection to isolate processes and prevent unauthorized access, as well as hardware-assisted multitasking to enable efficient context switching in multi-user environments, overcoming real mode's 1 MB address ceiling and lack of security mechanisms.
+Subsequent enhancements in the Intel 80386 (1985) solidified the IDT's role by fully supporting 256 vectors with refined trap and interrupt gates, accommodating 32-bit offsets for broader addressability and improved exception handling in segmented environments. The transition to 64-bit computing via the AMD64 architecture in 2003 extended IDT entries to 16 bytes in long mode, incorporating 64-bit offsets while restricting gate types to 64-bit interrupt and trap variants, thus enabling robust interrupt redirection and stack management for larger virtual address spaces. These developments were essential for modern operating systems such as Windows NT and Linux, which rely on the IDT for secure interrupt isolation and multitasking, while preserving real-mode IVT compatibility to support legacy BIOS and DOS applications.
+
+IDT Structure
+
+Overall Organization
+
+The Interrupt Descriptor Table (IDT) is organized as a linear array of up to 256 entries in memory, where each entry corresponds to an interrupt or exception vector and points to the address of the associated handler routine. This structure allows the processor to quickly locate and invoke the appropriate service routine upon receiving an interrupt vector number. The table's fixed maximum size ensures efficient indexing without requiring dynamic allocation during interrupt processing.
+In protected mode, each IDT entry occupies 8 bytes, resulting in a maximum table size of 2 KB for 256 entries. In long mode (IA-32e), entries are expanded to 16 bytes to support 64-bit addressing, yielding a maximum size of 4 KB. The operating system determines the actual number of populated entries, but the table is designed to accommodate the full range even if only a subset is used.
+The location and size of the IDT are managed by the Interrupt Descriptor Table Register (IDTR), a dedicated processor register that holds the linear base address of the table and its limit in bytes. In protected mode, the IDTR is a 48-bit structure (6 bytes total), comprising a 32-bit base address and a 16-bit limit field. In long mode, it extends to 80 bits (10 bytes), with the base address widened to 64 bits while retaining the 16-bit limit. This register enables the processor to access the IDT from any position in the linear address space.
+The processor indexes into the IDT using an 8-bit vector number ranging from 0 to 255, which serves as the entry index and is scaled by the entry size (8 bytes in protected mode or 16 bytes in long mode) to compute the offset from the base address. This mechanism supports sparse population, where unused entries can be left undefined or marked to generate a trap if accessed, allowing flexible allocation without requiring contiguous filling of the table.
+The operating system allocates the IDT in kernel linear address space, typically placing it in a protected memory region to prevent user-mode access. The IDTR limit must be set to at least 255 bytes in protected mode (to cover the first 32 exception vectors, each 8 bytes) or 511 bytes in long mode (for 16-byte entries), though full population requires limits of 2047 bytes or 4095 bytes, respectively, to encompass all 256 entries.
+
+Descriptor Format
+
+Each entry in the Interrupt Descriptor Table (IDT) is a gate descriptor that specifies the location and type of handler for an interrupt or exception. In protected mode, these descriptors are 8 bytes long and consist of several key fields that define the handler's address, target segment, and access attributes.
+The protected mode descriptor format includes the following bit fields: bits 0-15 hold the low 16 bits of the handler offset; bits 16-31 contain the segment selector for the code segment containing the handler; bits 32-47 are reserved (must be zero for interrupt and trap gates); bits 48-51 specify the gate type (with values 14 for interrupt gates and 15 for trap gates); bit 52 is reserved (zero); bits 53-54 indicate the Descriptor Privilege Level (DPL); bit 55 is the Present (P) flag; and bits 56-63 hold the high 16 bits of the handler offset. For task gates (type 5), the segment selector points to a Task State Segment (TSS) instead of a code segment, and offset fields are reserved.
+In long mode (IA-32e), descriptors are extended to 16 bytes to support 64-bit addressing and additional features. The layout builds on the protected mode format but includes: bits 0-15 for offset low (15:0); bits 16-31 for segment selector; bits 32-35 for the Interrupt Stack Table (IST) index (0-7, with 0 indicating no IST); bits 36-39 reserved (zero); bits 40-43 for type (14 for interrupt gate, 15 for trap gate); bit 44 reserved; bits 45-46 for DPL; bit 47 for P; bits 48-63 for offset middle (31:16); bits 64-95 for offset high (63:32); and bits 96-127 reserved (zero). Task gates are not supported in long mode.
+Gate types determine handler behavior: an interrupt gate (type 14) clears the Interrupt Flag (IF) in EFLAGS to disable maskable hardware interrupts during execution, suitable for hardware interrupts; a trap gate (type 15) preserves the IF flag, allowing nested interrupts and used for software exceptions or debugging; a task gate switches to a new task via the referenced TSS but is rarely used after the 80386 due to the deprecation of task management in modern systems.
+Attribute flags control validity and access: the P flag (bit 55 in protected mode, bit 47 in long mode numbering) must be 1 for the descriptor to be valid, or a not-present (#NP) exception occurs; the DPL (bits 53-54 in protected mode, bits 45-46 in long mode) specifies the minimum privilege level (0 highest to 3 lowest) required for invocation, enforcing ring checks to prevent less-privileged code from triggering higher-privilege handlers.
+Invalid descriptors, such as those with P=0 (triggering #NP), non-zero reserved bits, or invalid types, trigger a general-protection (#GP) fault during interrupt dispatch for the latter cases. The full handler offset is assembled as (offset_high << 32 | offset_middle << 16 | offset_low) in long mode or (offset_high << 16 | offset_low) in protected mode, forming the entry point into the target code segment.
+FieldProtected Mode BitsLong Mode BitsDescription
+Offset Low0-150-15Lower 16 bits of 32/64-bit handler address
+Segment Selector16-3116-31Index into GDT/LDT for code/TSS segment
+Reserved/IST32-47 (reserved=0)32-39 (IST index 0-7)Stack table index in long mode; reserved otherwise
+Type48-51 (e.g., 14=0xE, 15=0xF, 5=0x5)40-43 (e.g., 14=0xE, 15=0xF, 9=0x9)Defines gate behavior (interrupt, trap, task)
+DPL53-54 (0-3)45-46 (0-3)Privilege level for access control
+P55471 if descriptor present
+Offset High/Middle56-63 (31:16)48-63 (31:16), 64-95 (63:32)Upper bits of handler address
+ReservedN/A (beyond 63)96-127 (=0)Must be zero for compatibility
+
+Operating Modes
+
+Real Mode
+
+In real mode, the x86 architecture employs the Interrupt Vector Table (IVT) as the functional equivalent of the Interrupt Descriptor Table (IDT), providing a simple mechanism for interrupt handling without the segmentation or protection features of protected mode. The IVT is fixed at physical memory addresses 00000h to 003FFh, occupying the first 1 KB of RAM and consisting of 256 entries, each 4 bytes in length. Each entry comprises a 2-byte segment selector followed by a 2-byte offset, forming a far pointer to the interrupt handler routine in the 1 MB real-address space; unlike protected-mode descriptors, these entries do not include gates, selectors, or attribute fields such as type, privilege level, or present bit.
+The LIDT instruction, which loads the base address and limit into the IDT register (IDTR), behaves differently in real mode compared to protected mode. In real mode, the base address is ignored, as the IVT remains fixed at address 0, while the limit must be set to exactly 03FFh to match the 1 KB table size; any other limit value leads to undefined behavior during interrupt processing. When an interrupt occurs, the processor uses the vector number (0 to 255) to index the IVTmultiplying the vector by 4 to locate the entrythen fetches the segment:offset pair and transfers control directly to that address after pushing the current flags, code segment (CS), and instruction pointer (IP) onto the stack in 16-bit format. This direct jump lacks any validation, allowing interrupts to execute code anywhere within the 1 MB address space.
+Real mode imposes significant limitations on interrupt handling due to its simplified design. Without privilege levels or ring protections, any interrupt vector can access and potentially corrupt critical system areas, such as kernel code, if not properly handled, as there are no mechanisms to enforce access controls or stack switching. The addressing model is constrained to 20-bit physical addresses (up to 1 MB), with 16-bit offsets limiting handler reach without additional segmentation tricks, and no support for 32-bit code or data in standard configurations. These constraints make real mode suitable only for legacy or initialization environments.
+For compatibility with early x86 systems, the IVT is integral to bootloaders, which initialize vectors during power-on self-test (POST) to set up basic handlers before transitioning modes, and to MS-DOS, where applications hook IVT entries to extend functionality without kernel privileges. BIOS services, provided by firmware in low memory (typically F0000h to FFFFFh), are invoked via software interrupts using the IVT; for example, INT 10h accesses video services like mode setting or character output by vectoring to the BIOS handler at IVT offset 40h (10h * 4). This structure ensures backward compatibility for 16-bit code in environments like DOS but requires careful vector management to avoid conflicts.
+
+Protected Mode
+
+In protected mode, the interrupt descriptor table (IDT) consists of 256 entries, each 8 bytes in length, that define the location and access rights for interrupt and exception handlers. Each entry includes a 16-bit segment selector that references a code segment descriptor in the global descriptor table (GDT) or local descriptor table (LDT), along with a 32-bit offset that specifies the entry point of the handler within that segment, forming a linear address as CS:EIP. The entries can be task gates, interrupt gates, or trap gates; interrupt and trap gates directly invoke the handler routine, while task gates trigger a task switch via a task state segment (TSS). This structure enables the processor to support segmented memory addressing, distinguishing protected mode from real mode's flat model.
+Privilege enforcement is integral to IDT operations in protected mode, where the descriptor privilege level (DPL) of a gate is compared against the current privilege level (CPL) of the interrupted task. For software interrupts (such as INT n or INT 3), a general protection fault (#GP) is generated if the CPL exceeds the DPL, preventing less privileged code from invoking higher-privilege handlers; however, this check is bypassed for hardware interrupts and processor exceptions to ensure reliable error handling. Interrupt gates additionally clear the interrupt flag (IF) in EFLAGS upon entry to mask further interrupts, whereas trap gates preserve IF to allow nested interrupts or traps. The segment selector undergoes standard checks for validity, including conforming or non-conforming code segment rules, to maintain isolation between privilege rings.
+When an interrupt or exception occurs, the processor saves the current state on the stack, pushing EFLAGS, CS, and EIP; if a privilege-level change is required, it also pushes SS and ESP from the appropriate TSS stack pointer. The handler is then loaded by combining the segment selector and offset from the IDT entry, with the processor switching stacks if entering a more privileged level to isolate execution contexts. Certain exceptions (vectors 0 through 31) may push an error code immediately after EIP for diagnostic purposes, such as segment faults. Execution returns via the IRET instruction, which restores the saved state, including EFLAGS, while re-enabling interrupts only if the original IF was set (for interrupt gates, this occurs after the handler clears the mask if needed). These mechanisms provide multitasking isolation and protection not available in real mode, with vectors 0-31 reserved exclusively for processor-defined exceptions to enforce system integrity.
+
+Long Mode
+
+In long mode, the Interrupt Descriptor Table (IDT) supports 64-bit operation within the x86-64 architecture, utilizing 16-byte gate descriptors to handle interrupts and exceptions across the full 64-bit linear address space. Each descriptor includes a 64-bit offset to the handler code with bits 15:0 in bytes 01, bits 31:16 in bytes 67, and bits 63:32 in bytes 811, along with a 16-bit code-segment selector, a 3-bit Interrupt Stack Table (IST) index, and attribute fields specifying the gate type (interrupt or trap), descriptor privilege level (DPL, 2 bits), and present bit. This format enables a flat memory model without code-segment base addresses, differing from segmented addressing in 32-bit protected mode, and eliminates support for task gates to streamline hardware behavior.
+The IST field provides a mechanism for automatic stack switching during interrupt delivery, referencing one of up to seven 64-bit stack pointers stored in the Task State Segment (TSS); an IST index of zero uses the current stack, while non-zero values load a dedicated kernel stack to prevent overflows from nested interrupts or exceptions, such as double faults or machine checks. Interrupt gates clear the IF flag in RFLAGS upon entry to disable further maskable interrupts during handler execution, ensuring atomicity, while trap gates leave IF unchanged to allow nesting. The 256 vectors (0-255) align with protected mode assignments but generate #SS stack faults for invalid stack conditions in 64-bit contexts. Handlers execute in 64-bit code segments (with CS.L=1 and CS.D=0), typically using a fixed kernel code selector like 0x08, and the processor pushes an 8-byte stack frame comprising SS, RSP, RFLAGS, CS, and RIP unconditionally upon entry.
+Returning from handlers employs the IRETQ instruction, which pops the stack frame in reverse orderRIP, CS, RFLAGS, RSP, SSrestoring the 64-bit processor state and re-enabling interrupts if the saved RFLAGS.IF was set. If the return targets compatibility mode (a 32-bit code segment with CS.L=0), the handler can invoke legacy 32-bit code, maintaining backward compatibility for mixed environments, though all IDT entries must use 64-bit offsets in canonical form to avoid general-protection faults. In operating systems such as 64-bit Linux and Windows, the IDT emphasizes IST usage for reliable nesting; for instance, Linux configures IST entries in the TSS for vectors like 8 (double fault) and 2 (NMI) to switch to per-CPU emergency stacks, while Windows employs similar mechanisms in its kernel for exception handling without task-state segment switches.
+
+Setup and Initialization
+
+Loading the IDT
+
+The loading of the Interrupt Descriptor Table (IDT) into the processor's Interrupt Descriptor Table Register (IDTR) is a critical step performed by the operating system kernel during early initialization, typically after the Global Descriptor Table (GDT) has been established. This process establishes the location and size of the IDT in memory, enabling the CPU to reference it for interrupt and exception handling in protected mode. The IDTR, a special register, holds the linear base address of the IDT and its limit (the size minus one).
+The LIDT (Load Interrupt Descriptor Table) instruction is used exclusively for this purpose, with the syntax LIDT , where the operand is a 6-byte structure in the format specified by the Intel architecture: the first word (16 bits) contains the limit, followed by the base address (32 bits in IA-32 mode or 64 bits in long mode). The instruction loads these values directly into the IDTR without segment translation, making it one of the few operations that handle linear addresses in protected mode. For a complete IDT supporting 256 vectors, the limit is set to 0x7FF (2047 bytes) in IA-32 protected mode, where each descriptor is 8 bytes (256 8 = 2048 bytes total), or 0xFFF (4095 bytes) in long mode, where descriptors are 16 bytes each.
+In real mode, the IDT is not used; instead, the fixed Interrupt Vector Table (IVT) at physical address 0x00000000 handles interrupts, and the LIDT instruction primarily serves to load the limit value, with the base address being ignored by the processor. No explicit LIDT execution is required for basic real-mode operation beyond verifying the limit, but it may be invoked during the transition to protected mode.
+A typical initialization sequence in the kernel involves allocating a contiguous block of kernel-accessible memory for the IDT, zero-initializing the entries to prevent undefined behavior, computing the IDTR values (e.g., base as the linear address of the allocated memory and limit as 0xFFF for a full table in long mode), and then issuing the LIDT instruction to load them. This occurs very early in the boot process, often within the initial kernel entry point, to ensure interrupts are properly vectored before enabling additional hardware or user code. For example, in assembly or inline code, an IDT pointer structure is prepared and passed to LIDT as follows:
+lidt 
+where idtr_ptr points to the 6-byte (or 10-byte in 64-bit mode) descriptor.
+If the limit is invalid (e.g., zero or exceeding mode-specific maxima), the LIDT instruction triggers a general protection exception (#GP) immediately. In protected mode, the base address should ideally be page-aligned (multiples of 4096 bytes) to optimize memory management with paging enabled, though the CPU does not enforce this alignment strictly. Execution of LIDT requires kernel privilege level (CPL=0); otherwise, it raises #GP.
+
+Configuring Descriptors
+
+Configuring an IDT descriptor involves populating its fields to define the interrupt handler's location, privilege level, and behavior, typically after the IDT has been allocated and loaded into the IDTR. For a standard 32-bit protected mode interrupt gate, the offset field is set to the linear address of the handler routine, the selector field points to the kernel code segment (e.g., index 8 in the GDT, yielding selector 0x08), the type field is configured as 0x8E (indicating a 32-bit interrupt gate with present bit set, DPL=0 for kernel-only access, and interrupt flag clearing), and the present bit is asserted to 1. This assembly ensures the processor clears the interrupt flag (IF) upon entry, preventing nested interrupts unless explicitly re-enabled.
+In operating systems like Linux, descriptors are configured using kernel functions such as set_intr_gate, which initializes the entry with the handler address, kernel code selector (__KERNEL_CS), type 14 (GATE_INTERRUPT, corresponding to 0x8E in the low byte with DPL=0 and present=1), and DPL=0 for ring 0 access. Inline assembly can also be used to directly write the 8-byte descriptor structure into memory, packing the offset into bits 15-0 and 47-32, selector into bits 55-40, and attributes (including type 0x8E) into bits 39-32 and 63-56. In long mode (64-bit), descriptors expand to 16 bytes, with the offset becoming a full 64-bit value split across the structure, and an additional 3-bit IST (Interrupt Stack Table) index field (bits 31-0 of the high doubleword) specifying an entry in the TSS for stack switching on critical interrupts like NMIs. Linux employs variants like set_nmi_gate with ISTG macros to set this index (e.g., IST_INDEX_NMI) for vectors requiring isolated stacks.
+Validation of configured descriptors includes verifying the present bit is set to 1 (otherwise triggering a #NP exception), confirming the selector indexes a valid executable code segment in the GDT with conforming access rights, and ensuring the DPL matches the intended privilege (e.g., 0 for kernel handlers). In long mode, the offset must form a canonical address to avoid #GP faults. Functionality can be tested by issuing CLI (clear IF) and STI (set IF) instructions around handler invocations to observe interrupt masking behavior, confirming the gate type's effect on the flags register.
+Dynamic updates to individual descriptors require kernel privilege (CPL=0) and involve first using the SIDT instruction to store the IDTR contents, retrieving the base address of the IDT. The target entry's memory location is then computed as base + (vector_number entry_size), where entry_size is 8 bytes in 32-bit modes or 16 bytes in long mode, allowing direct overwrite of the descriptor fields with new values. Post-update, the processor automatically uses the modified entry on the next interrupt without requiring IDTR reload, though atomicity must be ensured to avoid partial reads during handler dispatch.
+
+Interrupt Vectors and Assignments
+
+Exceptions
+
+The Interrupt Descriptor Table (IDT) reserves the first 32 vectors (0 through 31, or 0h to 1Fh) for processor exceptions and the nonmaskable interrupt (NMI at vector 2) in x86 architectures. These include synchronous events triggered by the CPU itself during instruction execution or due to internal errors. These exceptions are categorized into three types: faults, traps, and aborts, each with distinct handling behaviors to maintain system integrity. Faults occur before the completion of the faulting instruction and are restartable, allowing the processor to resume execution from the original instruction pointer after the handler returns; examples include the divide error (#DE, vector 0) and page fault (#PF, vector 14). Traps, in contrast, are reported after the trapping instruction completes, enabling execution to continue at the subsequent instruction without restart; representative cases are the breakpoint exception (#BP, vector 3) and overflow (#OF, vector 4). Aborts represent severe, often unrecoverable conditions where program state may be lost and restart is impossible, such as the machine check exception (#MC, vector 18) or double fault (#DF, vector 8).
+Certain exceptions push a 32-bit error code onto the stack immediately after the return address, providing diagnostic information to the handler; this applies to vectors like #TS (10, invalid TSS), #NP (11, segment not present), #SS (12, stack segment fault), #GP (13, general protection), #PF (14, page fault), and #AC (17, alignment check). For the page fault (#PF), the error code encodes bits indicating whether the fault was due to a present/not-present page (P), read/write access (W/R), user/supervisor mode (U/S), and other attributes like instruction fetch (I) or protection key (PK); additionally, the processor loads the faulting linear address into the CR2 register for handler use, though CR2 is not pushed onto the stack. Not all exceptions generate error codesfor instance, #DE (vector 0) and #BP (vector 3) do notrequiring handlers to infer causes from context or registers. The double fault exception (#DF, vector 8) is unique as an abort triggered by a second exception (often a contributory fault or page fault) during the handling of a prior one; it pushes an error code of 0 and uses a dedicated double-fault stack (via the task state segment) to avoid recursion, but if unhandled, it escalates to a triple fault, invoking a processor reset or shutdown.
+Operating systems must install valid IDT descriptors (typically interrupt or trap gates) for all vectors 0-31 to ensure reliable exception handling, as failure to do so risks unrecoverable triple faults and system instability. In practice, modern OS kernels like Linux implement comprehensive exception tablesarrays mapping faulting instruction addresses to fixup codethat allow handlers (e.g., for #PF) to search for and execute recovery routines, such as returning -EFAULT for invalid user-space accesses, thereby emulating safe fault resolution without full restarts. This setup prioritizes precise exception classification and minimal disruption, with trap gates used for debug-oriented traps like #BP to preserve interrupt flags.
+
+Hardware Interrupts
+
+Hardware interrupts, also known as external interrupts, are asynchronous signals generated by hardware devices to request service from the CPU, with the Interrupt Descriptor Table (IDT) providing the entry points for their handlers via specific vectors. In systems using the legacy 8259 Programmable Interrupt Controller (PIC), interrupt requests (IRQs) from devices are prioritized and remapped to IDT vectors in the range 0x20 to 0x2F to avoid overlap with exception vectors (0x00 to 0x1F). The master PIC handles IRQs 0-7, mapping them to vectors 0x20-0x27, while the slave PIC manages IRQs 8-15, mapping to 0x28-0x2F, with the slave cascaded through the master's IRQ 2.
+In modern systems employing the Advanced Programmable Interrupt Controller (APIC) or its extensions like x2APIC, hardware interrupts use vectors starting from 0x30 for local APIC interrupts, with the full range extending up to 0xFF (255 vectors total) for greater flexibility and scalability. The I/O APIC routes device IRQs to these vectors, while the local APIC handles internal events, allowing programmable assignment beyond the fixed PIC scheme.
+The handling process begins when a device asserts its IRQ line, prompting the PIC or APIC to prioritize the request and deliver the corresponding vector number to the CPU via the APIC interface or INTA cycle. The CPU then uses this vector as an index into the IDT to locate and invoke the interrupt gate or task gate descriptor, transferring control to the handler routine. Upon completion, the handler issues an End-of-Interrupt (EOI) command to the controllervia port 0x20 for the master PIC, 0xA0 for the slave, or the APIC's EOI registerto clear the interrupt request and re-enable the line for future events.
+Priority management ensures orderly handling: in the 8259 PIC, priorities are fixed in hardware with IRQ 0 (typically the system timer) as the highest and IRQ 7 as the lowest, resolved by a daisy-chain mechanism if multiple IRQs are pending. The APIC, in contrast, supports programmable priorities through registers like the Task Priority Register (TPR), allowing software to adjust levels dynamically for better control in multiprocessor environments. Interrupt nesting is facilitated by interrupt gates, which automatically clear the Interrupt Flag (IF) in the EFLAGS register to disable maskable interrupts during handler execution, preventing lower-priority interruptions until the handler re-enables IF or issues EOI.
+Representative examples include the system timer on IRQ 0, mapped to vector 0x20 in PIC systems or a programmable vector like 0x31 in APIC configurations for periodic timing events, and the keyboard controller on IRQ 1, using vector 0x21 or 0x32 to signal key presses. These mappings ensure that critical hardware events, such as timing and input, integrate seamlessly with the IDT for efficient CPU response.
+
+Software Interrupts
+
+Software interrupts in the x86 architecture are explicitly generated by software instructions to invoke handlers defined in the Interrupt Descriptor Table (IDT), allowing controlled transitions to privileged code such as operating system services. The primary mechanism is the INT n instruction, where n is an 8-bit immediate value specifying the interrupt vector (0 to 255), which serves as an index into the IDT to locate the corresponding gate descriptor. Upon execution, the processor pushes the current values of the EFLAGS register (including the direction flag for string operations), the code segment selector (CS), and the instruction pointer (EIP or RIP) onto the stack; if the interrupt causes a privilege-level change (e.g., from user to kernel mode), it additionally pushes the stack segment selector (SS) and stack pointer (ESP or RSP) before the others. The processor then loads the handler's code segment and offset from the IDT entry and jumps to it, with the saved CS:EIP/RIP pointing to the instruction immediately following the INT n.
+A specialized form is the INT 3 instruction (opcode 0xCC), a one-byte breakpoint interrupt that generates vector 3 to invoke a debug handler, commonly used for software breakpoints in debugging tools without requiring hardware support. Unlike general INT n, INT 3 is treated as a trap-class event, allowing single-stepping through the breakpoint itself if desired. To return from a software interrupt handler, the IRET (or IRETQ in 64-bit mode) instruction pops the stack in reverse orderrestoring EIP/RIP, CS, EFLAGS (which reinstates the original direction flag, preserving its state for instructions like string moves), and if applicable, SS and ESP/RSPthus returning control to the interrupted code while maintaining processor state integrity.
+Historically, software interrupts have been widely used for operating system interactions, such as system calls in legacy environments. In MS-DOS, the INT 21h (vector 0x21) provided a multipurpose interface for services like file I/O, program execution, and keyboard input, with the AH register specifying the subfunction. Similarly, early Linux kernels on 32-bit x86 employed INT 0x80 (vector 128) as the primary syscall entry point, where the syscall number in EAX selected the kernel routine, passing arguments via registers; this legacy path remains supported for compatibility in modern kernels via the entry_INT80_compat handler. Vectors from 0x80 (128) to 0xFF (255) are typically reserved for user-defined software interrupts, as lower vectors (0-31) are dedicated to processor exceptions and non-maskable interrupts.
+In contemporary systems, however, the INT instruction for syscalls has been largely deprecated in favor of dedicated instructions like SYSCALL and SYSRET in 64-bit long mode, which offer faster context switching by avoiding full IDT gate traversals and stack manipulations for privilege changes, reducing latency in high-frequency operations. These modern alternatives, introduced with AMD64 extensions and adopted by Intel, bypass the overhead of interrupt gates (often configured as trap gates for software events) while maintaining security through model-specific registers for kernel entry points. INT remains relevant for debugging (e.g., INT 3) and legacy compatibility but is avoided in performance-critical paths due to its slower entry and exit compared to SYSCALL.
+
+Common Layouts and Examples
+
+Standard x86 Layout
+
+The standard x86 layout for the Interrupt Descriptor Table (IDT) follows Intel's recommended assignments for the 256 available interrupt vectors, reserving the lowest numbers for processor exceptions to ensure priority handling of critical events. Vectors 0 through 31 are dedicated to exceptions, such as vector 0 for the #DE (divide error) exception triggered by division by zero or overflow, and vector 14 for the #PF (page fault) exception occurring on invalid memory access. Vectors 32 through 47 (hexadecimal 20h to 2Fh) are assigned to hardware interrupts from the legacy Programmable Interrupt Controller (PIC), mapping IRQ lines 0 through 15; for instance, vector 32 corresponds to IRQ0, typically handled by the system timer to avoid conflicts in multi-vendor hardware environments. The remaining vectors 48 through 255 are available for operating system-defined interrupts or device-specific uses, providing extensibility for modern systems.
+This layout is summarized in the following table:
+Vector RangePurposeExamples/Notes
+031Processor exceptions0: #DE (divide error); 14: #PF (page fault)
+3247 (20h2Fh)Hardware interrupts (PIC IRQs)32 (IRQ0): System timer handler
+48255OS/device-defined interruptsAvailable for custom assignments
+
+The rationale for this assignment prioritizes low vectors for exceptions to prevent overlap with software or hardware interrupts, enabling efficient prioritization and orderly handling across processor-detected events and external sources. Higher vectors support extensibility, accommodating growth in interrupt sources without disrupting core functionality.
+In variations from the basic PIC-based layout, the Advanced Programmable Interrupt Controller (APIC) architecture utilizes vectors 16 through 255 for inter-processor interrupts (IPIs), delivered via the Interrupt Command Register in fixed or NMI modes to facilitate multi-core communication. Message-signaled interrupts (MSIs), common in PCI devices, are programmable within vectors 48 through 255 (often 010h to 0FEh), using memory writes for interrupt signaling to enhance scalability in high-performance systems.
+
+IBM PC Specifics
+
+In the original IBM PC (Model 5150), a single 8259 Programmable Interrupt Controller (PIC) was employed, mapping its eight interrupt requests (IRQs 0 through 7) to interrupt vectors 08h through 0Fh in the Interrupt Vector Table (IVT). This configuration directly overlapped with the lower range of x86 processor exceptions (00h through 1Fh), creating potential conflicts since exceptions like double fault (08h) and coprocessor segment overrun (0Dh) shared the same vectors. To mitigate this in operating systems transitioning to protected mode, the PIC interrupts are typically remapped by the OS during initialization: IRQs 0-7 to vectors 20h-27h and, for systems with a second PIC, IRQs 8-15 to 28h-2Fh, preserving the exception space.
+This initial mapping led to legacy conflicts in PC-compatible systems, where vectors 08h-0Fh were dedicated to the original 8259 PIC hardware interrupts, while the BIOS reserved vectors 10h-1Fh for essential ROM routines, such as video services (10h) and disk I/O (13h). Specific examples include IRQ4 for asynchronous communications (e.g., COM ports) initially assigned to vector 0Ch, IRQ6 for the floppy disk controller at 0Eh, and IRQ7 for the parallel printer at 0Fh, all of which could interfere with exception handling if not managed. Modern operating systems maintain compatibility mode support for DOS applications by preserving these original vector assignments in real mode or through emulation, ensuring legacy software can invoke hardware interrupts without modification.
+The evolution to the IBM PC AT (Model 5170) introduced a second cascaded 8259A PIC as a slave controller connected via the master's IRQ2 (vector 0Ah), expanding to 16 IRQs while addressing the limitations of the single-PIC design. Initially, the slave PIC's IRQs 8-15 were mapped by the BIOS to vectors 70h-77h to avoid overlap with the BIOS-reserved 10h-1Fh range and potential expansion card conflicts in lower vectors, with examples including IRQ8 for the real-time clock (RTC) at 70h and IRQ14 for the fixed disk controller at 76h. Operating systems subsequently remap the master to 20h-27h and the slave to 28h-2Fh for standardized protected-mode operation, shifting from the AT's initial high-vector placement while retaining backward compatibility.
+
+BIOS Interrupts
+
+In the x86 architecture's real mode environment, BIOS interrupts provide a standardized interface for software to access low-level hardware services during system initialization and early operation. These software interrupts utilize vectors in the range of 10h to 1Fh, which are reserved specifically for BIOS functions, allowing programs to invoke firmware routines without direct hardware manipulation. For instance, vector 10h handles video services, 13h manages disk operations, and 16h processes keyboard input, enabling essential tasks like displaying output or reading storage devices in the absence of a full operating system.
+These interrupts operate exclusively in real mode, where the interrupt vector table (IVT) at memory address 00000h points to handler code stored in read-only memory (ROM) segments starting from F0000h. Parameters are passed via CPU registers, with the AH register typically specifying the sub-function or service code; other registers like AL, BX, CX, and DX carry additional data or receive outputs. A representative example is INT 10h with AH=0Eh, which performs teletype output by writing the character in AL to the active display page, advancing the cursor, and interpreting control codes such as carriage return (CR) or line feed (LF), with BH selecting the page and BL the foreground color in graphics modes. This mechanism ensures compatibility across IBM PC-compatible systems by abstracting hardware variations through firmware.
+BIOS interrupts are inherently limited by real mode constraints, capping addressable memory at 1 MB and restricting access to 16-bit segmented addressing, which becomes inadequate for modern multitasking or large memory environments. Upon transitioning to protected mode, operating systems replace these interrupts with their own drivers and APIs, as the IDT supersedes the IVT and BIOS services are no longer directly invocable without mode switches, which are inefficient and insecure.
+As a legacy component, BIOS interrupts remain relevant in the boot process, where the firmware uses them to perform power-on self-test (POST), initialize hardware, and load the bootloader via INT 19h before handing control to the OS. In contemporary systems adopting UEFI, this reliance diminishes, as UEFI boot services (e.g., EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL for video akin to INT 10h, EFI_BLOCK_IO_PROTOCOL for disk like INT 13h, and EFI_SIMPLE_TEXT_INPUT_PROTOCOL for keyboard like INT 16h) and runtime services provide equivalent functionality through protocol-based calls, eliminating the need for interrupt vectors in favor of a modular, 64-bit capable interface.
+
+Advanced Usage
+
+Interrupt Hooking
+
+Interrupt hooking refers to techniques employed by kernel-level software, such as drivers or rootkits, to intercept and redirect interrupt processing defined in the Interrupt Descriptor Table (IDT). This allows custom code to execute before or instead of the original handler, enabling monitoring, modification, or suppression of interrupt-related events. In x86 architectures, hooking typically involves modifying IDT entries to point to new interrupt service routines (ISRs), often while preserving the original functionality through chaining mechanisms.
+Kernel drivers achieve this by first locating the IDT using the SIDT instruction, which stores the table's base address in the IDTR register. The driver then overwrites the relevant entrytypically an 8-byte gate descriptor on x86-32 or 16-byte on x86-64by updating the offset fields to the address of a custom handler. For example, the low and high offset components are set to form the new ISR address, while preserving the segment selector and attributes for privilege level and type (e.g., interrupt or trap gate). To chain to the original handler and avoid breaking system behavior, the custom ISR saves the context, performs its logic (such as logging or filtering), and jumps or calls the original routine before returning. This is common for IRQ filters, where the hook inspects interrupt sources before dispatching. In Linux, loadable kernel modules (LKMs) facilitate such modifications directly in kernel space.
+On Windows, direct IDT hooking targets hardware interrupts, such as INT 0x2E for legacy system calls, by altering IDT pointers to malicious or custom ISRs, often requiring per-processor updates since each CPU maintains its own IDT. However, for syscall interception, developers more commonly hook the System Service Dispatch Table (SSDT), accessed via the kernel variable KeServiceDescriptorTable, which maps syscall indices to handlers after the initial interrupt (e.g., via SYSENTER or SYSCALL instructions). This indirect approach modifies the dispatch table in ntoskrnl.exe to redirect specific services like NtQueryDirectoryFile, allowing result filtering without altering the IDT itself. SSDT hooking requires disabling write protection in the CR0 register or using memory descriptor lists (MDLs) to map pages writable.
+These methods carry significant risks, including system instability from improper context handling, such as stack corruption or deadlocks during nested interrupts, potentially leading to kernel panics. In 64-bit Windows, Kernel Patch Protection (PatchGuard) actively scans for IDT modifications and other kernel alterations, invoking a Blue Screen of Death (BSOD) upon detection to enforce integrity.
+Alternatives to direct IDT hooking include virtualization-based interception, where a virtual machine monitor (VMM) using Intel VT-x (VMX) controls interrupt delivery. In VMX mode, the VMM configures VM-execution controls like "external-interrupt exiting" to cause VM exits on interrupts, allowing it to inspect and redirect them before injecting virtual interrupts via the guest's IDT. For instance, VMware employs VMX to emulate and intercept guest interrupts, enabling transparent virtualization without kernel modifications in the guest OS. User-mode alternatives rely on OS APIs for event monitoring, such as Windows' registered I/O completion ports, but cannot directly access the IDT due to privilege restrictions.
+
+Security Considerations
+
+The Interrupt Descriptor Table (IDT) is a critical kernel data structure that can be targeted by malware, particularly rootkits, through overwrite techniques to intercept interrupts and gain unauthorized control over system execution. Rootkits often modify IDT entries to redirect interrupt handlers, enabling persistent kernel-level persistence and evasion of detection mechanisms. Such modifications can elevate attacker privileges by hijacking software interrupts, like system calls, without triggering general protection faults. In historical Linux kernels (pre-3.8.9), techniques like CVE-2013-2094 exploited buffer overflows to alter IDT entries, including DPL fields, for privilege escalation; these have been patched since 2013.
+Recent research as of 2025 has demonstrated novel IDT hijacking techniques in modern Linux kernels, even with SMEP and SMAP enabled. By exploiting LIDT instruction gadgets, attackers can relocate the IDT to user-controlled memory, enabling return-oriented programming (ROP) chains via exception redirection or causing denial-of-service (DoS) through unhandled faults. Proposed mitigations include enforcing constant virtual addresses for the IDT with post-LIDT validation checks.
+To mitigate IDT manipulation, operating systems employ memory protection mechanisms, such as marking the IDT pages as read-only in the kernel's page tables after initialization, preventing unauthorized writes from kernel-mode code or loaded modules. In Linux, the IDT is protected with read-only mappings and a fixed virtual address alias to prevent leakage of kernel addresses via SIDT, in conjunction with kernel address space layout randomization (KASLR) that randomizes surrounding kernel space. Hardware features like Supervisor Mode Execution Prevention (SMEP) and Supervisor Mode Access Prevention (SMAP), introduced in Intel processors, further protect against IDT-related risks by blocking kernel execution of user-mode code or access to user-mode memory, even if an attacker redirects an IDT entry to malicious payloads. In virtualized environments, hypervisors maintain a shadowed IDT for guest virtual machines (VMs), allowing the host to intercept and validate interrupt deliveries without exposing the guest's IDT to direct modification.
+Modern operating systems incorporate runtime integrity checks for the IDT. In Windows, Kernel Patch Protection (KPP), also known as PatchGuard, periodically scans the IDT for unauthorized modifications, such as altered gate descriptors or handler addresses, and triggers a system halt if tampering is detected. For Linux, the IDT is locked into read-only pages during kernel initialization (init), with subsequent protections enforced via module signing and lockdown modes to block unsigned kernel modules from accessing or altering it.
+Best practices for IDT security emphasize rigorous validation during setup and runtime. Kernel developers should verify segment selectors and DPL values in each IDT entry against expected kernel code segments (e.g., ensuring DPL=0 for most exceptions to restrict user invocation), using automated checks in initialization routines to detect misconfigurations. Additionally, utilizing the Interrupt Stack Table (IST) entries in the Task State Segment (TSS) isolates kernel interrupt stacks from user-mode faults; for example, assigning a dedicated IST for double faults or page faults prevents user-induced stack corruption from propagating to kernel execution, enhancing fault isolation.
+
+References
+
+ Intel 64 and IA-32 Architectures Software Developer's Manual
+
+ Intel 80286 Programmer's Reference Manual - Bitsavers.org
+
+ Intel 64 and IA-32 Architectures Software Developer's Manual
+
+ L06 The Programming Model of the x86-64 Architecture
+
+ AMD64 Architecture Programmer's Manual, Volume 2
+
+ Volume 3 (3A, 3B, 3C & 3D): System Programming Guide - Intel
+
+MSDOS and the Interrupt Vector Table (IVT) - Infosec Institute
+
+ in IBM's PS/2 and PC BIOS Interface Technical Reference
+
+LGDT/LIDT Load Global/Interrupt Descriptor Table Register
+
+8. Intel/AMD x86 Specific Information
+
+ Intel 64 and IA-32 Architectures Software Developer's Manual
+
+LGDT/LIDT: Load Global/Interrupt Descriptor Table Register (x86 ...
+
+The IDT - Interrupt Descriptor Table - OSDever.net
+
+https://elixir.bootlin.com/linux/latest/source/arch/x86/kernel/idt.c
+
+5. Kernel level exception handling
+
+ Intel 64 and IA-32 Architectures Software Developer's Manual
+
+What was the role of MS-DOS in Windows 95? - The Old New Thing
+
+ IBM PC Technical Reference - Bitsavers.org
+
+8259 PIC - OSDev Wiki
+
+ IBM Personal Computer AT - Technical Reference
+
+ BIOS Technical Reference
+
+ System BIOS for IBM PCI)(TrMIAT Computers and Compatibles
+
+ Unified Extensible Firmware Interface (UEFI) Specification
+
+Handling the Interrupt Descriptor Table -.:: Phrack Magazine ::.
+
+ CSC 471 Modern Malware Analysis Kernel Mode Rootkit SSDT ...
+
+ Attacking the Windows Kernel - NCC Group
+
+Melting Down PatchGuard: Leveraging KPTI to Bypass Kernel Patch ...
+
+ Intel Virtualization Technology - UT Computer Science
+
+ Chapter 21 RULE-BASED INTEGRITY CHECKING OF INTERRUPT ...
+
+ Rootkits Part 2: A Technical Primer - Infopoint Security
+
+Kernel IDT priviledge escalation - Rado RC1
+
+ System Register Hijacking: Compromising Kernel Integrity ... - USENIX
+
+Kernel address space layout randomization - LWN.net
+
+Kernel Level Protections: Supervisor Mode Execution ... - Sean Deaton
+
+Bare-Metal Performance For Virtual Machines with Exitless Interrupts
+
+ Updated Analysis of PatchGuard on Microsoft Windows 10 RS4
+
+ Securing the IDT and the System Call Table from malicious LKMs
+
+21. Page Table Isolation (PTI) - The Linux Kernel Archives
+
+Interrupt Stack Table
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

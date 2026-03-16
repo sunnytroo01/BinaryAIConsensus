@@ -1,0 +1,387 @@
+Server Message Block Grokipedia
+ 
+
+ Fact-checked by Grok 9 days ago 
+Server Message Block
+ Ara Eve Leo Sal 
+1x
+ The Server Message Block (SMB) protocol is a client-server communication protocol that enables shared access to files, directories, printers, serial ports, and other resources across a network, as well as interprocess communication between nodes. It operates over TCP/IP or other transport layers, allowing clients to request services such as file reads, writes, and printing from servers in a distributed environment.
+Originally developed by IBM in 1983 as a dialect for file and print sharing on early PC networks, SMB was later adopted and extended by Microsoft starting with its LAN Manager product in the late 1980s. Microsoft integrated SMB into Windows operating systems starting with Windows NT 3.1 and Windows 95, evolving it into the core mechanism for network file sharing, where it is known as the Microsoft SMB Protocol. In 1996, Microsoft published the Common Internet File System (CIFS) specification as an open version of SMB 1.0 to promote interoperability.
+The protocol has undergone significant revisions for improved performance, security, and scalability. SMB 1.0, the initial version, supported basic file operations but lacked modern security features and was chatty over networks. SMB 2.0, introduced in 2006 with Windows Vista and Windows Server 2008, reduced the number of commands from over 100 to about 19, added request compounding, and improved durability. Subsequent updates in SMB 2.1 (Windows 7/Server 2008 R2) enhanced large MTU support and client-side caching.
+SMB 3.0, released in 2012 with Windows 8 and Windows Server 2012, introduced major advancements including transparent failover for high availability, SMB Multichannel for aggregated bandwidth using multiple network interfaces, and encryption to protect data in transit. Later iterations, such as SMB 3.1.1 in Windows 10 and Server 2016, added AES-128 and AES-256 encryption, pre-authentication integrity checks to prevent man-in-the-middle attacks, and cluster dialect fencing for secure shared access in clustered environments. These versions prioritize security, with features like SMB signing using session keys and cipher suites to verify message authenticity and prevent tampering.
+Today, SMB remains a foundational protocol for Windows-based file servers, supporting practical applications like enterprise storage and cloud integration via services such as Azure Files. Recent enhancements include SMB over QUIC, introduced in Windows Server 2022, for secure and performant access over the internet. While SMB 1.0 remains dangerous in Windows 11 as of 2026 due to inherent security vulnerabilities, including remote code execution risks and malware exploitation (e.g., WannaCry), it is deprecated, not installed by default, and Microsoft strongly advises against enabling or using it, with recent 2025 updates further restricting or breaking SMBv1 compatibility in some cases; newer versions balance performance with robust security for diverse network scenarios.
+
+Overview
+
+Definition and Purpose
+
+The Server Message Block (SMB) is a client-server request-response protocol that enables shared access to files, directories, printers, serial ports, and other resources over networks. It primarily facilitates file system operations, printer access, and inter-process communication (IPC) via mechanisms such as named pipes, allowing clients to interact with remote servers as if accessing local resources. SMB typically operates over TCP/IP (using port 445 for direct hosting) or NetBIOS over TCP/IP (using ports 137-139), supporting both local area networks (LANs) and wide area networks (WANs).
+Developed in the early 1980s by Barry A. Feigenbaum at IBM, SMB originated as a means to extend local DOS file and printer access across networked IBM PC systems. Microsoft adopted and refined the protocol for its LAN Manager and OS/2 products, establishing it as a standard for cross-platform resource sharing in enterprise environments.
+The core purposes of SMB include enabling remote read/write file operations, directory creation and navigation, and device sharing without requiring dedicated hardware, thereby streamlining networked data access and management. This protocol supports authentication, session establishment, and transaction handling to ensure reliable resource utilization. In enterprise settings, SMB simplifies administration by centralizing resource access, reducing overhead for distributed teams, and promoting efficient collaboration across heterogeneous systems. Over time, SMB has evolved into modern versions that enhance scalability for large-scale deployments.
+
+Basic Operation
+
+The Server Message Block (SMB) protocol operates on a client-server model, where clients initiate requests to access shared resources on a server, such as opening a file or reading data, and the server responds with the requested data or a status indicating success or failure. This request-response mechanism enables remote file and printer sharing over a network, with the client maintaining stateful connections to track ongoing operations.
+Connection establishment begins with the client connecting to the server via TCP port 445 for direct SMB over TCP/IP, or through legacy NetBIOS over TCP ports 137 (UDP for name service), 138 (UDP for datagrams), and 139 (TCP for sessions). Upon connection, the client and server perform dialect negotiation by exchanging supported protocol versions to select the highest compatible dialect, ensuring mutual agreement on the SMB version for subsequent communication.
+Following connection, the session setup process authenticates the client using user credentials or share-level security to establish a secure context. The client then issues a tree connect request to mount a specific share on the server, creating a virtual connection to the shared resource like a file system or printer. Once connected, operations such as opening a file allocate a file identifier (FID) or handle, which the client uses in subsequent requests to reference the resource.
+SMB messages are framed with a standard header containing fields for command codes, error codes, and flags, followed by a variable-length payload specific to the operation. The header's command code identifies the action, such as 0x02 for SMB_COM_OPEN to open or create a file, or 0x0A for SMB_COM_READ to retrieve data from an open file. Error codes in the response header indicate outcomes like success or access denied, while the payload carries parameters, data, or results for the requested operation.
+
+Core Features
+
+File and Resource Sharing
+
+The Server Message Block (SMB) protocol enables servers to expose shared resources such as files, directories, printers, and serial ports to clients across a network using Universal Naming Convention (UNC) paths in the format \server\share. These shares represent logical mappings to physical resources on the server, allowing clients to access them transparently as if they were local. Clients can mount these shares as network drives, facilitating seamless integration into file explorers or applications for remote resource utilization.
+SMB supports a range of file operations, including creation, deletion, renaming, reading, and writing to files within shares. These operations are performed through dedicated SMB commands, such as SMB_COM_CREATE_DIRECTORY for creating files or directories and SMB_COM_DELETE for removal. Read and write actions allow byte-range access, where clients specify offsets and lengths to handle portions of files efficiently. To prevent concurrent access conflicts, SMB implements byte-range locking, enabling clients to lock specific sections of a file exclusively or shared for reading, as managed by commands like SMB_COM_LOCKING_ANDX. This ensures data integrity during multi-client interactions without locking the entire file.
+For printer sharing, SMB integrates with the server's print spooler service, allowing clients to submit print jobs to a shared printer queue via the UNC path. Upon receiving a job, the SMB server redirects the print data to the local spooler API using a stored print queue handle, where it is queued for processing. Clients can query job status, such as pending, printing, or completed, through SMB messaging, enabling remote monitoring and management of print tasks without direct spooler access. This mechanism supports diverse printing environments by treating printers as network resources akin to files.
+Directory services in SMB facilitate enumeration and manipulation of directory contents within shares. Clients use commands like SMB2 QUERY_DIRECTORY to list entries in a directory, retrieving details such as names, sizes, and types. Search operations support wildcard patterns, such as asterisks (*) for multiple characters or question marks (?) for single characters, based on Windows file system conventions, allowing filtered enumeration without full scans. Attribute manipulation, including setting timestamps for creation, modification, or access times and adjusting permissions, is handled via SMB_COM_SET_INFORMATION requests, enabling clients to customize resource metadata as needed.
+
+Opportunistic Locking
+
+Opportunistic locking, commonly referred to as oplocks, is a caching mechanism in the Server Message Block (SMB) protocol that enables clients to store file data locally, thereby reducing network traffic and enhancing performance for file access operations. When a client opens a file on an SMB server, it requests an oplock, which the server grants if no conflicting opens exist from other clients; this permission allows the client to cache reads, writes, or both depending on the oplock level, minimizing repeated server round-trips for data retrieval or modification.
+Oplocks are categorized into several levels to balance caching flexibility with sharing needs. A Level 1 (exclusive) oplock provides the client with full read and write caching rights, preventing any other client from accessing the file until the oplock is released. Level 2 oplocks, which are shareable, permit read-only caching and read-ahead operations among multiple clients but disallow local writes. Batch oplocks extend exclusive access by maintaining the file open on the server across multiple client open/close cycles, ideal for applications like text editors that repeatedly access the same file. Additional variants, such as read-only oplocks introduced in later Windows versions, further refine read caching for shareable scenarios.
+The oplock mechanism operates through SMB command exchanges during file operations. Upon a client's file open request via SMB, the server evaluates access conflicts and includes the granted oplock level in its response; for instance, an exclusive oplock is signaled with a specific byte value in the response header. If a conflicting access occurssuch as another client requesting write accessthe server initiates an oplock break by sending an oplock break notification to the original client, specifying the new oplock level (often none), which prompts the client to flush its local cache and acknowledge the break or close the file. This break process ensures data consistency while dynamically adjusting caching permissions.
+By enabling local caching, oplocks deliver key benefits, particularly in read-intensive workloads where clients can satisfy subsequent data requests from memory without server communication, substantially lowering latency and bandwidth usage. In supported implementations, higher-level oplocks like exclusive or batch also facilitate offline editing, allowing clients to perform local modifications on cached files and defer synchronization until reconnection, which proves advantageous for mobile or intermittently connected users.
+Despite these advantages, oplocks have inherent limitations that restrict their applicability. They are ill-suited for multi-writer environments requiring immediate consistency, as the caching model assumes single-client dominance and relies on timely break acknowledgments; failures in processing breaksdue to network interruptions, timeouts, or faulty implementationscan result in stale data on clients or server-side inconsistencies. Consequently, oplocks must be disabled or carefully managed in scenarios like collaborative databases to prevent corruption risks.
+
+Performance Enhancements
+
+Server Message Block (SMB) incorporates persistent handles and durable opens to ensure continuity of file access during transient network disruptions or server maintenance. Persistent handles allow the server to retain open file states briefly after client disconnection, enabling quick reconnection without re-establishing the session from scratch. Durable opens extend this resilience further, preserving handles across longer interruptions such as server reboots, thereby preventing data loss and minimizing recovery time for applications relying on shared resources.
+To optimize data transfer efficiency, SMB supports large Maximum Transmission Unit (MTU) sizes, accommodating jumbo frames up to 1 MB (introduced in SMB 2.1). This capability reduces the number of packets required for large file operations by allowing bigger payloads per transmission, which lowers protocol overhead and improves throughput for sequential reads and writes. By minimizing fragmentation and packet processing, large MTU support enhances overall network scalability, particularly in high-bandwidth environments.
+SMB employs server-side read-ahead and write-behind caching to buffer data proactively, overlapping I/O operations and reducing latency in file access patterns. Read-ahead anticipates sequential access by prefetching subsequent data blocks into the cache, while write-behind aggregates writes before committing them to storage, balancing performance with data integrity. These mechanisms, combined with opportunistic locking for client-side caching, enable efficient resource utilization across distributed systems.
+These enhancements contribute to measurable gains in SMB performance, including up to 10x improvements in IOPS for random reads and better bandwidth utilization in wide area network (WAN) scenarios through reduced overhead and aggregated transfers. For instance, in virtualized environments, such optimizations can achieve higher throughput while maintaining low latency, supporting scalable file sharing for enterprise workloads.
+
+Evolution
+
+Early Versions (SMB 1.0 and CIFS)
+
+The Server Message Block (SMB) 1.0 protocol emerged in the mid-1980s as a client-server communication mechanism for file, printer, and resource sharing on local area networks, initially developed by IBM for PC-DOS environments and later refined by Microsoft. It was formally introduced in Microsoft's LAN Manager 1.0 in 1987, where it operated as the primary protocol over NetBIOS for transport, relying on NetBIOS frames for session establishment, name resolution, and datagram services. This dependency on NetBIOS limited its direct use over TCP/IP until later adaptations.
+The core dialect of SMB 1.0, designated as "PC NETWORK PROGRAM 1.0," comprised 19 fundamental commands to handle basic operations such as file creation (SMB_COM_CREATE_DIRECTORY), opening (SMB_COM_OPEN), reading (SMB_COM_READ), writing (SMB_COM_WRITE), and deletion (SMB_COM_DELETE). These commands formed the foundational set, with additional extensions like the TRANSACTION (SMB_COM_TRANSACTION) and TRANSACTION2 (SMB_COM_TRANSACTION2) subcommands enabling more complex interactions, including querying and manipulating extended file attributes such as timestamps, permissions, and security descriptors. The TRANS2 operations, in particular, supported subfunctions for file information retrieval and attribute modifications, addressing limitations in the original core set.
+In 1996, Microsoft released an open specification for the SMB 1.0 dialect under the Common Internet File System (CIFS) moniker, primarily to promote interoperability and facilitate its use over internet-compatible transports like direct TCP/IP on port 445, reducing reliance on NetBIOS for broader adoption. Designed initially for Windows NT 4.0, CIFS maintained backward compatibility with existing SMB implementations but inherited the original protocol's legacy inefficiencies, notably its "chatty" design that necessitated frequent client-server round trips for acknowledgments and status checks during file operations.
+SMB 1.0 and CIFS exhibited key limitations that hindered performance and security in evolving network environments. The protocol's request-response model generated high latency, particularly over wide-area or high-delay links, as it required multiple round-trip exchangeseven for sequential byte reads or writesrather than efficient streaming, often resulting in throttled throughput below 10 MB/s on connections with 100 ms or more latency. Furthermore, it provided no native support for encryption or message signing, exposing sessions to interception, tampering, and hijacking by unauthorized parties through man-in-the-middle attacks.
+SMB 1.0 dominated file-sharing implementations throughout the Windows NT (from version 3.1 in 1993) and Windows 2000 eras, serving as the standard for enterprise domain-based networking and peer-to-peer resource access in millions of deployments. However, accumulating security vulnerabilitiesexploited in high-profile incidents like WannaCryprompted Microsoft to deprecate it publicly in 2014. SMB 1.0 is not installed by default in Windows 10 (starting with version 1709), Windows Server 2016, and subsequent versions including Windows 11 as of 2026. Microsoft strongly advises against enabling or reinstalling SMB 1.0 due to its inherent security vulnerabilities, including risks of remote code execution and exploitation by malware such as ransomware. September 2025 Windows security updates further restricted SMBv1 compatibility, causing connection failures to SMBv1 shares over NetBIOS over TCP/IP in systems with the updates installed, including Windows 11.
+
+SMB 2.x Developments
+
+The Server Message Block (SMB) 2.0 protocol, introduced in 2006 alongside Windows Vista and Windows Server 2008, represented a major redesign of the original SMB protocol to address its complexity and inefficiencies. It reduced the number of commands and subcommands from over 100 in SMB 1.0 to 19 core operations, streamlining the protocol while maintaining essential functionality for file and print sharing. A key innovation was the introduction of compound requests, which enable pipelining multiple operationssuch as opening a file, reading data, and closing itwithin a single network message, thereby reducing latency and round-trip overhead. Additionally, SMB 2.0 improved message integrity through enhanced signing mechanisms, replacing the weaker MD5-based approach of SMB 1.0 with more robust protections against tampering. The protocol also simplified the message header to a fixed 64-byte structure, compared to the variable-length header (starting at 32 bytes plus extensions) in SMB 1.0, which contributed to better parsing efficiency and reduced overhead.
+Building on SMB 2.0, the SMB 2.1 dialect was released in 2010 with Windows 7 and Windows Server 2008 R2, focusing on further optimizations for modern network environments. It introduced client oplock leasing, an enhancement to opportunistic locking that allows clients to maintain caching states across multiple file opens and network interruptions, improving resilience and reducing server load in distributed scenarios. SMB 2.1 also supported larger maximum transmission units (MTUs) up to 64 KB for reads and writes, enabling more efficient data transfer over high-speed links compared to the stricter limits in prior versions. For wide-area network (WAN) scenarios, it integrated BranchCache support, allowing content to be cached at branch offices to accelerate file access and minimize bandwidth usage across slow links.
+These changes in SMB 2.x collectively enhanced scalability, particularly for large-scale clusters, by improving handle durability and reducing protocol chattiness, which minimized connection state management overhead. In practical terms, the revisions yielded up to threefold performance improvements in file copy operations over SMB 1.0 in certain workloads, driven by fewer network round trips and optimized data handling.
+
+SMB 3.x Advancements
+
+The Server Message Block (SMB) 3.x series, introduced starting with SMB 3.0 in 2012, represents a significant evolution tailored for enterprise environments, emphasizing scalability, reliability, and security in high-performance networks. SMB 3.0, debuting with Windows 8 and Windows Server 2012, introduced SMB Multichannel, which aggregates multiple TCP connections between client and server to enhance throughput and provide fault tolerance by automatically rerouting traffic if a network path fails. This feature is particularly beneficial in environments with multiple network interfaces, enabling bandwidth utilization up to 10 Gbps and beyond without requiring specialized hardware. Additionally, SMB Transparent Failover allows seamless maintenance of clustered file servers, where clients automatically reconnect to available nodes during node failures or updates, minimizing downtime for applications like databases and virtual machines. SMB 3.0 also added end-to-end encryption for data in transit, protecting shares from eavesdropping on untrusted networks, alongside support for encryption at rest when integrated with storage solutions. These capabilities extended to Hyper-V integration, allowing virtual machines to store files on SMB shares with low-latency access comparable to local storage.)
+Building on SMB 3.0, the 3.0.2 dialect, released in 2013 with Windows 8.1 and Windows Server 2012 R2, enhanced security by introducing client-side encryption initiation, enabling clients to request encrypted sessions independently of server configuration. This update also improved signing mechanisms, adopting AES-CMAC for more robust integrity checks against tampering, while adding capabilities like asymmetric share detection to optimize performance in mixed environments. These refinements addressed deployment flexibility in heterogeneous networks, ensuring secure data transfer without mandating server-side enforcement.
+SMB 3.1.1, launched in 2015 alongside Windows 10 and Windows Server 2016, further advanced the protocol with encryption using AES-128-CCM and AES-128-GCM modes, providing enhanced performance and security compared to the previous AES-128-CCM-only encryption. Directory leasing was introduced to reduce network chatter in virtualized setups, allowing clients to cache directory information for extended periods and lease it from servers, which improves scalability for large-scale file servers supporting thousands of clients. Lightweight directory operations complemented this by enabling efficient querying of directory attributes without full file opens, optimizing performance for applications like search indexes. Later updates in Windows Server 2022 added AES-256-GCM and AES-256-CCM support. As of 2025, SMB 3.1.1 remains the default dialect in modern Windows implementations, with no major protocol version succeeding it, though enhancements like mandatory signing and SMB over QUIC in Windows Server 2025 build upon its foundation for enterprise resilience. These features collectively support high-speed networks exceeding 10 Gbps, including integration with Remote Direct Memory Access (RDMA) via SMB Direct for reduced CPU overhead in data center scenarios.
+
+Protocol Details
+
+Command and Message Structure
+
+The Server Message Block (SMB) protocol structures its messages as binary packets divided into three primary components: a fixed-length header, a variable-length parameter block, and a variable-length data block. This format enables efficient transmission of requests and responses over a network, with the header providing essential metadata for routing and execution.
+The SMB header, typically 32 bytes in length for early versions, begins with a 4-byte protocol identifier set to 0xFF followed by the ASCII characters 'S', 'M', and 'B' to denote an SMB message. Following this, a 1-byte command field specifies the opcode for the operation, such as tree connect or file open, with defined values ranging from 0x00 to 0xFF for various commands. Additional key fields include flags (1 byte) that indicate attributes like the reply bit (set in responses to mark them as such), a 2-byte process ID (PID) for tracking client processes, a 2-byte tree ID (TID) for shared resource contexts, and a 4-byte user ID (UID, later termed session ID or SID) to associate messages with user sessions. These fields collectively ensure message integrity, sequencing, and context preservation across exchanges. In later protocol iterations, the header evolves to include fields like structure size (fixed at 64 bytes for SMB 2.x) and credit charge for flow control, while retaining core identifiers like command and message IDs.
+Command types in SMB are identified by opcodes in the header's command field, categorizing operations into basic file and directory manipulations, such as tree connect (opcode 0x70) to establish access to a shared resource and tree disconnect (0x71) to release it, or file open (0x2D in extended forms) and close (0x2E) for handling individual files. More complex operations use transact commands like SMB_COM_TRANSACTION (0x25) or its NT variant (0xA0) to encapsulate sub-operations, including file creation or device I/O control, allowing flexibility for variable payloads without dedicated opcodes. These opcodes enable a request-response model where clients issue commands and servers reply with matching opcodes and status indicators.
+Payload formats follow the header and parameters, consisting of variable-length data blocks that carry operation-specific content, such as file names, buffers, or security descriptors. Early versions use ASCII strings padded to even lengths, while subsequent dialects support Unicode (UTF-16) for broader character compatibility, often prefixed with length indicators to parse variable sizes accurately. Error responses embed status codes in the header's status field, transitioning from 2-byte class/code pairs (e.g., ERRDOS for DOS errors) to 32-bit NT_STATUS values (e.g., 0xC0000001 for STATUS_UNSUCCESSFUL) in extended implementations, providing detailed failure semantics without altering the core structure. Data blocks may include format codes to denote types like disk attributes or search patterns, ensuring interoperability in diverse operations.
+Dialect negotiation occurs at connection initiation, where the client proposes supported protocol versions (dialects) via a negotiate protocol request, listing strings like "PC NETWORK PROGRAM 1.0" or "NT LM 0.12" in order of preference. The server responds by selecting the highest mutually compatible dialect, echoing it back in the response to establish the session's operational rules, including supported features like Unicode or extended security. This mechanism ensures backward compatibility while enabling advanced capabilities in modern environments.
+
+Session and Transport Mechanisms
+
+For SMB 2.0 and later, session management begins with the establishment of a session through the SMB2 SESSION_SETUP command, which authenticates the user using the Generic Security Service Application Program Interface (GSS-API) framework. This process supports authentication via NTLM or Kerberos protocols, where the client sends security tokens in the request, and the server validates them against the provided credentials. Upon successful authentication, the server generates a session key derived from the authentication context, typically the first 16 bytes of the cryptographic key, which is used to derive signing and encryption keys for subsequent communications. These session keys enable message signing to ensure integrity and, in SMB 3.x dialects, optional encryption using algorithms like AES-128-CCM or AES-128-GCM to protect data confidentiality. A single authenticated session can multiplex multiple tree connections, allowing the client to access different shares or resources over the same session without re-authenticating, thereby reducing overhead and improving efficiency.
+The SMB protocol primarily operates over transport layers that prioritize reliability and security. Modern implementations, starting from SMB 2.0, prefer direct hosting over TCP/IP on port 445, which is the primary and sufficient port for standard SMB file sharing in modern Windows versions, including Windows 11. This approach eliminates the need for intermediate layers and enables efficient, NetBIOS-less communication. Beginning with Windows 11 version 24H2 and Windows Server 2025, built-in Windows Defender Firewall rules no longer include the legacy NetBIOS ports (TCP/UDP 137-139) by default, as these ports are unnecessary for SMB 2.0 and later dialects, thereby improving security. As of Windows Server 2025, SMB also supports transport over QUIC (Quick UDP Internet Connections) on UDP port 443, providing secure, encrypted file sharing over untrusted networks such as the internet without requiring a VPN. For legacy compatibility with SMB 1.0 and earlier CIFS implementations, the protocol falls back to NetBIOS over TCP/IP (ports 137-139 UDP/TCP), where NetBIOS provides name resolution and session services atop the TCP or UDP transport. This dual-transport approach ensures backward compatibility while encouraging migration to the more streamlined TCP 445 or QUIC methods, as NetBIOS-based transports add latency and complexity unnecessary for contemporary networks. In certain scenarios involving SMB features that utilize RPC or DCOM (such as named pipes or distributed file system operations), related services may require additional ports, including TCP 135 for the RPC Endpoint Mapper and dynamic ports in the range 49152-65535 for RPC communications.
+Connection resilience features, introduced and enhanced in SMB 3.x, allow for seamless handling of network disruptions and server failovers without interrupting client operations. When a connection is lost, the client can initiate reconnection logic using persistent or resilient handles, which maintain open files and directories across interruptions, enabling transparent failover in clustered environments. Servers implementing SMB 3.x monitor connection health through mechanisms like TCP keep-alives and periodic session checks, effectively acting as heartbeats to detect failures promptly. Upon detecting a failure, the protocol supports re-establishing the connection and replaying pending requests, ensuring data integrity and minimal downtime during events such as node failover in Windows Server Failover Clustering.
+Flow control in SMB 2.0 and later versions employs a credit-based windowing system to manage request throughput and prevent server overload. Each SMB2 message includes CreditCharge and CreditRequest fields in the header; the server grants credits to the client upon processing requests, limiting the number of outstanding operations based on its capacity using a vendor-specific algorithm. Initially, the server provides a small credit window (e.g., at least one credit on negotiation), which can expand dynamically as the server handles load, allowing the client to issue up to the granted credits concurrently while avoiding congestion. This mechanism replaces the less efficient request pipelining of SMB 1.0, providing better scalability and performance under high-load scenarios.
+
+Implementations
+
+Microsoft Implementations
+
+Microsoft's implementation of the Server Message Block (SMB) protocol has been integral to file and printer sharing in Windows operating systems since the early versions. In Windows NT, Windows 2000, and Windows XP, SMB 1.0 served as the primary dialect for both client and server roles, enabling network access to shared resources over NetBIOS or TCP/IP transports. With the release of Windows Vista and Windows Server 2008, Microsoft introduced SMB 2.0, which became the default, reducing protocol overhead and improving performance for client-server interactions. Subsequent versions, such as SMB 2.1 in Windows 7 and Windows Server 2008 R2, added large MTU support and client-side caching. By Windows 8 and Windows Server 2012, SMB 3.0 was implemented, adding features like SMB Multichannel for better bandwidth utilization. Windows Server 2016 and later default to SMB 3.1.1 as the standard for enhanced security and efficiency in enterprise environments.
+Key components of Microsoft's SMB implementation include the SMB redirector on the client side, which handles requests to remote servers and maps them to local file system operations, and the server service, known as LanmanServer, which manages shared resources and responds to incoming SMB connections. Configuration of these components is often performed via Group Policy, allowing administrators to disable legacy versions like SMB 1.0 to mitigate security risks; for instance, policies under Computer Configuration > Administrative Templates > Network > Lanman Workstation can enforce the use of only SMB 2.0 and later.
+Exclusive to Microsoft's ecosystem, SMB Direct leverages Remote Direct Memory Access (RDMA) over Ethernet adapters to offload data transfer from the CPU, enabling low-latency, high-throughput file sharing in scenarios like Hyper-V storage or SQL Server deployments. Additionally, SMB integrates seamlessly with Active Directory for access control, using Kerberos authentication in domain-joined environments to validate user credentials and enforce NTFS permissions on shares.
+In Windows 11 version 24H2 and Windows Server 2025, Microsoft mandates SMB 3.x dialects by default, with SMB 1.0 and other insecure protocols disabled out-of-the-box to prioritize security. In these releases, the built-in firewall rules no longer include the legacy NetBIOS ports (TCP/UDP 137-139), which were required only for SMB 1.0 and are unnecessary for modern SMB versions that use TCP 445; TCP 445 is sufficient for standard SMB file sharing. Administrators can manually reconfigure the firewall to enable these legacy ports if required for compatibility with older systems. These releases also support port customization for SMB trafficbeyond the traditional TCP 445via PowerShell cmdlets like New-SmbServerAlternativePort, allowing administrators to configure alternative ports for SMB over QUIC (default UDP 443) to enhance network segmentation and threat isolation.
+
+Open-Source and Third-Party Implementations
+
+Samba is the most prominent open-source implementation of the SMB protocol, providing both client and server functionality for Unix-like systems such as Linux and FreeBSD since the 1990s. It supports SMB versions from 1.0 through 3.1.1, enabling file and print sharing, as well as Active Directory domain controller emulation for cross-platform interoperability. Widely deployed in network-attached storage (NAS) devices and enterprise environments, Samba facilitates seamless integration of non-Windows systems into Microsoft-dominated networks.
+Another notable open-source server implementation is KSMBD, a Linux kernel module introduced in kernel version 5.15 in 2021 and declared stable in Linux 6.6. Designed for enhanced performance by processing SMB requests directly in kernel space, KSMBD supports SMB 2.x and 3.x dialects, including multichannel and encryption features, making it suitable for high-throughput file serving in Linux-based systems.
+For cross-platform needs, third-party solutions like Tuxera Fusion provide a high-performance SMB stack optimized for Linux, macOS, and Windows environments. It offers superior scalability, supporting up to 32 nodes and advanced features such as SMB Direct over RDMA, positioning it as an alternative to Samba for demanding workloads like media production and enterprise storage.
+In niche areas, historical tools like Likewiserebranded as BeyondTrust PowerBroker Identity Servicesfocus on identity integration for SMB access, allowing Unix and Linux systems to join Active Directory domains using Kerberos authentication. For embedded systems, Visuality Systems' NQ provides a compact C-based SMB client and server stack compliant with SMB 3.x, enabling resource-constrained devices to interoperate with Windows networks. Similarly, Ryussi's MoSMB delivers a user-mode SMB 3.x server for Linux-based embedded and NAS appliances, emphasizing enterprise-grade compliance and security for workloads like Hyper-V and SQL Server.
+Open-source and third-party implementations face ongoing challenges in achieving full compliance with SMB 3.1.1 features, particularly encryption and signing algorithms. As of 2025, Samba versions 4.20 and later provide robust support for SMB 3.1.1 encryption, though rigorous testing against Microsoft baselines remains essential for interoperability.
+
+Security Aspects
+
+Authentication and Encryption
+
+Server Message Block (SMB) employs multiple authentication mechanisms to verify client identities and establish secure sessions. The NTLM protocol, available in versions 1 and 2, operates via challenge-response exchanges where the client demonstrates knowledge of the user's password without sending it in plaintext, enabling secure access to SMB shares. In Active Directory domain environments, Kerberos serves as the preferred method, facilitating mutual authentication through time-limited tickets issued by a trusted key distribution center, which reduces reliance on password-based challenges. Guest access, allowing anonymous connections without credentials, has been deprecated in contemporary Windows implementations starting from Windows Vista and Server 2008, as it poses significant risks for unauthorized entry.
+Session security in SMB prevents message tampering through digital signing, ensuring integrity during transmission and preventing man-in-the-middle attacks, including NTLM relay attacks. SMB signing requires that each message be signed with a key derived from the session key, which an attacker cannot forge or relay without possessing the key. From SMB 2.02 onward, signing utilizes the HMAC-SHA256 algorithm to compute a hash-based authentication code for each message, replacing the vulnerable MD5 approach used in SMB 1.0. The signing key is derived from the session key generated during authentication; for NTLM, this involves hashing the user's password, while Kerberos derives it from the ticket's shared secret, allowing both client and server to independently verify signatures without additional round trips. When SMB signing is disabled (commonly reported as "signing: false" in security scans, indicating the server does not require signing), unsigned messages can be intercepted and replayed, enabling NTLM relay attacks where authentication is relayed to the target system or other services such as LDAP for privilege escalation.
+SMB 3.0 and subsequent versions provide encryption to protect data confidentiality over untrusted networks, using the AES-CCM mode with 128-bit or 256-bit keys for both encryption and authentication of payloads. Administrators can enable encryption at the share level on servers or enforce it globally via client-side policies, with support for AES-GCM in SMB 3.1.1 for improved performance on compatible hardware. In scenarios involving older SMB dialects or non-supporting peers, connections fall back to unencrypted mode if not explicitly required, though this is discouraged in secure deployments.
+In Windows Server 2025 and Windows 11 version 24H2, the SMB client provides a Group Policy to require encryption for all outbound SMB 3.x connections, which can be enabled in hardened configurations to safeguard sensitive data in transit. This capability supports organizational compliance with regulatory frameworks by mitigating interception risks on shared networks.
+
+Known Vulnerabilities and Mitigations
+
+Server Message Block (SMB) version 1.0 has been plagued by significant security flaws, most notably the EternalBlue vulnerability (CVE-2017-0144), which allows remote code execution through specially crafted packets targeting the SMBv1 server component in various Windows systems. This exploit was widely used in the 2017 WannaCry ransomware attack, which propagated across networks by leveraging the vulnerability to encrypt files and demand ransoms, affecting hundreds of thousands of systems globally. Additionally, SMB 1.0 supports null sessions, enabling anonymous access without credentials, which permits attackers to enumerate shares, users, and other network resources, facilitating reconnaissance for further exploits.
+In SMB 2.x and 3.x, risks persist despite improvements, including NTLM relay attacks where attackers intercept NTLM authentication credentials and relay them to SMB servers that do not require signing, gaining unauthorized access to SMB shares or escalating privileges on other services such as LDAP. These attacks are facilitated when SMB signing is disabled or not required, as indicated by "signing: false" in scans from tools like NetExec (formerly CrackMapExec). In penetration testing scenarios, upon identifying such systems, common next steps include further enumeration with NetExec (e.g., --shares to list accessible shares, --users/--groups for Active Directory enumeration, --pass-pol for password policy extraction, --rid-brute for RID cycling), attempting null or guest access if permitted, and exploiting the lack of signing via NTLM relay attacks using tools such as Impacket's ntlmrelayx.py to relay authentication to the target or other protocols (e.g., LDAP for escalation), as disabled signing permits unsigned messages enabling relay. Denial-of-service (DoS) conditions can also arise from malformed packets, such as those triggering buffer overflows or infinite loops in SMB transaction handling, potentially crashing affected servers. A prominent example is SMBGhost (CVE-2020-0796), a remote code execution flaw in SMB 3.1.1 that mishandles compression requests, allowing unauthenticated attackers to execute arbitrary code on unpatched Windows 10 versions 1903 and 1909.
+To mitigate these vulnerabilities, organizations should disable SMB 1.0 entirely, which can be achieved using PowerShell commands like Set-SmbServerConfiguration -EnableSMB1Protocol $false and Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" SMB1 -Type DWORD -Value 0 -Force to remove its features from both client and server configurations. As of 2026, SMB 1.0 remains dangerous in Windows 11 due to inherent security vulnerabilities, including remote code execution risks (e.g., EternalBlue exploited by WannaCry malware). It is not installed by default, and Microsoft strongly advises against enabling or using it. Recent 2025 updates further restricted or broke SMBv1 compatibility in some cases, reinforcing the need to keep it disabled. For SMB 2.x and 3.x, enforce the use of SMB 3.1.1 with mandatory encryption (via Set-SmbServerConfiguration -EncryptData $true) and require SMB signing (via Set-SmbServerConfiguration -RequireSecuritySignature $true -EnableSecuritySignature $true) to protect against relay and interception attacks, while configuring firewalls to block inbound TCP port 445 traffic from external sources, limiting exposure to internal networks only. Beginning with Windows 11 version 24H2 and Windows Server 2025, SMB signing is required by default for all inbound and outbound connections, and the built-in firewall rules adopt a restrictive profile for file and printer sharing that no longer includes legacy NetBIOS ports (UDP 137/138 and TCP 139) by default, as these ports are associated only with deprecated SMB 1.0 functionality; this change reduces the attack surface while making TCP 445 sufficient for standard modern SMB sharing. For secure remote access over untrusted networks, optional SMB over QUIC provides TLS 1.3-encrypted connectivity using UDP port 443.
+As of 2025, Microsoft released September security updates (e.g., KB5065426) that intentionally disrupt compatibility with SMBv1 shares over NetBIOS, addressing lingering risks by breaking legacy connections and compelling upgrades to secure versions, though this may require reconfiguration for affected environments. Subsequent November 2025 security updates have introduced additional changes to SMB behaviors, which may affect network sharing and require verification of compatibility in updated environments. Ongoing security guidance emphasizes integrating SMB into zero-trust models, where access to shares is continuously verified regardless of network location, reducing reliance on perimeter defenses alone.
+
+References
+
+SMB protocol - IBM
+
+Microsoft SMB Protocol and CIFS Protocol Overview - Win32 apps
+
+SMB is Dead, Long Live SMB! - Microsoft Community Hub
+
+: Server Message Block (SMB) Protocol - Microsoft Learn
+
+Detect, enable, and disable SMBv1, SMBv2, and SMBv3 in Windows
+
+Overview of file sharing using the SMB 3 protocol in Windows Server
+
+SMB Security Enhancements | Microsoft Learn
+
+Overview of Server Message Block signing in Windows
+
+: Overview - Microsoft Learn
+
+https://www.samba.org/samba/docs/myths_about_samba.html
+
+Early Microsoft Networks | OS/2 Museum
+
+: Overview - Microsoft Learn
+
+Direct host SMB over TCP/IP - Windows Server - Microsoft Learn
+
+Service overview and network port requirements - Windows Server
+
+: Message Syntax - Microsoft Learn
+
+MS-CIFS - 2.2.2.1 SMB_COM Command Codes - Microsoft Learn
+
+: Receiving an SMB_COM_LOCKING_ANDX Request
+
+: Application Requests a Byte-Range Lock on a File
+
+: Submitting a Print Job Using the SMB Protocol Family
+
+: Example 6: Sending a Print Job to an SMB Share
+
+2.2.33 SMB2 QUERY_DIRECTORY Request - Microsoft Learn
+
+: Appendix A: Product Behavior - Microsoft Learn
+
+: Receiving an SMB_COM_RENAME Request
+
+Opportunistic Locks - Win32 apps - Microsoft Learn
+
+Oplocks and network redirectors - Windows Drivers - Microsoft Learn
+
+Types of Oplocks - Windows drivers - Microsoft Learn
+
+Types of Opportunistic Locks - Win32 apps - Microsoft Learn
+
+: SMB_COM_LOCKING_ANDX (0x24) | Microsoft Learn
+
+draft-leach-cifs-v1-spec-01 - IETF Datatracker
+
+SMB and Opportunistic Locking | Network World
+
+Information on Opportunistic Locking - Micro Focus Software Support
+
+Chapter 17. File and Record Locking - Samba
+
+: SMB2_CREATE_DURABLE_HANDLE_REQUEST_V2
+
+Performance Tuning for SMB File Servers - Microsoft Learn
+
+A new era for Azure Files: Bigger, faster, better! | Microsoft Azure Blog
+
+History of SMB - Samba
+
+: SMB_COM_TRANSACTION2 (0x32) Extensions
+
+: Common Internet File System (CIFS) Protocol
+
+Implementing CIFS: Introduction - ubiqx
+
+Stop using SMB1 | Microsoft Community Hub
+
+ Optimizing SMB Traffic for Increased Employee Productivity | Riverbed
+
+SMBv1 Not Installed by Default in Windows Server and Windows
+
+Two Minute Drill: Overview of SMB 2.0 | Microsoft Community Hub
+
+: Handling Compounded Requests - Microsoft Learn
+
+Overview of Server Message Block signing - Microsoft Learn
+
+SMB2 Packet Header - ASYNC | Microsoft Learn
+
+: Requesting a Lease on a File or a Directory
+
+BranchCache | Microsoft Learn
+
+SMB 3.0 features in Windows Server file server - Microsoft Learn
+
+: Server Message Block (SMB) Protocol Versions 2 and 3
+
+2.2.3 SMB Message Structure - MS-CIFS - Microsoft Learn
+
+The SMB Header - MS-CIFS - Microsoft Learn
+
+SMB2 Packet Header | Microsoft Learn
+
+: SMB_COM_NT_TRANSACT (0xA0) Extensions
+
+: Data Buffer Format Codes - Microsoft Learn
+
+: SMB Error Classes and Codes - Microsoft Learn
+
+2.2.2.4 SMB Error Classes and Codes - Microsoft Learn
+
+Microsoft SMB Protocol Dialects - Win32 apps
+
+: Handling a New Authentication - Microsoft Learn
+
+3.3.2 Using the NTLM Protocol - Microsoft Learn
+
+: Per Session - Microsoft Learn
+
+: Encrypting the Message - Microsoft Learn
+
+: Application Requests a Connection to a Share
+
+: Relationship to Other Protocols - Microsoft Learn
+
+: Handling Loss of a Connection - Microsoft Learn
+
+: Handling a Resiliency Request - Microsoft Learn
+
+: Granting Credits to the Client - Microsoft Learn
+
+: Algorithm for the Granting of Credits - Microsoft Learn
+
+The SMB Redirector may hang when the SMB protocol is used in ...
+
+LanmanServer Policy CSP - Microsoft Learn
+
+Improve performance of a file server with SMB Direct - Microsoft Learn
+
+SMB security hardening - Windows Server - Microsoft Learn
+
+Configure alternative SMB ports - Windows Server - Microsoft Learn
+
+Samba - opening windows to a wider world
+
+Samba Features added/changed
+
+KSMBD Declared Stable - No Longer "Experimental" - In Linux 6.6
+
+KSMBD - SMB3 Kernel Server The Linux Kernel documentation
+
+Tuxera Fusion SMB
+
+Fusion SMB instead of Samba: Why? - Tuxera
+
+Visuality Systems - The SMB Protocol Experts
+
+SMB File Server Solution for Enterprise Workloads
+
+Samba 4.20 Features added/changed
+
+Network access validation algorithms and examples for Windows
+
+Kerberos authentication overview in Windows Server - Microsoft Learn
+
+Protect SMB traffic from interception - Microsoft Learn
+
+Configure the SMB client to require encryption in Windows
+
+https://nvd.nist.gov/vuln/detail/CVE-2017-0144
+
+https://learn.microsoft.com/en-us/security-updates/SecurityBulletins/2017/ms17-010
+
+KB5005413: Mitigating NTLM Relay Attacks on Active Directory ...
+
+Vulnerability Report for Windows SMB DoS - Core Security
+
+https://nvd.nist.gov/vuln/detail/CVE-2020-0796
+
+Secure SMB Traffic in Windows Server - Microsoft Learn
+
+September 9, 2025KB5065426 (OS Build 26100.6584)
+
+Zero Trust Strategy & Architecture | Microsoft Security
+
+Secure SMB Traffic in Windows Server
+
+Service overview and network port requirements - Windows Server
+
+SMB security hardening in Windows Server and Windows Client
+
+Secure SMB Traffic in Windows Server
+
+SMB security hardening in Windows Server and Windows Client
+
+Secure SMB Traffic in Windows Server
+
+SMBv1 Not Installed by Default in Windows Server and Windows | Microsoft Learn
+
+SMBv1 Not Installed by Default in Windows Server and Windows
+
+Detect, enable, and disable SMBv1, SMBv2, and SMBv3 in Windows
+
+Microsoft says Windows September updates break SMBv1 shares
+
+SMB security hardening in Windows Server and Windows Client
+
+The Renaissance of NTLM Relay Attacks: Everything You Need to Know
+
+Enumerate Hosts with SMB Signing Not Required - NetExec Wiki
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

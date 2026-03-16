@@ -1,0 +1,258 @@
+PBKDF2 Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+PBKDF2
+ Ara Eve Leo Sal 
+1x
+ PBKDF2 (Password-Based Key Derivation Function 2) is a cryptographic key derivation function designed to produce a cryptographic key from a password, salt, and other parameters, intentionally slowing down the process through multiple iterations of a pseudorandom function (PRF) to resist brute-force and dictionary attacks. Defined in the Public-Key Cryptography Standards (PKCS #5) version 2.1 and published as RFC 8018 by the Internet Engineering Task Force (IETF), PBKDF2 applies the PRFtypically HMAC with an approved hash function such as SHA-256iteratively to derive keys of variable length, making it suitable for password-based encryption and authentication schemes.
+The function takes five inputs: a password P, a salt S (with at least 128 bits of randomness recommended by NIST to prevent precomputation attacks), an iteration count c (a positive integer that determines the computational cost, with higher values increasing security), a desired derived key length dkLen in octets, and the PRF. The algorithm computes the derived key DK by dividing it into blocks of the PRF output length hLen, then for each block i, it generates a chain of c PRF values starting from U_1 = PRF(P, S || INT(i)), followed by U_j = PRF(P, U_{j-1}) for j = 2 to c, and XORs them to form F(P, S, c, i) = U_1 \oplus U_2 \oplus \cdots \oplus U_c; the full key is the concatenation of these blocks. This iterative chaining ensures that each output block depends on the previous computations, amplifying the work factor against parallel attacks.
+PBKDF2 is recommended by standards bodies like the National Institute of Standards and Technology (NIST) for password-based key derivation when used with HMAC and an approved underlying hash function, as outlined in Special Publication 800-132, though it notes that the iteration count should be tuned to require approximately 0.25 to 1 second of computation on target hardware, depending on the application, to balance security and usability. Modern guidelines, such as OWASP's as of 2023, recommend at least 600,000 iterations for PBKDF2-HMAC-SHA256. It supersedes the earlier PBKDF1 from PKCS #5 v1.5 (RFC 2898), which is retained only for backward compatibility and not advised for new implementations due to limitations like fixed output length. Widely adopted in various cryptographic protocols and systems for secure password storage (e.g., generating hashes resistant to rainbow tables via the salt), PBKDF2 remains a foundational tool in modern cryptography despite the emergence of memory-hard alternatives like scrypt or Argon2 for enhanced protection against GPU-accelerated attacks.
+
+Introduction
+
+Purpose and Applications
+
+PBKDF2, or Password-Based Key Derivation Function 2, is a deterministic function that derives a cryptographically secure pseudorandom key from a password by applying a pseudorandom function, such as HMAC, iteratively based on inputs including the password, a salt, an iteration count, and the desired key length. This process transforms low-entropy passwords into keys suitable for encryption, message authentication, or other cryptographic operations, ensuring the output appears random even from predictable inputs.
+The primary applications of PBKDF2 include password-based encryption schemes, such as PBES2, where it generates keys to encrypt data protected by user passwords. It is also widely used for secure password storage in authentication systems, where the derived key serves as a hashed verifier for login credentials, as recommended by NIST for storing password verifiers. Examples include disk encryption tools like Microsoft's BitLocker, which employs PBKDF2 to derive keys from passphrases for full-volume protection.
+A core feature of PBKDF2 is key stretching, achieved through a high number of iterations that deliberately increase the computational cost of each key derivation, thereby slowing down brute-force and dictionary attacks on compromised passwords. This makes offline attacks on leaked password databases significantly more time-intensive, as each password guess requires repeating the full iteration process.
+
+High-Level Operation
+
+PBKDF2 operates by transforming a human-memorable password into a cryptographically secure key through a deliberate, resource-intensive process designed to thwart unauthorized access. The primary inputs include the password, a secret string easy for users to remember; a salt, which is a randomly generated value that ensures each derivation is unique and prevents precomputation attacks such as rainbow tables; an iteration count, representing the number of repeated hashing operations to impose a computational burden; and a specified output length, determining the size of the resulting key in bits or bytes.
+At a conceptual level, the derivation begins with combining the password and salt as the initial input to a pseudorandom function, typically HMAC based on a secure hash like SHA-256. This function is then applied iterativelyreusing the output of each round as input to the nextfor the full iteration count, effectively "stretching" the weak password input into a robust intermediate value. If the desired output exceeds the length of a single iteration's result, multiple such blocks are generated and concatenated to achieve the required key size.
+The final output is a fixed-length bit string suitable for use as a symmetric encryption key, such as for algorithms like AES. For example, deriving a 256-bit AES key from a weak password like "password123" involves pairing it with a 128-bit random salt and performing 100,000 iterations; this process completes in seconds on standard hardware for authorized access but significantly slows potential attackers.
+
+Algorithm Details
+
+Parameters
+
+PBKDF2 requires five primary input parameters to derive a cryptographic key from a password: the password itself, a salt, an iteration count, the desired key length, and a pseudorandom function (PRF).
+The password (P) is a variable-length octet string serving as the base input, typically derived from user-provided text encoded in UTF-8 to ensure consistent byte representation across systems. It must be handled securely in memory and transmission to prevent leakage, as exposure could undermine the derivation process.
+The pseudorandom function (PRF) is a keyed function that takes the password as the key and produces a pseudorandom output from an input string; it is typically HMAC with an approved hash function such as SHA-256, with output length hLen in octets.
+The salt (S) is an octet string of random data, with a minimum length of 128 bits (16 bytes) to provide sufficient entropy and uniqueness for each key derivation. This randomness thwarts precomputation attacks, such as rainbow tables, by ensuring that identical passwords yield different outputs when paired with different salts; the salt is regenerated uniquely for every derivation and stored alongside the derived key for later verification.
+The iteration count (c) is a positive integer that dictates the number of HMAC computations performed during derivation, with a minimum value of 1 but a recommended baseline of at least 1,000 to increase computational resistance against brute-force attempts. For modern hardware, values of 100,000 or highersuch as 600,000 iterations when using HMAC-SHA256are advised to balance security against usability, with the exact number tunable based on the threat model, such as higher counts for server-side applications facing offline attacks.
+The desired key length (dkLen) specifies the output size in octets, a positive integer up to (2^32 - 1) times the PRF's output block length, allowing flexibility for various cryptographic needs. Common values include 32 bytes to match the key size for AES-256 encryption.
+
+Derivation Process
+
+The PBKDF2 derivation process generates a cryptographic key of specified length from a password by applying a pseudo-random function, typically HMAC, in an iterative manner to increase computational cost and resist brute-force attacks. When the desired key length exceeds the output size of the pseudo-random function, known as hLen, the process computes multiple independent blocks, each of length hLen, and concatenates them, truncating to the exact required length if necessary. The number of such blocks, denoted l, is the ceiling of dkLen divided by hLen. Each block is produced through a chained iteration of the pseudo-random function, followed by bitwise XOR combination of the results.
+The procedure begins by determining l as described. For each block index i ranging from 1 to l, the process computes a value F specific to that block. To do so, it first generates an initial chain value U1 by applying the pseudo-random function to the password using as input the concatenation of the salt and the four-octet big-endian integer representation of i. Subsequent chain values are then derived iteratively: for each iteration j from 2 to the iteration count c, Uj is obtained by applying the pseudo-random function to the password using the previous chain value U_{j-1} as input. The block Ti is the result of bitwise XORing all c chain values, U1 through Uc.
+Once all blocks are computed, the full intermediate output T is the concatenation of T1 through Tl. The final derived key consists of the first dkLen octets of T. Notably, the iteration for each block is performed independently, ensuring that the salt and block index uniquely initialize each chain, while the XOR operation aggregates the iterated computations within a block.
+A high-level outline of the per-block F computation can be described as follows: initialize the result and the first U value using the pseudo-random function on the password with salt concatenated to the block index encoding; then, loop c-1 times, updating U with the pseudo-random function on the password and the prior U, and accumulating the XOR of the new U into the result. The overall derivation then concatenates these F results across blocks before truncation. This structure, defined in the original specification, ensures deterministic output given the inputs while amplifying the effort required for key recovery.
+
+Mathematical Formulation
+
+The Password-Based Key Derivation Function 2 (PBKDF2) is formally defined as a function that takes a password PPP, a salt SSS, an iteration count ccc, and a desired key length dkLendkLendkLen in octets, producing a derived key DKDKDK of length dkLendkLendkLen. Specifically,
+PBKDF2(P,S,c,dkLen)=T1T2Tl(firstdkLenoctets),
+\text{PBKDF2}(P, S, c, dkLen) = T_1 || T_2 || \cdots || T_l \quad \text{(first } dkLen \text{ octets)},
+PBKDF2(P,S,c,dkLen)=T1T2Tl(firstdkLenoctets),
+where l=dkLen/hLenl = \lceil dkLen / hLen \rceill=dkLen/hLen, || denotes concatenation, and hLenhLenhLen is the output block length of the underlying pseudorandom function (PRF) in octets. Each block TiT_iTi for i=1,2,,li = 1, 2, \dots, li=1,2,,l is computed as
+Ti=F(P,S,c,i),
+T_i = F(P, S, c, i),
+Ti=F(P,S,c,i),
+where FFF is an auxiliary function that applies the PRF iteratively with XOR combinations.
+The auxiliary function FFF is defined as
+F(P,S,c,i)=U1U2Uc,
+F(P, S, c, i) = U_1 \oplus U_2 \oplus \cdots \oplus U_c,
+F(P,S,c,i)=U1U2Uc,
+with \oplus denoting bitwise XOR, U1=PRF(P,SINT(i))U_1 = \text{PRF}(P, S || \text{INT}(i))U1=PRF(P,SINT(i)), and Uk=PRF(P,Uk1)U_k = \text{PRF}(P, U_{k-1})Uk=PRF(P,Uk1) for each k=2,,ck = 2, \dots, ck=2,,c. Here, INT(i)\text{INT}(i)INT(i) represents the four-octet encoding of the positive integer iii in big-endian byte order (most significant octet first). The PRF is a keyed pseudorandom function that takes a secret key and an input string, producing a fixed-length output; by default, it is the HMAC keyed with PPP and using SHA-1 as the underlying hash function, yielding hLen=20hLen = 20hLen=20 octets. However, the definition is extensible to other PRFs, provided their output length hLenhLenhLen is known and they meet the requirements for a secure pseudorandom function.
+In the edge case where c=1c = 1c=1, the function F(P,S,1,i)F(P, S, 1, i)F(P,S,1,i) simplifies to a single application of the PRF: F(P,S,1,i)=PRF(P,SINT(i))F(P, S, 1, i) = \text{PRF}(P, S || \text{INT}(i))F(P,S,1,i)=PRF(P,SINT(i)), reducing the iteration to a direct computation without subsequent XORs. The resulting DKDKDK is obtained by truncating the concatenated blocks to exactly dkLendkLendkLen octets, ensuring the output matches the requested length while maintaining the security properties derived from the iterative mixing.
+
+Security Analysis
+
+Resistance to Attacks
+
+PBKDF2 provides strong resistance to brute-force attacks through its iterative application of a pseudorandom function (PRF), typically HMAC, which forces an attacker to perform a computationally intensive process for each password guess. With a high iteration count, such as 600,000 for PBKDF2-HMAC-SHA256, each trial requires the equivalent of approximately 0.1 seconds on a single modern CPU core, significantly slowing down exhaustive searches. This design ensures that the computational cost scales linearly with the number of iterations, allowing defenders to adjust the parameter based on available hardware to maintain a practical verification time while imposing a heavy burden on offline attackers.
+The mandatory inclusion of a unique, randomly generated salttypically at least 128 bits longprevents dictionary attacks and the use of precomputed rainbow tables, as an attacker must generate separate tables for every possible salt value, rendering such optimizations infeasible. This salting mechanism ensures that even identical passwords produce distinct derived keys, eliminating the efficiency gains from precomputation across multiple users or entries.
+PBKDF2 offers partial resistance to time-memory tradeoff attacks due to its iteration-based structure, which limits the benefits of parallelization despite its low memory footprint; however, this makes it susceptible to acceleration on GPUs and ASICs, where thousands of cores can perform iterations concurrently. To achieve effective protection against offline brute-force attacks, guidelines recommend at least 600,000 iterations for PBKDF2-HMAC-SHA256, calibrated to take roughly 100-500 milliseconds on defender hardware.
+Although PBKDF2's core design does not inherently protect against side-channel attacks, software implementations are vulnerable to timing and cache-based leaks unless constructed with constant-time operations to ensure uniform execution regardless of input.
+
+HMAC and Collision Vulnerabilities
+
+PBKDF2 was originally specified in 2000 using HMAC-SHA1 as its default pseudorandom function (PRF), where the key derivation process iteratively applies HMAC with SHA-1 as the underlying hash. This design leverages HMAC's keyed construction to produce pseudorandom output from the password and salt, with iterations intended to increase computational cost against brute-force attacks.
+In 2017, researchers from Google and the CWI Amsterdam demonstrated the first practical collision attack on SHA-1, achieving two distinct inputs with the same hash output after approximately 2^{63} SHA-1 computations, far below the ideal 2^{80} complexity for a 160-bit hash. While SHA-1's collision resistance is now broken, this does not directly compromise HMAC-SHA1 in PBKDF2, as HMAC security relies primarily on the PRF properties rather than full collision resistance of the hash alone. Theoretically, an attacker could attempt to forge HMAC outputs by exploiting collisions in the inner or outer padded messages, but this requires control over the secret key (the password in PBKDF2), which is infeasible without already knowing it.
+PBKDF2's salting and high iteration counts further mitigate potential collision-related risks, as each derivation is unique per salt and the iterations chain multiple HMAC calls, preventing direct reuse of precomputed collisions. Nonetheless, SHA-1's degraded security marginreducing effective collision effort to around 2^{61} in optimized attacksprompts recommendations against using HMAC-SHA1 for new PBKDF2 implementations.
+Although the 2000 specification defaults to HMAC-SHA1, a 2011 update to related standards permitted alternative PRFs like HMAC-SHA-256, and post-2017 guidance emphasizes migration to SHA-256 or SHA-512 for PBKDF2 to restore full security margins. NIST's SP 800-131A, revised in 2011 and reaffirmed in subsequent guidance, deprecates SHA-1 for most cryptographic uses, including recommending stronger hashes for key derivation functions like PBKDF2, with a full phase-out targeted by 2030. No complete break of HMAC-SHA1 has been achieved, but its use in legacy PBKDF2 systems warrants caution and eventual replacement to avoid reduced long-term security.
+
+Best Practices
+
+When implementing PBKDF2 for password-derived keys, select an iteration count that balances security and usability, aiming for a minimum of 600,000 iterations when using HMAC-SHA-256 to ensure resistance to brute-force attacks on modern hardware. Profile the iteration count on target hardware to achieve a derivation time of 100-500 milliseconds, providing a practical delay for legitimate users while significantly slowing offline attacks.
+Generate salts of at least 16 bytes (128 bits) using a cryptographically secure pseudorandom number generator (CSPRNG) to prevent rainbow table attacks and ensure uniqueness per derivation. Store the salt alongside the derived key in a modular crypt format, such as $pbkdf2$iterations$salt$key, to facilitate secure retrieval and verification without exposing components.
+Choose HMAC-SHA-256 or HMAC-SHA-512 as the underlying pseudorandom function, as these provide stronger collision resistance than HMAC-SHA-1, which should be avoided for new implementations due to known weaknesses; MD5 is entirely unsuitable. Implementations must employ constant-time HMAC operations to mitigate timing attacks that could leak information through execution time variations. Avoid naive parallelization of iterations, as it can undermine security unless performed with hardware-accelerated primitives validated for constant-time behavior.
+Be aware that GPU acceleration dramatically reduces the effectiveness of low iteration counts, enabling attackers to perform up to 10^9 guesses per second on optimized hardware for modest configurations, underscoring the need for high iterations. To maintain security as hardware advances, periodically re-derive keys for existing users by increasing the iteration count during password changes or maintenance windows, doubling it approximately every two years.
+
+History and Standards
+
+Development and Standardization
+
+PBKDF2 was developed by RSA Laboratories as an enhancement to password-based key derivation techniques, with the initial draft submitted in May 1999 by Burt Kaliski. The function was formalized in PKCS #5 version 2.0, authored by Kaliski, which introduced PBKDF2 as a more secure alternative to the earlier PBKDF1 by employing a pseudorandom function (PRF), typically HMAC, in place of a single hash iteration and incorporating a block index to prevent short keys from wrapping around iterations. This specification was published as IETF RFC 2898 in September 2000, obsoleting prior drafts and establishing PBKDF2 for deriving keys from passwords with configurable iteration counts to resist brute-force attacks.
+Standardization efforts integrated PBKDF2 into broader cryptographic frameworks, with RSA Laboratories updating the standard in PKCS #5 v2.1 to include minor enhancements and transfer oversight to the IETF, republished as RFC 8018 in 2017. In 2010, the National Institute of Standards and Technology (NIST) incorporated PBKDF2 into Special Publication 800-132, recommending it as a core component for password-based key derivation in storage applications, emphasizing its use with approved hash functions and salts.
+Subsequent evolution addressed practical and security updates; RFC 6070 in 2011 provided standardized test vectors for PBKDF2 implementations to ensure interoperability. NIST's deprecation of SHA-1, initially outlined in SP 800-131A in 2011 and reinforced in revisions through 2020, prompted recommendations to pair PBKDF2 with stronger PRFs like HMAC-SHA-256 to maintain resistance against collision attacks. Early adoption included its implementation in the OpenSSL cryptographic library, facilitating widespread use in software development.
+
+Implementations and Adoption
+
+PBKDF2 has been integrated into numerous cryptographic libraries, enabling its widespread use across programming languages and platforms. OpenSSL includes PBKDF2 functionality through APIs such as PKCS5_PBKDF2_HMAC and the more recent EVP_KDF-PBKDF2, which implements the function as defined in SP 800-132 for deriving keys from passwords using a salt and iteration count. Python's hashlib module in the standard library supports PBKDF2 with various hash functions like SHA-256, facilitating secure password hashing without external dependencies. For example, to derive a 32-byte encryption key and a 32-byte MAC key from a password and salt using PBKDF2-HMAC-SHA256, the following code can be used:
+import hashlib
+
+pwd = 'password'
+salt = b'salt' # In practice, use a random salt like os.urandom(16)
+iterations = 600000
+dklen = 64
+
+derived = hashlib.pbkdf2_hmac('sha256', pwd.encode('utf-8'), salt, iterations, dklen)
+ek = derived # 32-byte encryption key
+mk = derived # 32-byte MAC key
+This generates a 64-byte derived key, which is then split into two 32-byte keys. The iteration count of 600,000 aligns with OWASP recommendations for balancing security and performance. In Java, the javax.crypto package provides PBKDF2 via SecretKeyFactory and PBEKeySpec, allowing developers to generate keys from passphrases with configurable iterations and salts. Similarly, .NET Framework and .NET Core offer PBKDF2 through the Rfc2898DeriveBytes class, which adheres to RFC 2898 specifications for password-based key derivation.
+In networking protocols, PBKDF2 plays a key role in Wi-Fi security standards. WPA2 Personal and WPA3 Personal in legacy pre-shared key (PSK) mode employ PBKDF2 with HMAC-SHA1 and 4096 iterations to derive the 256-bit Pairwise Master Key (PMK) from the pre-shared key passphrase and SSID, enhancing resistance to offline dictionary attacks on captured handshakes. Native WPA3 Personal mode, however, uses the Simultaneous Authentication of Equals (SAE) protocol instead. The WPA3 standard, introduced in 2018, retains PBKDF2 for legacy PSK compatibility while introducing SAE for enhanced protection in password-based setups. PBKDF2 is also utilized in the Secure Remote Password (SRP) protocol for deriving verifiers from passwords, combining it with modular exponentiation to prevent eavesdropping during authentication.
+Mobile operating systems leverage PBKDF2 for secure key management. In iOS, the Keychain services apply PBKDF2 with 10 million iterations to derive keys from backup passwords for protecting keybags in encrypted backups. Android's Keystore system uses PBKDF2 to derive a master key from the screen lock credential (such as a PIN), encrypting it with AES to safeguard app-specific keys and sensitive data. Disk encryption tools like VeraCrypt (successor to TrueCrypt) rely on PBKDF2-HMAC variants, including SHA-512 and Whirlpool, to derive volume header keys from user passwords, supporting multiple iterations for added security.
+PBKDF2 remains a default choice in many password managers and web frameworks due to its standardization and ease of implementation. For instance, LastPass employs PBKDF2-SHA256 with a default of 600,000 iterations (as of 2025) to encrypt user vaults, balancing security against brute-force attacks with acceptable login times. In web development, Django uses PBKDF2 as its default password hasher, with version 4.0 (released in 2021) increasing iterations to 260,000 for PBKDF2SHA256 to strengthen defenses; as of version 5.2 (April 2025), this has been further increased to 1,000,000 iterations, while also supporting Argon2 as an optional upgrade via the argon2-cffi library.
+Despite its ubiquity, adopting stronger parameters in legacy systems poses challenges, as increasing iteration counts can degrade performance on older hardware, complicating migrations without rehashing existing credentials. On contemporary processors like Intel Core i7, PBKDF2-SHA1 achieves approximately 1.6 million iterations per second in benchmarks, allowing secure configurations with hundreds of thousands of rounds while maintaining sub-second derivation times.
+
+Alternatives and Comparisons
+
+Other Key Derivation Functions
+
+PBKDF1 serves as the predecessor to PBKDF2 in the PKCS #5 standard, applying a single hash function such as MD2, MD5, or SHA-1 directly to the concatenation of the password and salt, iterated a specified number of times to derive a key. This direct hashing approach lacks the use of a pseudorandom function like HMAC, limiting the output length to the hash function's digest sizeup to 128 bits for MD5 or 160 bits for SHA-1and making it susceptible to length extension attacks inherent to Merkle-Damgrd hash constructions like those used in MD5 and SHA-1. Due to these constraints, PBKDF1 is considered legacy and is recommended only for compatibility with existing systems.
+Bcrypt, introduced in 1999 by Niels Provos and David Mazires, is an adaptive password-hashing function designed primarily for secure storage of user credentials. It modifies the Blowfish block cipher through an expensive key setup phase, known as Eksblowfish, where the cost is exponentially scaled via a work factor (typically denoted as the logarithm base 2 of iterations, starting from 2^4). A 128-bit salt is incorporated into the process to prevent precomputation attacks like rainbow tables, and the output is a fixed 184-bit string encoding the salt, work factor, and hash, facilitating easy verification. This design emphasizes resistance to brute-force attacks by allowing the computational cost to increase over time as hardware improves.
+Scrypt, developed by Colin Percival in 2009, is a memory-hard key derivation function aimed at hindering parallelization on specialized hardware like GPUs or ASICs. It begins by generating a large array of pseudorandom values using the password, salt, and parameters N (memory cost), r (block size), and p (parallelism), requiring approximately N * 128 bytes of memory per invocationoften around 128 MB for N=2^{20} in practical settings. The core operation involves the Salsa20/8 core function to mix values in the array through sequential reads and writes, followed by a final PBKDF2-like stretching step with HMAC-SHA-256. Scrypt has been adopted in cryptocurrency mining, notably as the proof-of-work algorithm in Litecoin since its launch in 2011, to promote broader participation beyond ASIC dominance.
+Argon2 emerged as the winner of the 2015 Password Hashing Competition (PHC), a multi-year effort to identify a modern, secure password-hashing standard resistant to side-channel and parallel attacks. Designed by Alex Biryukov, Daniel Dinu, and Dmitry Khovratovich, it is a memory-hard function with tunable parameters for time cost (iterations), memory cost (in kibibytes, typically 64 KiB to 1 GiB or more to enforce high RAM usage), and lanes (parallelism degree, up to 2^{24} for multi-core resistance). The algorithm proceeds in three phases: filling a matrix with pseudorandom data via Blake2b hashing of the password, salt, and parameters; processing the matrix through a permutation-based mixing (using a data-dependent or independent addressing mode); and extracting the output via another Blake2b invocation. It features three variantsArgon2d for data-dependent indexing (resistant to GPU/ASIC trade-offs), Argon2i for data-independent addressing (side-channel resistant), and the hybrid Argon2idto address different threat models, with memory parameters explicitly adjustable to balance security and performance.
+HKDF, specified in 2010 by Hugo Krawczyk, is an HMAC-based extract-and-expand key derivation function suited for deriving keys from high-entropy sources like Diffie-Hellman shared secrets or random nonces, rather than low-entropy passwords. It operates in two steps: an optional extraction phase using HMAC to compress input key material and salt into a fixed-length pseudorandom key (PRK), followed by an expansion phase that applies HMAC iteratively with an info string and optional context to produce multiple keys of desired lengths. This modular design ensures provable security under the HMAC assumption when the input entropy is sufficient, making it a building block in protocols like TLS but not optimized for password stretching.
+
+When to Use PBKDF2 vs Alternatives
+
+PBKDF2 offers several strengths that make it suitable for specific scenarios, including its simplicity in implementation, relatively fast performance on standard CPUs, and broad support across programming languages and platforms. These attributes render it ideal for resource-constrained environments, such as embedded systems or legacy applications where computational overhead must be minimized, and for ensuring compatibility with existing infrastructures that mandate FIPS-140 validated algorithms.
+However, PBKDF2 has notable weaknesses, particularly its lack of memory-hardness, which allows it to be efficiently parallelized on GPUs and custom hardware like ASICs, potentially yielding speedups of several orders of magnitude over CPU-based computationsfor instance, GPU attacks can achieve rates exceeding billions of iterations per second compared to thousands on a typical CPU. Additionally, legacy implementations often pair it with SHA-1, which is now considered insecure due to collision vulnerabilities, necessitating the use of stronger primitives like HMAC-SHA-256 to mitigate risks.
+In comparison to bcrypt, PBKDF2 excels in general key derivation tasks where variable-length outputs are required, as bcrypt is primarily designed for fixed-output password hashing (typically 184 bits) and is less flexible for producing keys of arbitrary lengths. While bcrypt provides better resistance to hardware acceleration through its adaptive cost parameter and Blowfish-based construction, making it slower and thus more secure for password storage in server environments, PBKDF2 remains preferable when speed and output flexibility are prioritized over bcrypt's built-in work factor adaptability.
+Against memory-hard alternatives like scrypt and Argon2, PBKDF2 falls short for high-security password storage applications, as these functions impose significant RAM requirements that hinder parallel attacks on GPUs and ASICs, providing superior protection against brute-force efforts in scenarios with substantial threat models. Scrypt, with its tunable memory and CPU costs, and Argon2 (the Password Hashing Competition winner), offer enhanced resistance to side-channel and hardware exploits compared to PBKDF2's iteration-only model; thus, they are recommended for new systems handling sensitive credentials, while PBKDF2 may suffice for low-risk uses if iteration counts are tuned sufficiently high (e.g., 600,000 for SHA-256).
+As of November 2025, OWASP recommends Argon2id as the preferred password hashing algorithm, followed by scrypt and bcrypt, with PBKDF2 suitable for FIPS-140 compliance needs. NIST SP 800-63B-4 (July 2025) approves PBKDF2 for password verifiers when using approved hashing functions with sufficient computational cost (salted and iterated), alongside memory-hard options like Argon2, without mandating migration from PBKDF2. For interoperability or compliance needs, such as FIPS environments, PBKDF2 with HMAC-SHA-256 remains a viable choice, though prioritizing Argon2id, bcrypt, or scrypt is advised for novel implementations to address evolving hardware threats.
+
+References
+
+RFC 8018 - PKCS #5: Password-Based Cryptography Specification ...
+
+ NIST SP 800-132, Recommendation for Password-Based Key ...
+
+pbkdf2 package - golang.org/x/crypto/pbkdf2 - Go Packages
+
+https://datatracker.ietf.org/doc/html/rfc2898#section-5.2
+
+https://datatracker.ietf.org/doc/html/rfc2898#section-5
+
+https://datatracker.ietf.org/doc/html/rfc2898#section-6.2
+
+https://pages.nist.gov/800-63-3/sp800-63b.html#sec4-2-2
+
+Password Storage - OWASP Cheat Sheet Series
+
+https://datatracker.ietf.org/doc/html/rfc2898#section-8
+
+RFC 2898 - PKCS #5: Password-Based Cryptography Specification ...
+
+RFC 2898: Password-Based Cryptography Specification, Version 2.0
+
+On PBKDF2 iterations - Neil Madden
+
+On time-memory trade-offs for password hashing schemes - Frontiers
+
+Why is HMAC-SHA1 still considered secure?
+
+Is PBKDF2/RFC 2898 broken because SHA1 is broken?
+
+ Transitioning the Use of Cryptographic Algorithms and Key Lengths
+
+ Acceleration Attacks on PBKDF2 Or, what is inside the black-box of ...
+
+Who is author/designer/creator of PBKDF2 algorithm?
+
+Information on RFC 6070 - RFC Editor
+
+EVP_KDF-PBKDF2 - OpenSSL Documentation
+
+Password hashing in Python with pbkdf2 - Simon Willison: TIL
+
+Hashing and Validation of PBKDF2 in Java Implementation - MojoAuth
+
+Introduction to WPA Key Hierarchy - NetworkLessons.com
+
+WPA3-Personal | TechDocs - WLAN, SD-Branch, & Location Services
+
+Feeding PBKDF2 to SRP verifier creation
+
+Keybags for Data Protection - Apple Support
+
+ A Practical Forgery Attack Against Android KeyStore
+
+pbkdf2-hmac - VeraCrypt
+
+About password iterations - LastPass Support
+
+Django 4.0 release notes
+
+Hashing Performance - Liferay.Dev
+
+ A Future-Adaptable Password Scheme - USENIX
+
+ stronger key derivation via sequential memory-hard functions colin ...
+
+ Argon2: the memory-hard function for password hashing and other ...
+
+RFC 5869 - HMAC-based Extract-and-Expand Key Derivation ...
+
+NIST Special Publication 800-63B
+
+Password Hashing Showdown: Argon2 vs bcrypt vs scrypt vs PBKDF2
+
+ NIST SP 800-63B-4 Second Public Draft, Digital Identity Guidelines
+
+Password Storage - OWASP Cheat Sheet Series
+
+hashlib Secure hashes and message digests Python 3.14.2 documentation
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

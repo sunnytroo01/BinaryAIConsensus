@@ -1,0 +1,253 @@
+ABA problem Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+ABA problem
+ Ara Eve Leo Sal 
+1x
+ The ABA problem is a concurrency hazard in lock-free programming algorithms that utilize atomic operations, such as compare-and-swap (CAS), where a shared memory location is read as value A by one thread, temporarily modified to B and then restored to A by another thread, misleading the first thread into believing the value remained unchanged despite intervening alterations. This issue can lead to subtle data corruption, invalid memory accesses, or violations of algorithm invariants, particularly in nonblocking data structures like queues or stacks implemented without locks.
+The problem stems from the value-based comparison in atomic primitives like CAS, which succeed if the current value matches the expected one but fail to detect intermediate changes that revert the value, especially when pointers or references are involved in dynamic memory environments. A classic example occurs in a lock-free linked list dequeue operation: Thread T1 reads the head pointer as node A; meanwhile, Thread T2 removes A, processes subsequent nodes, and reinserts A (or a recycled node with the same address); T1 then performs a CAS assuming A is still valid, potentially linking to deallocated memory or skipping nodes. Such scenarios are exacerbated in multithreaded systems on multicore processors, where the absence of locks aims for progress guarantees but introduces these race conditions.
+To mitigate the ABA problem, developers often employ techniques like tagging pointers with version counters or timestamps to track modifications beyond mere value equality, requiring wider atomic operations (e.g., 128-bit CAS on 64-bit systems). Alternative approaches include load-linked/store-conditional (LL/SC) instructions, which are inherently ABA-resistant but have limited hardware support, or integrating safe memory reclamation methods like hazard pointers or epoch-based garbage collection to prevent reuse of freed objects. Systematic analyses classify ABA risks in descriptor-based lock-free designs, proposing prevention schemes that maintain performance comparable to specialized instructions like double-wide CAS while avoiding overflow issues in counters. These solutions are critical for reliable concurrent software in real-time and high-performance computing applications.
+
+Background
+
+Lock-free programming
+
+Lock-free programming refers to a class of non-blocking synchronization techniques in concurrent systems where algorithms ensure that at least one thread makes progress toward completion of its operation in a finite number of its own steps, regardless of the scheduling or speed of other threads. This contrasts with wait-free algorithms, which provide the stronger guarantee that every thread completes its operation in a finite number of its own steps, independent of other threads' behavior. Lock-free approaches avoid traditional locks, such as mutexes, which can lead to blocking, priority inversion, and convoying effects under contention, thereby improving scalability on multiprocessor systems.
+The foundations of lock-free programming trace back to theoretical work in the late 1980s and early 1990s, driven by the rise of shared-memory multiprocessors that demanded efficient concurrent data structures. Maurice Herlihy's seminal contributions, including impossibility results for wait-free implementations and hierarchies of synchronization primitives, established key limits and possibilities for non-blocking designs during this period. By the mid-1990s, practical lock-free algorithms emerged as hardware support for atomic operations became more widespread, enabling implementations that balanced performance and correctness in multithreaded environments.
+Common applications of lock-free programming include concurrent queues and stacks, which are essential for producer-consumer patterns in parallel computing and operating systems. For instance, lock-free queues facilitate efficient message passing in multiprocessor systems, while stacks support last-in, first-out operations in thread-safe memory allocation. Memory reclamation mechanisms in garbage-collected or manual systems also leverage lock-free techniques to manage dynamic data structures without halting progress.
+The ABA problem arises as a prerequisite in lock-free programming due to its heavy reliance on atomic operations, such as compare-and-swap, for synchronization in the absence of mutual exclusion mechanisms like locks. These operations enable optimistic concurrency control by allowing threads to update shared variables only if they match expected values, but they expose vulnerabilities when values appear unchanged despite intervening modifications by other threads.
+
+Compare-and-swap operation
+
+The compare-and-swap (CAS) operation is an atomic instruction that reads the value from a specified memory location, compares it to an expected value, andif they matchconditionally writes a new value to that location, all performed indivisibly to ensure thread safety in concurrent environments. This primitive enables optimistic concurrency control by allowing threads to attempt updates without acquiring locks, succeeding only if no intervening modifications occurred.
+In pseudocode, a typical CAS implementation can be expressed as follows:
+if (*ptr == expected) {
+ *ptr = new_value;
+ return true; // (/page/Success)
+} else {
+ return false; // Failure
+}
+This form assumes the operation returns a success indicator, though variants may return the original value read from memory for further processing.
+Hardware implementations of CAS vary by architecture but provide the necessary atomicity at the processor level. On x86 and x86-64 processors, it is realized through the CMPXCHG instruction, which compares the contents of the accumulator register (e.g., EAX or RAX) with a destination operand; if equal, it stores a source operand into the destination and sets the zero flag (ZF=1), otherwise it loads the destination value into the accumulator (ZF=0). The LOCK prefix ensures bus locking for multi-processor atomicity when accessing shared memory. On ARM architectures, CAS is emulated using a pair of exclusive load and store instructions: LDREX (Load Register Exclusive) marks a memory address for exclusive access by loading its value, while STREX (Store Register Exclusive) attempts to store a new value only if no other processor has modified the address since the LDREX, returning success (0) or failure (1) accordingly.
+In lock-free programming, CAS serves as a foundational building block for constructing higher-level concurrent data structures, such as stacks, queues, and linked lists, by enabling retry loops that resolve conflicts through repeated atomic attempts. However, its reliance on direct value equality for the comparison overlooks any intermediate state changes to the memory location, which can introduce vulnerabilities in scenarios involving pointer reuse or value recycling.
+
+The ABA Problem
+
+Definition
+
+The ABA problem is a synchronization anomaly that arises in concurrent programming when a thread performs a compare-and-swap (CAS) operation on a shared memory location, erroneously perceiving no change in its value despite intermediate modifications by other threads. Specifically, it occurs as a false positive in CAS-based speculation, where one thread reads a value A from the location, another thread alters it to B and then back to A, allowing the first thread's CAS to succeed under the false assumption that the state remains unchanged. This issue stems from the atomic primitive's reliance on value equality alone, without tracking the history of modifications.
+Key characteristics of the ABA problem include its occurrence across multiple threads accessing shared memory in a multiprocessor environment, where the problem is triggered by the reuse of the same value in a location after transient changes. It fundamentally involves optimistic concurrency control mechanisms that depend on CAS for progress guarantees, leading to incorrect assumptions about data consistency. The anomaly highlights limitations in detecting intervening operations solely through value comparison, potentially resulting in subtle semantic errors in algorithm execution.
+Theoretically, the ABA problem relates to violations of linearizability in concurrent object implementations, as framed in Maurice Herlihy's hierarchy of synchronization primitives, where non-blocking algorithms struggle to maintain atomicity without additional safeguards. It underscores challenges in achieving wait-free or lock-free progress in the consensus hierarchy, as CAS alone cannot resolve certain forms of interference.
+The scope of the ABA problem is primarily confined to lock-free and non-blocking synchronization schemes that employ CAS operations, though it can manifest in other optimistic concurrency approaches; it does not affect traditional lock-based synchronization, which serializes access to prevent such races.
+
+Failure mechanism
+
+The failure mechanism of the ABA problem unfolds through a specific sequence of concurrent thread interactions involving a compare-and-swap (CAS) operation. Consider two threads accessing a shared memory location. Thread 1 first reads the value A from the location as part of preparing a CAS to update it conditionally. Before Thread 1 executes the CAS, Thread 2 intervenes: it reads the current value (A), modifies the location to a different value B (which may involve freeing or reallocating the associated object), and then restores the location to a new value A' that numerically matches the original A but represents a distinct state or object. When Thread 1 finally performs the CAScomparing the expected value A against the current value and writing a new value if they matchthe operation succeeds because A equals A', even though significant changes occurred in between.
+This erroneous success stems from the root cause of the CAS primitive: it performs a shallow comparison based solely on the numerical equality of the values at the memory location, without verifying deeper aspects such as the object's identity, state history, or ongoing validity. As a result, Thread 1 remains unaware of the intermediate modification, treating the restored value as unchanged and proceeding with an update that overlooks Thread 2's alterations.
+The implications for program correctness are severe, potentially leading to lost updates where Thread 2's changes are overwritten without effect, use-after-free errors if the original object was deallocated and reused, or infinite loops in memory reclamation schemes that fail to detect retired nodes. These issues can manifest as data corruption, crashes, or subtle inconsistencies in lock-free algorithms.
+The probability of encountering the ABA problem increases in environments with frequent memory reuse, such as those using object pools or manual allocation. It is lower in garbage-collected languages, where the garbage collector prevents the reuse of memory addresses for referenced objects, though the risk is not entirely eliminated.
+
+Examples
+
+Shared variable scenario
+
+In the shared variable scenario, the ABA problem arises in a simple lock-free implementation where multiple threads use compare-and-swap (CAS) to update a shared integer counter, such as a reference count or balance, and concurrent operations allow the value to temporarily change and revert, leading to incorrect outcomes. Consider a counter initialized to 1, where Thread 1 attempts an atomic decrement: it loads the value (1), computes the new value (0), and issues a CAS to update if unchanged.
+Before Thread 1's CAS executes, Thread 2 performs an increment, raising the counter to 2 (reflecting an additional reference or deposit). Subsequently, another operation (e.g., by Thread 2 or a third thread) decrements it back to 1, restoring the original observed value. Thread 1's CAS then succeeds, setting the counter to 0, as the current value matches its loaded snapshot of 1despite the intervening increment to 2 having been effectively lost.
+This demonstrates a lost update, where the final counter value (0) undercounts the true net operations (initial 1 plus one increment minus one decrement should yield 1, but the intermediate increment is skipped). The pseudocode for such atomic decrement and increment operations is as follows:
+Atomic Decrement:
+decrement() {
+ do {
+ old = load(counter);
+ new_val = old - 1;
+ } while (!CAS(&counter, old, new_val));
+}
+Atomic Increment:
+increment() {
+ do {
+ old = load(counter);
+ new_val = old + 1;
+ } while (!CAS(&counter, old, new_val));
+}
+
+This scalar variable case isolates the ABA issue to value reversion without involving pointer aliasing or memory reuse, making it an accessible introduction to the failure mechanism in CAS-based synchronization.
+
+Linked list removal
+
+In lock-free implementations of concurrent data structures, the ABA problem frequently manifests during node removal operations in singly-linked lists, such as stacks or queues, where an atomic head pointer is used to manage the list structure. Consider a simple lock-free stack represented as a singly-linked list, with the top element pointed to by an atomic head pointer. Each node contains a value and a next pointer. The removal operation, often called pop, attempts to atomically update the head to the next node if the current head matches the expected value, using a compare-and-swap (CAS) instruction. This design avoids locks but exposes the structure to concurrency hazards.
+The failure arises when one thread reads the head pointer, only for another thread to modify the list in a way that restores the original pointer value, misleading the CAS. For instance, suppose the stack initially has nodes A (top, value X) B null. Thread 1 reads head = A. Meanwhile, Thread 2 pops A (sets head = B via CAS), then pops B (sets head = null). The memory for node A is then reused to allocate a new node C (with the same address as A but potentially different content). Thread 2 pushes C onto the now-empty stack, setting head = C (which has the same address as A). When Thread 1 resumes and performs CAS to update head from A to B, the CAS succeeds because the current head matches the address of A again, even though B has been removed and the list state has fundamentally changednow incorrectly linking the invalid B as the new head and potentially losing C. This scenario relies on unsafe memory reclamation allowing immediate reuse of freed node memory to produce the ABA condition with identical pointer values.
+The following pseudocode illustrates a basic lock-free pop operation susceptible to this issue (adapted from standard Treiber stack implementations, where ABA occurs due to pointer reuse without safeguards):
+Node* pop(atomic<Node*>* head) {
+ Node* old_head;
+ Node* new_head;
+ do {
+ old_head = atomic_load(head);
+ if (old_head == nullptr) return nullptr;
+ new_head = old_head->next;
+ } while (!atomic_cas(head, old_head, new_head));
+ return old_head;
+}
+Here, Thread 1 loads old_head = A, computes new_head = B, but before CAS, Thread 2 alters the list such that head returns to A (via reuse). The CAS then spuriously succeeds, detaching B incorrectly.
+In real-world applications, such as concurrent queues or deques used in high-performance systems like multithreaded servers or parallel processing frameworks, this corruption can lead to severe issues: infinite loops during traversal if cycles form from mislinked nodes, memory leaks from un-reclaimable detached nodes, or data loss as elements are erroneously skipped or duplicated. These impacts have been documented in analyses of non-blocking list-based structures, where unchecked pointer changes during removal exacerbate scalability problems in multiprocessor environments.
+
+Mitigation Strategies
+
+Tagged pointers
+
+Tagged pointers provide a software-based mitigation for the ABA problem in lock-free data structures by embedding a version counter or tag directly into the pointer value, leveraging unused bits to distinguish between different instances of the same address. On 64-bit architectures, pointers are typically aligned to 8-byte boundaries, leaving the low-order 3 bits available for tagging without impacting address resolution, though larger alignments can free up to 4 or more bits. The compare-and-swap (CAS) operation targets the entire tagged pointer as a single atomic unit, ensuring that both the address and tag must match the expected value for the update to succeed.
+In implementation, the tag is incremented monotonically each time the associated pointer is modified, such as during node insertion or removal in a concurrent structure. This prevents ABA failures because, even if the pointer address reappears unchanged, the updated tag will mismatch the original read value, causing the CAS to fail and prompting the thread to retry. For architectures supporting double-wide CAS instructions like cmpxchg16b on x86-64, larger tagsup to 16 bitscan be packed alongside the 48-bit effective address space, enhancing robustness against tag overflow.
+The advantages of tagged pointers include minimal runtime overhead, as they avoid extra memory allocations or per-thread tracking structures, and seamless integration with standard CAS primitives when tags fit within the pointer width. However, limitations arise from the scarcity of unused bits, restricting tag range and risking overflow in long-running or high-throughput scenarios, and lack of portability across platforms without consistent alignment guarantees or double-wide atomic support.
+This technique gained prominence in the 2000s for constructing lock-free stacks and similar structures, as seen in scalable implementations that pair it with pooled memory management. It is utilized in modern libraries like libcds, where tagged variants of intrusive free lists employ it to avert ABA issues without relying on separate memory reclamation schemes. For instance, in linked list removal operations, the tagged successor pointer detects reuse of freed nodes.
+
+Hazard pointers
+
+Hazard pointers are a lock-free memory reclamation technique designed to safely manage the deletion of nodes in concurrent data structures, ensuring that threads do not access deallocated memory while preventing the ABA problem. Introduced by Maged M. Michael in 2004, the method relies on threads publishing "hazard pointers"single-writer, multi-reader shared pointers (typically one or two per thread)to indicate nodes they are currently accessing or may access imminently. A node can only be reclaimed if no active hazard pointers reference it, allowing arbitrary reuse of memory without locks while maintaining thread safety.
+The process begins when a thread accesses a node in a lock-free structure, such as during a traversal or operation; it first reads the relevant pointer and then atomically sets its hazard pointer to that value, signaling protection. Upon logical removal of a node (e.g., unlinking from a list), the thread retires it by adding the pointer to a private local list rather than immediately freeing it. When this local list reaches a thresholdtypically set to approximately $ H + \sqrt{H} $, where $ H $ is the total number of hazard pointers across all threadsthe thread performs a reclamation scan: it collects all current hazard pointers from other threads into a list or set, then checks each retired pointer against this collection. Any retired node not matching an active hazard pointer is safely deallocated, with the process repeating periodically to bound memory usage.
+This mechanism prevents the ABA problem by guaranteeing that a retired node remains in memory until all potentially accessing threads have updated their hazard pointers away from it, avoiding scenarios where a node transitions from state A to deletion, reuse (back to A), and causes a false compare-and-swap success. Unlike simpler versioning approaches like tagged pointers, hazard pointers provide fine-grained, per-node protection without requiring hardware extensions, though they complement such methods in hybrid designs.
+The time complexity of a reclamation scan is $ O(H^2) $ in the basic implementation, as each of the $ O(H) $ retired nodes in the local list must be compared against all $ H $ hazard pointers, though amortized costs per retirement are $ O(1) $ due to infrequent scans. Hazard pointers scale well under contention, with experimental evaluations showing lock-free structures using them achieving up to 9 times the throughput of lock-based alternatives on multi-processor systems with 16 threads.
+Hazard pointers are widely adopted in lock-free libraries for languages without automatic garbage collection, such as C++ implementations in Boost and proposals for standardization in C++26, and have been applied to data structures like queues, stacks, and hash tables. In Java, they appear in specialized concurrent libraries for manual memory management, though the language's garbage collector often suffices for standard collections.
+
+Epoch-based reclamation
+
+Epoch-based reclamation (EBR) is a memory management technique designed to safely deallocate objects in lock-free data structures, addressing the ABA problem by deferring reclamation until it is guaranteed that no thread holds a stale reference to the object. In this approach, execution is divided into discrete epochs marked by a global counter, and threads coordinate to ensure that retired objectsthose removed from the data structure but potentially still referencedare held in limbo until all threads have advanced beyond the epoch in which they were retired. This batching mechanism allows for safe reuse of memory only after a sufficient grace period, preventing the scenario where an object is deleted, reused with the same address, and modified in a way that misleads a concurrent compare-and-swap operation.
+The core mechanism involves threads entering an epoch at the start of an operation by reading the global epoch counter and announcing their participation, typically via a shared array or local record. During the operation, threads may retire objects by adding them to a per-epoch limbo list or bag. To exit the epoch, threads update their announcement to reflect the new global epoch, often during quiescent periods when no critical sections are active. Reclamation occurs when all threads have announced the current epoch, at which point objects from the epoch two prior can be safely freed, as no thread can still be accessing them. This process relies on threads periodically checking and advancing epochs, ensuring cooperative progress.
+Implementation typically uses an atomic global epoch counter, incremented infrequently to mark epoch boundaries, alongside per-thread epoch records to track participation. Retired objects are collected in a small number of limbo listsoften three, cycling as epochs advanceand reclamation is triggered probabilistically by threads scanning the announcement array to verify global progress. In lock-free settings, this integrates with data structure operations by deferring object retirement until after successful updates, such as in skip lists or queues, where a per-object flag may temporarily hold items in limbo.
+EBR avoids the ABA problem by ensuring that reclaimed objects cannot be immediately reused; the epoch-based grace period guarantees that any thread reading the object address during a critical section will see it in a consistent state before potential reuse in a future epoch. This temporal separation prevents the "A to B and back to A" sequence that could validate an erroneous CAS, as intermediate changes occur only after all possible readers have quiesced.
+A key advantage of EBR is its scalability to many threads, with O(1) overhead per operation due to the global, batched nature of reclamation, avoiding per-object synchronization. Originally proposed by Fraser in his 2004 thesis for practical lock-free systems, it has been refined in subsequent works, such as distributed variants that enhance progress under contention. However, drawbacks include potential memory bloat from unreclaimed objects if threads stall or crash, as reclamation requires all threads to advance epochs cooperatively, and it assumes non-preemptive or quiescent scheduling to avoid indefinite delays. Compared to finer-grained alternatives like hazard pointers, EBR offers lower per-operation costs but at the expense of global coordination.
+
+Alternative Primitives
+
+Load-linked store-conditional
+
+The load-linked/store-conditional (LL/SC) primitive consists of two instructions designed for atomic memory operations in multithreaded environments. The load-linked (LL) instruction reads the current value from a specified memory location and simultaneously establishes a processor-specific reservation on that location, typically implemented via hardware mechanisms like exclusive monitors or cache reservations. The subsequent store-conditional (SC) instruction attempts to write a new value to the same location but succeeds only if no other processor (or the same processor in some cases) has modified that location since the LL; otherwise, it fails without writing and returns a failure indicator. This reservation-based approach ensures that the update is atomic without requiring a value comparison, directly addressing synchronization needs in concurrent programming.
+A typical implementation of an atomic update using LL/SC involves a retry loop, as shown in the following pseudocode:
+retry:
+ val LL(address)
+ // Perform computation to derive new_val from val
+ if SC(address, new_val) then
+ return success // Update committed atomically
+ else
+ goto retry // Reservation invalidated; retry
+The SC fails on any intervening write to the address, forcing a retry, which guarantees progress under reasonable contention but may require multiple attempts. This mechanism has been integral to lock-free algorithms since the early 1990s, enabling non-blocking implementations of shared data structures without the mutual exclusion overhead of locks.
+LL/SC instructions are supported in several prominent architectures, including ARM (via LDREX for load-exclusive and STREX for store-exclusive), PowerPC (lwarx for load word and reserve indexed and stwcx. for store word conditional indexed), and RISC-V (LR for load-reserved and SC for store-conditional). Unlike compare-and-swap (CAS), which verifies that the loaded value matches the expected old value before storing, LL/SC detects any modification to the location regardless of the new value written, rendering it inherently immune to the ABA problem where a value cycles back to its original state undetected.
+Despite its advantages, LL/SC has limitations, including the potential for spurious SC failures due to non-conflicting events such as cache line evictions or monitor resets, which can lead to livelock in high-contention or many-core systems if retries are not managed with backoff strategiesthough such cases are rare in practice. Additionally, LL/SC operations generally incur higher latency than single-instruction CAS due to the need for reservation tracking and potential coherence traffic across multiple instructions.
+
+Double-wide compare-and-swap
+
+The double-wide compare-and-swap (DWCAS), also referred to as double compare-and-swap (DCAS) when applied to adjacent words, is an atomic synchronization primitive that simultaneously compares two adjacent memory locations to a pair of expected values and, if both match, replaces them with a pair of new values in a single indivisible operation. This extends the standard single-word compare-and-swap (CAS) to handle multi-word updates atomically, enabling more robust concurrent modifications without intermediate states visible to other threads. On 64-bit architectures, DWCAS typically operates on 128-bit aligned memory, treating two 64-bit words as a single unit.
+In the context of the ABA problem, DWCAS mitigates the issue by pairing a pointer with an adjacent version counter or tag within the same atomic operation. For instance, when updating a shared pointer, a thread reads both the pointer and its associated counter; if another thread modifies either (e.g., by removing and reinserting a node, incrementing the counter), the DWCAS will fail upon reattempt, detecting the change and preventing the false success that single-word CAS might allow. This approach ensures that the operation only succeeds if the entire paired state remains unchanged, providing a hardware-supported way to track liveness without relying solely on software techniques.
+Hardware support for DWCAS is available through instructions like Intel's CMPXCHG16B on x86-64 processors, which performs the 128-bit comparison and exchange on aligned memory operands, requiring the LOCK prefix for atomicity across multi-core systems. While native on modern x86 and some ARM extensions, DWCAS can be emulated in software using sequences of single-word CAS operations, though this emulation is significantly more expensive in terms of contention and steps due to the need for additional synchronization to simulate atomicity.
+DWCAS has been applied in constructing lock-free data structures such as deques, queues, and hash tables, where atomic multi-word updates are essential for maintaining consistency under high contention. Seminal work in the late 1990s and early 2000s by Afek et al. explored DWCAS for universal constructions that transform sequential objects into non-blocking concurrent versions, and for specialized structures like concurrent deques that avoid blocking while handling dynamic resizing. These applications demonstrate DWCAS's power in enabling progress guarantees in shared-memory systems, particularly for pointer-based algorithms prone to ABA.
+Despite its benefits, DWCAS introduces trade-offs including increased algorithmic complexity from managing paired state, higher cache line pressure due to atomic access across two words (potentially spanning cache boundaries), and limited universality compared to more general primitives, as it requires adjacent locations and is not available on all hardware without emulation overhead. While powerful for specific multi-word synchronization needs, its adoption is balanced against these costs in performance-critical designs.
+
+References
+
+CON09-C. Avoid the ABA problem when using lock-free algorithms - SEI CERT C Coding Standard - Confluence
+
+Understanding and Effectively Preventing the ABA Problem in ...
+
+The Balancing Act of Choosing Nonblocking Features
+
+ Wait-free synchronization - Brown CS
+
+None
+
+Lockless patterns: an introduction to compare-and-swap - LWN.net
+
+ Instruction Set Reference, A-Z - Intel
+
+ldrex - Arm Developer
+
+ARM Architecture Reference Manual ARMv7-A and ARMv7-R edition
+
+ Understanding and Effectively Preventing the ABA Problem in ...
+
+ The ABA problem, a bit of Concurrency Theory - ETH Zrich
+
+CON09-C. Avoid the ABA problem when using lock-free algorithms
+
+The ABA Problem | Baeldung on Computer Science
+
+Reasoning about Nonblocking Concurrency
+
+Lock-free linked lists using compare-and-swap - ACM Digital Library
+
+How many ABA tag bits are needed in lock-free data structures?
+
+Rationale
+
+ A Scalable Lock-free Stack Algorithm - People | MIT CSAIL
+
+cds::intrusive::FreeList Class Reference - libCds
+
+Hazard Pointers: Safe Memory Reclamation for Lock-Free Objects
+
+ Hazard Pointers for C++26 - Open Standards
+
+Lock-free memory reclamation with hazard pointers - Stack Overflow
+
+ Practical lock-freedom
+
+ Reclaiming Memory for Lock-Free Data Structures - arXiv
+
+The Balancing Act of Choosing Nonblocking Features - ACM Queue
+
+A method for implementing lock-free shared-data structures
+
+Load-Reserved/Store-Conditional Instructions - Five EmbedDev
+
+ Implementing and Breaking Load-Link / Store-Conditional on ... - arXiv
+
+ DCAS is not a Silver Bullet for Nonblocking Algorithm Design
+
+ Intel 64 and IA-32 Architectures Software Developer's Manual
+
+DCAS-based concurrent deques - ACM Digital Library
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

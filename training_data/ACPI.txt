@@ -1,0 +1,377 @@
+ACPI Grokipedia
+ 
+
+ Fact-checked by Grok 25 days ago 
+ACPI
+ Ara Eve Leo Sal 
+1x
+ The Advanced Configuration and Power Interface (ACPI) is an open industry standard that defines a hardware-software interface enabling operating systems to discover, configure, and manage computer hardware components, including power states, thermal zones, and device resources, to optimize system performance, energy efficiency, and interoperability across diverse platforms such as PCs, servers, and embedded systems. It facilitates Operating System-directed Power Management (OSPM), allowing the OS to control power consumption, sleep modes, and hardware events without relying on proprietary BIOS mechanisms, thereby replacing earlier standards like Advanced Power Management (APM). The specification includes mechanisms for device enumeration, resource allocation (e.g., IRQs, memory ranges), and event handling via tables and control methods interpreted in ACPI Machine Language (AML). As of May 2025, the current version is 6.6, maintained by the UEFI Forum.
+ACPI originated in the mid-1990s as a collaborative effort by Intel, Microsoft, and Toshiba to address limitations in legacy BIOS power management, such as platform-specific implementations and OS-firmware conflicts, with initial contributions from companies like HP and Phoenix Technologies. The first specification, version 1.0, was released in 1996, introducing basic power states (S0-S5 for systems, D0-D3 for devices) and plug-and-play configuration. Subsequent versions evolved to support emerging hardware: version 2.0 (2000) added 64-bit addressing and thermal zones; 3.0 (2004) enhanced multiprocessor and PCI Express support; 4.0 (2009) introduced error handling via ACPI Platform Error Interface (APEI); 5.0 (2011) added Non-Volatile Dual In-line Memory Module (NVDIMM) and ARM architecture compatibility; and 6.0 (2015) incorporated persistent memory and USB Type-C features. Since 2013, the UEFI Forum has overseen development through the ACPI Special Interest Group (SIG), ensuring broad industry adoption and updates for modern technologies like CXL and RISC-V.
+Key components of ACPI include a hierarchical namespace for device representation, system description tables (e.g., Differentiated System Description Table (DSDT), Secondary System Description Table (SSDT), Fixed ACPI Description Table (FADT)), and control methods defined in ACPI Source Language (ASL) and compiled to AML for execution by the OS interpreter. It supports power management through processor states (C-states for idle, P-states for performance), thermal policies with cooling devices and fan controls, and event models using System Control Interrupts (SCI) and General-Purpose Events (GPEs). Configuration features enable hot-plug operations, resource descriptors for buses like PCIe and USB4, and hardware interfaces such as Embedded Controllers and Platform Communication Channel (PCC). Version 6.6 introduces enhancements like the CXL Early Discovery Table for Compute Express Link support, Platform Health Assessment Table (PHAT) for reliability monitoring, and improved memory power management via the Memory Power State Table (MPST).
+ACPI's scope extends to x86, ARM, and RISC-V architectures, powering features in operating systems like Windows and Linux for battery management, sleep/wake transitions, and error reporting. Its benefits include reduced power usage through dynamic state transitions, enhanced hardware portability via standardized abstraction, and improved system reliability with features like Reliability, Availability, and Serviceability (RAS2) extensions. By abstracting hardware details, ACPI minimizes OS development efforts and supports evolving technologies without frequent firmware updates.
+
+Overview
+
+Definition and Purpose
+
+The Advanced Configuration and Power Interface (ACPI) is an open industry standard that defines interfaces for device configuration and power management in computer systems. It was originally developed by Intel, Microsoft, and Toshiba, with subsequent contributions from other vendors such as Hewlett-Packard. ACPI enables operating systems to discover and configure hardware components in a vendor-neutral manner, extending beyond traditional BIOS limitations to support modern system capabilities.
+The primary purpose of ACPI is to facilitate Operating System-directed configuration and Power Management (OSPM), allowing the operating system to exert direct control over power states, hardware resource allocation, and device enumeration without reliance on BIOS-specific code. Through OSPM, ACPI shifts power management responsibilities from firmware to the OS, enabling dynamic adjustments to system and device behaviors based on usage patterns and policy. This approach ensures consistent behavior across diverse hardware platforms while supporting advanced features like interrupt routing and bus enumeration.
+ACPI delivers key benefits by enhancing energy efficiency through mechanisms that transition idle devices and subsystems into lower power states, thereby reducing overall power consumption. In mobile systems, it extends battery life by optimizing resource usage and enabling fine-grained control over components like batteries and processors. Additionally, ACPI improves system responsiveness by allowing rapid state transitions and replaces legacy methods such as Advanced Power Management (APM) with a more robust, OS-integrated framework. Its scope encompasses hardware discovery akin to Plug and Play standards, alongside enforcement of power policies for both individual devices and the entire platform.
+
+Key Components
+
+ACPI tables form the foundational data structures that convey hardware configuration and capabilities from the platform firmware to the operating system. The Root System Description Table (RSDT) provides 32-bit pointers to other ACPI tables, ensuring compatibility with earlier specifications, while the Extended System Description Table (XSDT) uses 64-bit pointers for modern systems and supersedes the RSDT when present. These root tables, located via the Root System Description Pointer (RSDP) in low memory, enable the operating system present manager (OSPM) to discover and load subsequent tables that describe the system's hardware features beyond fixed registers. The Differentiated System Description Table (DSDT) serves as the primary table, containing the core Differentiated Definition Block encoded in ACPI Machine Language (AML) to outline the system's devices, resources, and control logic. Secondary System Description Tables (SSDTs) supplement the DSDT by providing additional definition blocks, which are loaded in the order listed in the RSDT or XSDT, allowing for modular extensions to hardware descriptions without altering the base configuration.
+The ACPI Namespace establishes a hierarchical, tree-structured object model that represents the system's devices, methods, and resources, constructed by the OSPM through the loading and evaluation of definition blocks from the DSDT and SSDTs. This namespace organizes enumerable objectssuch as device nodes and data fieldsinto a unified view accessible via pathnames, facilitating dynamic queries and modifications during runtime. Central to this model is ACPI Machine Language (AML), a compact bytecode format compiled from the ACPI Source Language (ASL), which the OSPM's AML interpreter executes to evaluate namespace objects, perform calculations, access I/O or memory, and implement platform-specific behaviors. AML enables the namespace to support both static data and dynamic operations, ensuring portable hardware abstraction across diverse platforms.
+Control methods within the namespace provide standardized interfaces for device identification and resource management, implemented as AML code under specific object names. The _HID (Hardware ID) method returns a unique identifier, such as a Plug and Play EISA-compatible ID or ACPI string (e.g., "PNP0C0C" for a power button), allowing OSPM to match devices with appropriate drivers during enumeration. The _CRS (Current Resource Settings) method delivers a package of resource descriptors detailing the device's current allocations, including interrupt, I/O, and memory ranges, which OSPM uses to assess and reconfigure resources without hardware probing. Complementing this, the _SRS (Set Resource Settings) method accepts a similar resource package from OSPM to program the device's hardware registers, enabling precise configuration for non-PCI bus devices and ensuring resource conflicts are resolved. These methods collectively support Plug and Play functionality by abstracting hardware details into interpretable objects.
+Fixed ACPI hardware registers offer a direct, platform-independent interface for core system control, mapped via addresses in the Fixed ACPI Description Table (FADT). The PM1a and PM1b control and status register blocks (PM1x_CNT_BLK and PM1x_EVT_BLK) handle global power events, with the event blocks including status and enable registers for detecting and arming interrupts from sources like power buttons (PWRBTN_STS/EN) and wake events (WAK_STS). The control blocks, accessed in system I/O or memory space, feature fields such as SLP_TYPx to specify sleep states (S1-S5) and SLP_EN to trigger transitions, allowing OSPM to initiate low-level power management without relying solely on namespace methods. OSPM interprets these components to orchestrate hardware behavior across the system.
+
+History
+
+Early Development
+
+The Advanced Configuration and Power Interface (ACPI) originated in 1996 as a collaborative effort by Intel Corporation, Microsoft Corporation, and Toshiba Corporation to establish a standardized framework for power management and hardware configuration in personal computers. This development was driven by the growing popularity of mobile computing, which demanded more efficient battery life and seamless power control, while addressing the shortcomings of prior standards like Advanced Power Management (APM) and Plug and Play (PnP) BIOS. APM's reliance on BIOS-level, real-mode calls limited operating system (OS) oversight, resulting in inflexible power policies and compatibility issues across hardware vendors, whereas PnP BIOS inadequately handled dynamic device enumeration and power integration. The partnership aimed to shift control to the OStermed OS-directed power management (OSPM)enabling hardware vendors to build interoperable systems without proprietary extensions.
+The first ACPI specification, version 1.0, was released on December 22, 1996, following industry reviews involving over 70 companies such as Compaq, Dell, and Hewlett-Packard. It introduced foundational elements including the Root System Description Table (RSDT), which points to other system tables; the Fixed ACPI Description Table (FADT), detailing hardware registers for power events and timers; and a hierarchical ACPI namespace for abstracting devices and resources via ACPI Machine Language (AML). Basic system power states (S-states) were defined, ranging from S0 (working) to S5 (soft off), allowing OS-managed transitions with varying power savings and wake latencies while preserving context where possible. This version was ratified by the PC industry as part of Microsoft's OnNow initiative, with products anticipated for late 1997 to support instant-on capabilities across desktops, laptops, and servers.
+Early adoption of ACPI 1.0 faced significant hurdles due to immature hardware and firmware implementations, particularly in BIOS configurations from the late 1990s. Many pre-2001 systems exhibited bugs such as unreliable PCI interrupt routing via the ACPI namespace's _CRS objects and failures in System Control Interrupt (SCI) setup, often requiring OS workarounds like forcing ACPI enablement or disabling local APIC timers to prevent boot hangs. These issues stemmed from the specification's complexityspanning over 500 pagesand the challenge of transitioning from APM's simpler, firmware-centric model, leading to widespread blacklisting of early hardware in OS kernels until BIOS updates became more reliable.
+
+Specification Versions and Evolution
+
+The ACPI specification has evolved significantly since version 2.0, incorporating enhancements for power management, hardware configuration, and support for emerging architectures. Version 2.0, released in August 2000, introduced 64-bit addressing support, processor and device performance states (P-states), multiprocessor enhancements for power and performance dependencies, and improved consistency across the namespace for better OS compatibility. These additions built on earlier foundations by enabling more dynamic control over processor frequencies and voltages, facilitating energy-efficient computing on 64-bit systems like Itanium.
+Subsequent versions from 3.0 to 5.0, spanning 2004 to 2014, expanded ACPI's scope to address server-scale systems, storage interfaces, and mobile platforms. ACPI 3.0, released in September 2004, added support for more than 256 processors, Non-Uniform Memory Access (NUMA) configurations, PCI Express and SATA device descriptions, ambient light sensors for display power management, user presence detection, and an extended thermal model with multiple cooling devices per zone. ACPI 4.0, released in June 2009, introduced low-power idle states (S0ix) for modern standby modes, clock power management domains, x2APIC interrupt controllers, logical processor idling, power metering and budgeting interfaces, Intelligent Platform Management Interface (IPMI) integration, USB 3.0 support in device location descriptors, and hardware error reporting structures. ACPI 5.0, released in December 2011, focused on system-on-chip (SoC) optimizations with hardware-reduced ACPI profiles, Generic Timer Description Table (GTDT) for Arm systems, Collaborative Processor Performance Control (CPPC) for heterogeneous cores, Platform Communications Channel (PCC) for low-latency messaging, GPIO and Serial Peripheral Bus (SPB) abstractions, and the Device-Specific Data (_DSD) object for vendor extensions. In October 2013, ownership of the specification transferred from Intel, Microsoft, and others to the UEFI Forum, broadening contributor involvement and aligning ACPI with UEFI advancements for diverse platforms including Arm.
+From version 6.0 onward, released starting in May 2015, ACPI has emphasized heterogeneous computing, security, and non-x86 architectures to support IoT devices, cloud infrastructure, and mobile systems. ACPI 6.0 introduced support for non-volatile memory interfaces, the Low Power Idle Table (LPIT), Processor Properties Topology Table (PPTT) for cache hierarchies, Heterogeneous Memory Attribute Table (HMAT) for memory performance attributes, and enhancements to CPPC for big.LITTLE processor configurations common in Arm-based heterogeneous systems. ACPI 6.5, released in August 2022, further enhanced Arm64 support through updates to the Generic Interrupt Controller (GIC) structures, improved Platform Timer support, and extensions for Scalable Platform Error Handling (RAS2), enabling better error correction and telemetry on Arm servers. The most recent version, 6.6, released on May 13, 2025, adds features for confidential computing including the Confidential Computing Event Log (CCEL) table, Secure Devices (SDEV) extensions, and cache coherency attributes (_CCA); PCIe power management improvements via enhanced wake status bits and hot-plug settings; updates to the I/O Virtualization Reporting Structure (IVRS) for AMD-based virtualization; and RISC-V architecture support with new interrupt controllers (RINTC, IMSIC, PLIC) and the RISC-V Hart Capabilities Table (RHCT).
+This progression reflects a shift toward modern hardware paradigms, with increased focus on Arm and RISC-V processors for edge and server applications, low-power IoT optimizations like S0ix and LPIT, and security enhancements such as confidential computing and error reporting to meet demands for resilient, efficient systems. The UEFI Forum's stewardship since 2013 has fostered open collaboration, ensuring ACPI remains adaptable to evolving technologies while maintaining backward compatibility.
+
+Architecture
+
+Core Architecture
+
+The Advanced Configuration and Power Interface (ACPI) employs a layered architecture that separates hardware, firmware, and software components to enable operating system-directed power management (OSPM) and device configuration. At the hardware layer, ACPI relies on fixed and generic registers, interrupts, and power planes to support device states and event signaling, such as those defined in the Fixed ACPI Description Table (FADT). The firmware layer consists of ACPI Machine Language (AML) code, interpreted by the OSPM to execute control methods that abstract hardware details, including power resource management objects like _PRx for power resources. The software layer, implemented by OSPM, coordinates these elements to manage system power, device enumeration, and performance based on user policies and quality-of-service requirements.
+During system boot, the ACPI namespacea hierarchical tree structure representing the device's logical viewis constructed through table loading and enumeration. The BIOS locates the Root System Description Pointer (RSDP) in low memory or the EFI System Table, which points to the Root System Description Table (RSDT) or Extended System Description Table (XSDT); these in turn reference tables like the FADT and Differentiated System Description Table (DSDT). The DSDT, containing the primary AML definition block, is loaded first into memory, followed by Secondary System Description Tables (SSDTs) to extend the namespace without overwriting existing definitions. OSPM then parses this namespace using an AML interpreter to enumerate the device tree, evaluating objects for hardware discovery and configuration capabilities.
+ACPI's event model facilitates asynchronous hardware notifications to the operating system via the System Control Interrupt (SCI) and General-Purpose Events (GPEs). The SCI serves as the primary OS-visible interrupt, triggered when enabled status bits in power management or GPE registers are set, allowing OSPM to respond without firmware intervention once control is transferred from System Management Mode (SMM). GPE blocks, defined in the FADT as GPE0_BLK and GPE1_BLK, handle device-specific events like thermal changes or docking through status (GPEx_STS) and enable (GPEx_EN) registers, which OSPM polls or services via interrupt handlers. This model ensures efficient, low-latency communication between hardware changes and OSPM actions, such as invoking control methods for event processing.
+Resource allocation in ACPI distinguishes between static and dynamic assignments to support Plug and Play functionality. Static resources are fixed at boot and require no runtime reconfiguration, typically for non-configurable devices without a _PRS object. Dynamic resources, however, allow OSPM to reassign settings like IRQs or I/O ranges based on system needs; the _PRS (Possible Resource Settings) method returns a buffer of feasible resource descriptors in the same format as _CRS (Current Resource Settings), enabling OSPM to select conflict-free options. OSPM evaluates _PRS during enumeration, coordinates allocations across dependent devices using extended resource descriptors, and applies selections via the _SRS (Set Resource Settings) method to update hardware registers.
+
+ACPI Component Architecture (ACPICA)
+
+The ACPI Component Architecture (ACPICA) serves as the reference open-source implementation of the ACPI specification, providing an operating system-independent framework for interpreting ACPI Machine Language (AML) and managing hardware configuration and power features. Initially developed by Intel in 2001 as an open-source subsystem to simplify ACPI adoption across platforms, ACPICA has evolved into a community-maintained project that isolates operating system dependencies, enabling seamless integration into various kernels. The latest release, version 20250807 from August 2025, ensures ongoing alignment with evolving ACPI standards.
+Key components of ACPICA include the AML interpreter, which executes bytecode from ACPI tables; the OS services layer, which abstracts platform-specific operations; and tools such as the AML debugger and disassembler for analysis and troubleshooting. Additionally, it supports the compilation of ACPI Source Language (ASL) into AML via the iASL compiler, facilitating the development and validation of ACPI tables by firmware engineers. These elements form a modular structure that allows developers to build custom ACPI subsystems without modifying core code, emphasizing portability across 32-bit and 64-bit environments.
+ACPICA is widely integrated into open-source operating systems, notably as the acpi_subsystem in the Linux kernel, where it handles table parsing, event processing, and resource management. FreeBSD also incorporates ACPICA for similar purposes, leveraging its tools for system validation and porting ACPI features to new hardware. Beyond kernel use, ACPICA's utilities, including the iASL compiler, are essential for developing and debugging ACPI tables during BIOS/UEFI firmware creation, ensuring compliance and functionality.
+In terms of development, ACPICA transitioned from Intel-led maintenance to an independent community-driven project, with source code hosted on GitHub under dual BSD and GPL licenses to encourage broad contributions. This shift has sustained regular updates, with the codebase maintaining full compatibility with the ACPI 6.6 specification released in May 2025, including support for new features like RISC-V architecture integration. The project's rigorous release cycle, typically every 1-3 months, focuses on bug fixes, spec conformance, and enhancements to tools for improved developer productivity.
+
+Power Management
+
+OSPM Responsibilities
+
+The Operating System-directed Power Management (OSPM) is the component of the operating system, typically implemented as a kernel-level driver or subsystem, that directs ACPI operations to enforce policies for power management, device configuration, performance optimization, and thermal control on compliant platforms. During operating system boot, OSPM assumes control from any pre-existing legacy hardware mechanisms, becoming the sole authority for coordinating these functions through the ACPI namespace and control methods.
+OSPM's primary responsibilities encompass policy-driven decisions for transitioning between power states, negotiating resource allocations for motherboard and peripheral devices, and managing dynamic events such as device insertion or removal via system notifications. To align platform capabilities with operating system support, OSPM invokes the _OSC (Operating System Capabilities) control method, which allows it to query and request control over specific featureslike power management protocols or hardware interfacesby passing a UUID-identified capabilities buffer to the firmware and receiving a status response indicating granted permissions.
+In practice, OSPM implements configurable policies such as user-defined timeouts that trigger entry into low-power sleep modes to conserve energy during periods of inactivity, and adaptive thermal management that responds to firmware-reported temperature thresholds by throttling device or processor activity to prevent overheating. These policies enable OSPM to balance system responsiveness with efficiency based on real-time platform feedback.
+For error handling and safe hardware operations, OSPM relies on dedicated ACPI control methods, including _EJ0, which it executes to initiate the ejection of hot-pluggable devices by coordinating power shutdown and mechanical removal, followed by status checks to confirm successful detachment.
+
+System and Device States
+
+ACPI defines global system power states, known as S-states, which represent the overall power management levels of the entire platform. These states range from fully operational to powered off, balancing power savings with wake-up latency. The working state, S0, maintains full system functionality with all components active and consuming normal power.
+Sleeping states S1 through S3 provide progressive power reductions while preserving context for quick resumption. In S1, the system enters a low-latency sleep where processor caches are flushed but most context remains intact, with clocks halted except for essential ones like the real-time clock (RTC); power draw is low but higher than deeper states. S2 extends this by powering off the processor and caches, requiring a reset on wake, yet maintaining low latency and memory context. S3, or suspend-to-RAM, achieves minimal power usage by self-refreshing DRAM while cutting power to nearly all other components, offering low wake latency through enabled wake events. S4, hibernate or suspend-to-disk, saves the entire system context to non-volatile storage for the lowest power consumption among sleeping states, though with the highest latency due to full restoration on resume. Finally, S5 denotes soft off, where the system is logically powered down with no context preserved, necessitating a full boot sequence for reactivation, and power is minimal or zero.
+StateDescriptionPower ConsumptionWake LatencyContext Preservation
+S0WorkingFullNoneAll
+S1SleepLowLowMost (except caches)
+S2SleepVery lowLowMemory
+S3Suspend-to-RAMMinimalLowMemory only
+S4HibernateNear zeroHighSaved to disk
+S5Soft offOffFull bootNone
+Device power states, or D-states, apply to individual hardware components and allow granular power management independent of the global system state. Every ACPI-compliant device must support D0, the fully on state where the device operates at maximum functionality with full power and context retention. D1 and D2 are optional intermediate states with reduced powerD1 consumes less than D0 but more than D2, retaining more context and requiring less driver intervention on resume, while D2 further lowers power and may lose additional context. D3 represents the off state with zero power and no context, subdivided into D3hot (software-controlled, device remains enumerable but non-functional) and D3cold (hardware-powered off, often used in PCIe for maximum savings, requiring full reinitialization). For PCIe devices, D3hot maintains configuration space access, whereas D3cold removes all power, including auxiliary, for deeper savings. Transitions to these states are controlled via optional _PSx control methods in the ACPI namespace: _PS0 for D0, _PS1 for D1, _PS2 for D2, and _PS3 for D3, executed by the operating system power manager (OSPM) after managing dependent power resources.
+StateDescriptionPower ConsumptionContext RetentionRestore Time
+D0Fully onFullAllImmediate
+D1Intermediate< D0, > D2PartialShort
+D2Intermediate< D1, > D3MinimalMedium
+D3hotOff (hot)MinimalOptionalLong
+D3coldOff (cold)ZeroNoneLongest
+State transitions between S-states and D-states are orchestrated by OSPM, which evaluates platform capabilities to select appropriate levels. For system sleep, the _PTS (Prepare To Sleep) method is invoked with the target S-state value (1-5) to perform pre-sleep housekeeping, such as saving context or notifying devices. The platform then sets sleep type registers (SLP_TYPx) and asserts the sleep enable bit (SLP_EN) to enter the state; for S1-S3, caches are flushed and devices transition to compatible D-states. Wake events, enabled through general-purpose events (GPEs) or device-specific interrupts, trigger resumption: in S1-S3, the system de-asserts stop-clock signals and invalidates caches for quick return to S0, while S4 requires firmware to restore saved context from storage. Platform-specific latencies vary; for example, S3 typically resumes in seconds via memory refresh, but S4 can take tens of seconds depending on disk I/O. Device transitions follow similar flows, with OSPM evaluating _PRW (Power Resources for Wake) to enable wake-capable devices in states compatible with the current S-state (e.g., D-state _SxD and _SxW). Post-wake, the _WAK method executes to handle device reconfiguration. Suspend and resume flows ensure orderly progression, preventing deeper states for wake-enabled devices to maintain responsiveness.
+Hybrid sleep combines the low-latency benefits of S3 with the reliability of S4 by writing system context to a hibernation file on disk before entering S3; if power is lost during S3, the system resumes from the file as in S4. This approach enhances data safety in unstable power environments without the full latency of pure hibernation.
+
+Performance and Processor Management
+
+Processor Power States
+
+Processor power states, known as C-states in the ACPI framework, define the idle modes of the CPU to enable power conservation while the system remains in the global working state (G0). The C0 state represents the fully active mode where the processor executes instructions and can adjust performance through mechanisms like throttling. Deeper idle states, from C1 to Cn, progressively reduce power consumption by halting execution, gating clocks, flushing caches, and in some cases scaling voltage, though each introduces increasing latency for resuming activity. C1 is the mandatory shallow idle state, entered via a native halt instruction like HLT, which maintains processor context and cache coherency with minimal latency, typically under 10 microseconds. Optional states such as C2 and C3 provide greater savings: C2 stops the core clock while preserving cache coherency via chipset support, and C3 flushes caches or disables bus mastering to allow deeper sleep, but requires handling interrupts for coherency. Higher Cn states (C4 and beyond) extend this hierarchy with platform-specific implementations, often involving voltage reduction for enhanced efficiency.
+Platform constraints on C-states are enforced through the Fixed ACPI Description Table (FADT), which includes flags like PROC_C1 to mandate C1 support and declares maximum latencies for C2 and C3 to guide the operating system's power manager (OSPM). The FADT assumes symmetric support across processors in a multiprocessor system, limiting all cores to the shallowest common state if any processor lacks deeper capabilities. For implementation, the _CST control method, introduced in ACPI 2.0, dynamically describes available C-states per processor, returning details such as register interfaces, state types (e.g., functional or latency-optimized), transition latencies in microseconds, and power consumption in milliwatts. This method overrides fixed registers like P_LVL2 and P_LVL3 used in earlier ACPI versions for entering C2 and C3, enabling flexible, processor-specific configurations. OSPM coordinates entry and exit from these states by evaluating idle duration against latency tolerances, ensuring safe transitions that account for bus master activity and cache flushing requirements.
+In multi-core environments, advanced features like package-level C-states extend individual core idling to coordinated package sleep, where the _CSD method specifies dependencies such as software-coordinated (SW_ANY or SW_ALL) or hardware-coordinated entry across cores or threads. Latency tolerances, detailed in _CST packages, allow OSPM to select states based on predicted idle time, balancing responsiveness with savingsfor instance, avoiding deep Cn states if latency exceeds 100 microseconds for latency-sensitive workloads. Support for these dynamic and hierarchical C-states was formalized starting with ACPI 2.0 for Cn extensions, with further enhancements in ACPI 6.0 via the _LPI method for low-power idle hierarchies in processor containers.
+The primary benefit of C-states lies in their trade-offs for power savings: shallower states like C1 achieve modest reductions with near-instant wake-up, while deeper states like C6 or C7 in modern CPUs enable substantial savings through aggressive clock and voltage scaling, albeit with latencies up to several milliseconds that suit prolonged idles. This enables significant energy efficiency in battery-powered or data-center systems, where OSPM policies optimize based on workload patterns to minimize total power draw without excessive performance penalties. Processor C-states integrate with broader ACPI system states to ensure coherent power management during global operations like sleep transitions.
+A common BIOS or firmware setting, often labeled "C-states off" or simply "C-states" (with disable option), allows users to disable CPU idle states beyond C0 (the fully active state). When enabled, this setting prevents the processor from entering deeper C-states (C1 and higher), restricting it to C0 or minimal idle modes. The result is lower wake-up latency and improved responsiveness for latency-sensitive workloads, but with increased idle power consumption, greater heat generation, and reduced overall energy efficiency. Such a configuration limits the C-states reported to or usable by OSPM (e.g., via _CST), constraining its ability to select deeper power-saving states based on idle duration and latency tolerances even when conditions would otherwise permit them.
+
+Performance States (P-States)
+
+Performance states (P-states) in the Advanced Configuration and Power Interface (ACPI) specification enable processors to operate at discrete performance levels while in the active C0 state, allowing dynamic scaling of computational performance and power consumption based on workload demands. P-states are enumerated starting from P0 as the highest-performance state, decreasing to Pn as lower-performance states, with each state tied to a specific combination of operating frequency and voltage that reduces power usage as performance diminishes. This mechanism, introduced in ACPI Specification version 2.0, supports fine-grained control over processor efficiency without entering idle modes.
+The primary control method for advertising supported P-states is the _PSS object, an ACPI package under the processor device that lists available states, including details such as core frequency in MHz, power consumption in mW, transition latency, and references to control registers for each state. The _PCT object defines the hardware registers used for reading the current P-state status and writing to transition to a new state, while the _PPC object specifies the number of P-states currently available to the operating system, enabling dynamic enablement or disablement of states based on platform conditions. Operating system power management (OSPM) coordinates these methods through CPU frequency governors, which select and request P-states via _PCT writes in response to utilization, policy, or policy-driven heuristics, ensuring seamless integration with broader power management strategies.
+ACPI P-states incorporate features to handle advanced processor capabilities, such as turbo boost, where frequencies exceeding the base can be exposed as part of higher P-states (e.g., within P0) when conditions like thermal headroom allow, enabling bursts of elevated performance on demand. For heterogeneous multi-core architectures, such as Arm's big.LITTLE design combining high-performance "big" cores with efficiency-focused "LITTLE" cores, per-processor _PSS objects allow independent P-state definitions tailored to each core type, facilitating workload migration and optimized scaling across diverse core clusters.
+By enabling processors to transition between P-states, ACPI achieves a balance between power consumption and performance requirements, particularly in battery-powered devices like laptops where lower states reduce energy draw during light loads to extend runtime without compromising responsiveness under heavy utilization. For instance, scaling to a lower P-state can decrease CPU power by adjusting voltage and frequency proportionally, yielding significant efficiency gains in dynamic environments.
+
+Operating System Implementation
+
+Windows Support
+
+Microsoft Windows has provided native support for the Advanced Configuration and Power Interface (ACPI) since Windows 98, where it was first implemented to enable operating system-directed power management (OSPM) on compatible hardware. The core component of this support is the Acpi.sys kernel driver, an inbox system file that serves as the primary OSPM implementation, responsible for parsing ACPI tables such as the Root System Description Pointer (RSDP) and Differentiated System Description Table (DSDT), as well as processing ACPI events like power button presses and thermal notifications. Acpi.sys integrates with the Windows kernel to manage hardware resources transparently, allowing applications and the OS to interact with devices without direct BIOS involvement.
+Windows leverages ACPI for comprehensive power management features, including native handling of system sleep states (S-states) from S0 (working) to S5 (soft off), processor idle states (C-states), and performance states (P-states) that dynamically adjust CPU frequency and voltage for energy efficiency. Users can configure power schemespredefined profiles balancing performance and battery lifethrough the Powercfg command-line tool, which queries and sets ACPI-defined policies for sleep timeouts, display dimming, and device power states. In Windows 11, enhancements include improved support for Modern Standby, an S0 low-power idle mode that maintains partial system activity for instant resume and connected scenarios on compatible hardware, aligning OSPM responsibilities with ACPI's device power management model.
+For compatibility, Windows uses the ACPI _OSC (Operating System Capabilities) method to negotiate control of hardware features with firmware during boot, ensuring the OS can enable or disable capabilities like PCIe Active State Power Management (ASPM) to optimize link power without conflicts. This negotiation is crucial for modern platforms, including System-on-Chip (SoC) and Arm-based devices, where Windows provides built-in drivers for ACPI-defined peripherals such as batteries, thermal zones, and embedded controllers.
+Diagnostic tools in Windows facilitate ACPI troubleshooting: the Event Viewer displays system logs for ACPI events, such as errors from the embedded controller (e.g., Event ID 13 for timeouts or ID 15 for unexpected data), allowing administrators to monitor power state transitions and hardware interactions. For deeper analysis, WinDbg, Microsoft's kernel debugger, includes ACPI-specific extensions like !acpiinf for inspecting fixed-feature registers and !acpicache for viewing cached tables, enabling developers to trace OSPM execution and AML (ACPI Machine Language) bytecode issues.
+
+macOS Support
+
+Apple's macOS (formerly macOS X) has supported ACPI since its early versions on x86 hardware, using it for power management, device discovery, and hardware abstraction. The XNU kernel includes an ACPI subsystem that interprets AML and handles OSPM tasks, such as battery status, thermal control, and sleep/wake cycles. On Intel-based Macs, ACPI enables features like Safe Sleep (hybrid S3/S4) and processor power states. With the transition to Apple silicon (ARM) starting in 2020, macOS relies less on ACPI, using custom firmware interfaces, but retains compatibility for x86 emulation and certain peripherals. As of macOS Sonoma (2023) and later, including Sequoia (2024), ACPI support continues for legacy hardware integration. 
+
+Linux and Other Open-Source Support
+
+Linux kernel developers integrated the ACPI Component Architecture (ACPICA) starting with version 2.4 in January 2001, enabling core ACPI functionality such as AML interpretation and hardware abstraction within the operating system. This integration has evolved to provide robust support for ACPI features, including compliance with recent specification versions. Userspace tools complement kernel capabilities; for instance, cpupower facilitates management of processor performance states (P-states) by querying and setting CPU frequencies, while powertop analyzes and reports power usage to identify inefficiencies.
+ACPI in Linux enables dynamic thermal management through mechanisms like the thermal zone framework, which monitors temperatures and triggers cooling actions such as fan speed adjustments. Battery handling is supported via the power supply class, allowing accurate reporting of charge levels, remaining time, and status updates from ACPI battery devices. Event handling is managed by acpid, a daemon that processes ACPI events like lid closures or power button presses, dispatching them to user-space applications. For advanced usage, the acpi_call kernel module permits invocation of custom ACPI methods, useful for hardware-specific tweaks not covered by standard drivers.
+Other open-source operating systems have adopted ACPI with varying degrees of completeness. FreeBSD and NetBSD incorporate ports of ACPICA, providing similar core support for power management and device enumeration on x86 platforms. Haiku offers partial ACPI implementation, including CPU idle states but with limitations in sleep modes and event handling. ReactOS includes basic ACPI compatibility for compatibility with Windows hardware, though full feature parity remains under development. Non-x86 architectures present additional challenges; for example, ARM-based systems running Android encounter compatibility issues with ACPI due to reliance on device trees for enumeration, limiting adoption in mobile environments.
+The open-source community drives ACPI improvements through the Linux ACPI mailing list (), where developers submit bug fixes, propose enhancements, and validate implementations against the ACPI specification using tools from the ACPICA suite. This collaborative effort ensures ongoing compatibility and performance optimizations across diverse hardware.
+
+Interfaces
+
+Hardware Interfaces
+
+ACPI employs a set of fixed hardware registers to facilitate direct interaction between the operating system and platform hardware, enabling mode transitions and event notifications. The SMI_CMD register, an I/O port specified in the Fixed ACPI Description Table (FADT), allows the OS Present Manager (OSPM) to switch between ACPI-enabled and legacy modes by writing specific values such as ACPI_ENABLE (typically 0xF1) or ACPI_DISABLE (typically 0xF0) to initiate System Management Mode (SMM) handling. The System Control Interrupt (SCI), another fixed feature defined in the FADT, serves as the primary OS-visible interrupt for ACPI events; it is a shareable, level-active, low-polarity interrupt that triggers upon status changes in general-purpose event (GPE) registers or power management registers, with the SCI_EN bit in the PM1 control register enabling ACPI mode operation. These registers, including PM1 event blocks for status and enable bits (e.g., PWRBTN_STS for power button events), are accessed via I/O or memory-mapped spaces and are byte-aligned for compatibility across platforms.
+ACPI integrates with various system buses to manage device configuration and power states at the hardware level. For PCI, the Memory Configuration (MCFG) table provides a memory-mapped mechanism to access PCI configuration space, allowing OSPM to enumerate and configure PCI devices without relying on I/O port accesses. In PCIe environments, Active State Power Management (ASPM) is supported through dedicated registers such as the PCIEXP_WAKE_STS bit in the PM1 status register, which signals wake events from low-power link states (L0s, L1) to enable transitions back to full power. USB integration occurs via generic serial bus descriptors in ACPI namespace objects, mapping USB ports to power resources and interrupts through the FADT's generic address structure, while I2C and SMBus support is handled similarly via resource descriptors that describe slave addresses and clock frequencies for low-speed peripherals.
+Platform-specific hardware interfaces extend ACPI's reach to peripherals like keyboards and lids through dedicated controllers. The Embedded Controller (EC), identified by the _HID PNP0C09 in the ACPI namespace, manages asynchronous events such as lid open/close detection and keyboard input; it uses a 256-byte I/O space with EC_SC (status/command) and EC_DATA registers, where events set the SCI_EVT flag to trigger an SCI, prompting OSPM to query details via commands like QR_EC. Starting with ACPI 4.0, General Purpose Input/Output (GPIO) events are supported through interrupt connections mapped in the GPE block or via the _AEI object, allowing hardware signals from GPIO pins (e.g., for buttons or sensors) to generate SCIs without requiring an EC.
+ACPI extensions accommodate non-x86 architectures through defined hardware interfaces for interrupt controllers and platform events. For Arm-based systems, support was introduced in ACPI 5.0, with the Generic Interrupt Controller (GIC) integrated via the Multiple APIC Description Table (MADT) and Generic Interrupt Distribution Table (GTDT), where GIC interrupts are described as SPI (Shared Peripheral Interrupts) to route ACPI events like GPEs to the OS. RISC-V support, introduced in ACPI 6.6, leverages the Platform Interrupt Controller (PLIC) and core-local interrupts through similar MADT extensions, enabling SCI delivery and device wake events on RISC-V servers while maintaining compatibility with the fixed hardware model.
+
+Firmware and Software Interfaces
+
+The firmware in ACPI-compatible systems, implemented via UEFI or legacy BIOS, generates essential ACPI tables during boot to describe hardware configuration, power states, and device capabilities for the operating system-directed power management (OSPM) subsystem. These tables, including the Root System Description Pointer (RSDP), Extended System Description Table (XSDT), Fixed ACPI Description Table (FADT), and Differentiated System Description Table (DSDT), are constructed by the firmware based on platform hardware and loaded into system memory for OSPM access. Additionally, firmware employs ACPI Source Language (ASL) scripting to define control methods that handle platform-specific quirks, such as custom device initialization or power sequencing, which are compiled into ACPI Machine Language (AML) bytecode for execution by the OSPM interpreter. The _OSI (Operating System Interface) method further enables firmware to detect the host operating system's version and supported features, allowing conditional logic in ASL code to adapt behavior for compatibility across different OSPM implementations.
+At the software layer, ACPI provides interfaces for user-space applications to query and interact with system resources without direct kernel involvement. Libraries such as libacpi offer a programmatic API for accessing ACPI data, including battery status, thermal zones, fan speeds, and AC adapter presence, by interfacing with kernel-exposed ACPI objects via system calls or device files. Event notifications between firmware and software are facilitated through the Notify() opcode in AML, which firmware or hardware events invoke to signal changessuch as device insertions, power source switches, or thermal thresholdsto OSPM, prompting evaluation of associated control methods.
+Device status and error handling in ACPI rely on standardized control methods like _STA (Status), which returns a bitmask indicating a device's presence, functional state, and power management support, enabling OSPM to dynamically enumerate or disable hardware as needed. For resource-constrained or embedded systems, hardware-reduced ACPI mode minimizes reliance on dedicated ACPI hardware registers, instead using general-purpose inputs/outputs (GPIOs) or interrupt-signaled events for power and configuration signaling, as defined in the specification to support low-cost designs.
+Recent extensions to ACPI have expanded its interfaces for emerging use cases. In version 6.6, interfaces for confidential computing were introduced, including new ACPI tables and methods to manage secure enclaves and attestation logs, enabling OSPM to interact with trusted execution environments while preserving isolation from the firmware layer.
+
+Criticism and Limitations
+
+Technical Criticisms
+
+One prominent technical criticism of ACPI centers on its inherent complexity, particularly stemming from the verbose nature of ACPI Machine Language (AML), which results in large ACPI tables and significant debugging challenges. The AML, an interpreted bytecode derived from ACPI Source Language (ASL), requires an OS-level interpreter that adds substantial overhead, as it is not optimized for performance-critical operations like frequent power state changes. This verbosity arises from AML's extensibility, allowing detailed hardware descriptions but leading to bloated tables that complicate parsing and maintenance. Debugging is further hampered by the opaque interaction between BIOS-provided AML and the OS interpreter, often requiring specialized tools like acpidump and iasl to disassemble and override tables, with issues frequently tracing to BIOS bugs or compiler incompatibilities.
+Backward compatibility requirements impose additional burdens on ACPI implementations, as the specification mandates support for legacy hardware alongside modern features, resulting in fragmented versions across hardware platforms and increased code complexity in the ACPI core. This legacy support enables coexistence of pre-ACPI mechanisms like Advanced Power Management (APM) in mixed environments, but it forces the subsystem to handle outdated hardware abstractions, complicating development and potentially leading to suboptimal performance on newer systems. For instance, firmware must remain compatible with the earliest kernel versions supporting a given ACPI baseline, exacerbating version fragmentation and hindering clean evolution of the standard.
+ACPI also faces criticism for performance overhead, especially in older implementations that rely on event polling rather than interrupt-driven mechanisms, introducing unnecessary CPU cycles and delays in power state transitions. Polling-based governors, such as early Linux Ondemand variants, periodically sample load to trigger frequency changes, which can misjudge short bursts of activity and inflate energy usefor example, reducing polling intervals from 200 ms to 10 ms during kernel compilation lowers consumption from 475 Wh to 368 Wh but still incurs overhead from repeated checks. State transitions, like those between P-states or C-states, suffer from latency due to AML interpretation and hardware handoffs, with ACPI tables providing latency estimates that OS power managers must navigate, often leading to conservative policies that prioritize stability over efficiency.
+Vendor non-compliance exacerbates these issues, as inconsistent implementations of ACPI elements like Hardware ID (_HID) strings or resource allocation methods frequently cause driver loading failures and enumeration problems. For example, invalid ASL code in BIOS tables can result in mismatches for HID-over-I2C devices, where incorrect _CID values (e.g., not PNP0C50) or misconfigured GPIO interrupts prevent the HIDI2C driver from initializing, leading to devices failing to appear in the OS device manager with errors like Code 10. Such deviations from the specification, often due to OEM-specific optimizations or errors in resource methods, undermine ACPI's goal of standardized hardware abstraction and require extensive workarounds in drivers.
+
+Security and Compatibility Issues
+
+ACPI's ACPI Machine Language (AML) enables the execution of firmware-provided code within the operating system's ACPI interpreter, introducing risks such as arbitrary code execution due to insufficient isolation and permission checks. For instance, vulnerabilities like CVE-2010-4347 in the Linux kernel's ACPI subsystem allowed unprivileged processes to override control methods, potentially executing arbitrary kernel code. Buffer overflows in AML interpreters exacerbate these issues, as seen in stack-based overflows from poor bounds checking during bytecode processing, which can lead to memory corruption and privilege escalation.
+ACPI interactions with System Management Mode (SMM) further heighten security concerns, as ACPI events can trigger System Management Interrupts (SMIs) that invoke highly privileged SMM handlers with full hardware access. Attacks exploiting this include cache poisoning, where adversaries modify cached SMRAM contents to execute altered SMI code, bypassing chipset locks like D_LCK; such exploits have been demonstrated on multiple x86 platforms including laptops and servers. To mitigate these, ACPI Specification version 6.4 introduces tables like the Windows SMM Security Mitigations Table (WSMT), which enables firmware to report SMM protections to the OS, and the Trusted Platform Module 2 (TPM2) table for secure boot integration. Additional features, such as the Secure Devices (SDEV) table, support trusted execution environments by describing devices protected during boot handoff.
+Compatibility issues in ACPI often stem from firmware implementation errors, particularly in power state transitions like S3 suspend-to-RAM, where wake events fail to restore display output, resulting in black screens and requiring hard resets. These bugs arise from incomplete ACPI table descriptions or mismatched hardware signaling during resume, affecting diverse systems from laptops to desktops. Support for modern low-power states like S0ix (modern standby) varies on older hardware, as legacy BIOS implementations lack the required ACPI extensions, leading to fallback to higher-power modes like S3 or complete incompatibility with connected standby features.
+On non-PC platforms such as Arm servers, ACPI faces challenges due to its x86-centric design, including limited vendor experience in firmware development and testing, which results in incomplete table implementations and regressions in power management or device enumeration. Efforts to address legacy compatibility include deprecating outdated tables like the Root System Description Table (RSDT) on Arm64, as it only supports 32-bit addresses and is ignored in favor of the 64-bit XSDT. The ACPI specification also mandates hardware-reduced models on Arm, excluding legacy fixed-feature hardware interfaces to streamline non-x86 deployments.
+Recent enhancements in ACPI Specification 6.6 improve security for virtualized environments by introducing the Confidential Computing Event Log (CCEL) table, which logs measurements for confidential VMs (e.g., AMD SEV or Intel TDX) to enable attestation of runtime integrity. It also adds the Storage Volume Key Location (SKVL) table for managing encryption keys in confidential contexts and strengthens TPM integration via the existing TPM2 table, facilitating secure boot and measured launches in virtual machines.
+
+References
+
+ Advanced Configuration and Power Interface (ACPI) Specification
+
+Specifications | Unified Extensible Firmware Interface Forum
+
+ACPI - Arm Developer
+
+Advanced Configuration and Power Interface (ACPI) BIOS
+
+1. Introduction ACPI Specification 6.5 documentation - UEFI Forum
+
+Intel, Microsoft and Toshiba Publish Specification For Easy, Flexible ...
+
+3. ACPI Concepts ACPI Specification 6.5 documentation
+
+5. ACPI Software Programming Model - UEFI Forum
+
+https://uefi.org/specs/ACPI/6.5/07_Power_and_Performance_Mgmt.html
+
+20. ACPI Machine Language (AML) Specification - UEFI Forum
+
+6. Device Configuration ACPI Specification 6.4 documentation
+
+4. ACPI Hardware Specification ACPI Specification 6.5 documentation
+
+ Advanced Configuration and Power Interface Specification
+
+Modern System Power Management - ACM Queue
+
+https://www.kernel.org/doc/ols/2004/ols2004v1-pages-121-132.pdf
+
+ Advanced Configuration and Power Interface Specification
+
+Revision History ACPI Specification 6.4 documentation
+
+ Advanced Configuration and Power Interface Specification 4.0
+
+ Advanced Configuration and Power Interface Specification
+
+Preexisting ACPI Specifications - UEFI Forum
+
+ Advanced Configuration and Power Interface Specification
+
+ Advanced Configuration and Power Interface (ACPI) Specification
+
+6. Device Configuration ACPI Specification 6.5 documentation
+
+Overview of ACPI Component Architecture (ACPICA) - Intel
+
+Download for ACPI Component Architecture (ACPICA) - Intel
+
+The ACPI Component Architecture (ACPICA) project provides an ...
+
+Documentation for ACPI Component Architecture (ACPICA) - Intel
+
+Introduction to ACPICA Release Automation The Linux Kernel ...
+
+ACPI Specification 6.6 - UEFI Forum
+
+ACPI Component Architecture (ACPICA) News - Intel
+
+https://uefi.org/htmlspecs/ACPI_Spec_6_4_html/06_Device_Configuration/Device_Configuration.html#_osc-operating-system-capabilities
+
+https://uefi.org/specs/ACPI/6.5/03_ACPI_Concepts.html#system-power-management
+
+https://uefi.org/specs/ACPI/6.5/03_ACPI_Concepts.html#thermal-management-concepts
+
+https://uefi.org/htmlspecs/ACPI_Spec_6_4_html/06_Device_Configuration/Device_Configuration.html#_ej0-eject-method
+
+16.1. Sleeping States ACPI Specification 6.4 documentation
+
+2. Definition of Terms ACPI Specification 6.4 documentation
+
+7.3. Device Power Management Objects ACPI Specification 6.4 ...
+
+System power states - Win32 apps | Microsoft Learn
+
+8. Processor Configuration and Control - UEFI Forum
+
+https://uefi.org/specs/ACPI/6.5/08_Processor_Configuration_and_Control.html#pss-performance-supported-states
+
+https://uefi.org/specs/ACPI/6.5/08_Processor_Configuration_and_Control.html#pct-performance-control
+
+https://uefi.org/specs/ACPI/6.5/08_Processor_Configuration_and_Control.html#ppc-performance-present-capabilities
+
+Intel Turbo Boost Technology 2.0 Frequency - 005 - ID:743844
+
+P-states and C-States | Microsoft Learn
+
+Acpi.sys (Windows ACPI Driver) - Microsoft Learn
+
+Supporting ACPI Devices - Windows drivers - Microsoft Learn
+
+Powercfg command-line options - Microsoft Learn
+
+Enabling PCI Express Native Control in Windows - Microsoft Learn
+
+ACPI-defined Devices - Windows drivers - Microsoft Learn
+
+https://learn.microsoft.com/en-us/answers/questions/3966966/event-id-56-acpi-1-in-event-viewer-after-restartin
+
+ACPI Debugging - Windows drivers | Microsoft Learn
+
+!acpiinf (WinDbg) - Windows drivers | Microsoft Learn
+
+ACPI - FreeBSD Wiki
+
+acpi(4) - NetBSD Manual Pages
+
+Supported Hardware - ReactOS Wiki
+
+Garrett: Why ACPI? - LWN.net
+
+https://uefi.org/specs/ACPI/6.5/04_ACPI_Hardware_Specification.html#fixed-hardware-programming-model
+
+https://uefi.org/specs/ACPI/6.5/04_ACPI_Hardware_Specification.html#the-acpi-hardware-model
+
+https://uefi.org/specs/ACPI/6.5/04_ACPI_Hardware_Specification.html#pm-event-and-control-register-blocks
+
+https://uefi.org/specs/ACPI/6.5/06_Device_Configuration.html#pci-configuration
+
+https://uefi.org/specs/ACPI/6.5/04_ACPI_Hardware_Specification.html#pci-express-wake-status
+
+https://uefi.org/specs/ACPI/6.5/06_Device_Configuration.html#usb
+
+https://uefi.org/specs/ACPI/6.5/12_Embedded_Controller_Interface_Specification.html#embedded-controller-interface-description
+
+https://uefi.org/specs/ACPI/6.5/04_ACPI_Hardware_Specification.html#general-purpose-event-register-blocks
+
+1. Introduction ACPI Specification 6.6 documentation - UEFI Forum
+
+Overview ACPI Specification 6.6 documentation - UEFI Forum
+
+libacpi - general purpose library for ACPI - Ubuntu Manpage
+
+19. ACPI Source Language (ASL) Reference - UEFI Forum
+
+ ACPI Specification version 6.3 - UEFI Forum
+
+ ACPI in LinuxR Myths vs. Reality - The Linux Kernel Archives
+
+Documentation - How to debug ACPI Problems - LWN.net
+
+ Platform Runtime Mechanism - UEFI Forum
+
+ACPI on Arm systems - The Linux Kernel documentation
+
+(PDF) Event-driven processor power management - ResearchGate
+
+ Tuning UEFI Settings for Performance and Energy Efficiency on 4th ...
+
+Troubleshooting Common Errors - Windows drivers - Microsoft Learn
+
+ Security bugs in embedded interpreters - PDOS-MIT
+
+ System Management Mode Design and Security Issues
+
+ Advanced Configuration and Power Interface (ACPI) Specification
+
+Understanding the Windows SMM Security Mitigation Table (WSMT)
+
+210449 acpi_device_add: buffer overflow in strcpy - Kernel Bugzilla
+
+S0ix States - Intel
+
+ ACPI on ARM64: Challenges Ahead
+
+ACPI Tables The Linux Kernel documentation
+
+https://documentation-service.arm.com/static/661e74f45d66282bc2cf9cbc
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

@@ -1,0 +1,447 @@
+Gaussian elimination Grokipedia
+ 
+
+ Fact-checked by Grok 1 month ago 
+Gaussian elimination
+ Ara Eve Leo Sal 
+1x
+ Gaussian elimination is a systematic algorithm for solving systems of linear equations, determining the rank of a matrix, computing matrix inverses, and finding matrix determinants by transforming an augmented matrix into row echelon form using elementary row operationssuch as swapping rows, multiplying a row by a nonzero scalar, and adding a multiple of one row to anotherfollowed by back-substitution to obtain the solution. The method reduces the original system to an equivalent upper triangular form, where the variables can be solved sequentially from the bottom up, ensuring numerical stability when partial pivoting is employed to select the largest pivot element and avoid division by small numbers.
+Although commonly attributed to Carl Friedrich Gauss, who formalized its use in the early 19th century for solving least squares problems in astronomy, the technique traces its origins to ancient Chinese mathematics in the text Nine Chapters on the Mathematical Art around 200 BCE, where a similar row reduction method was applied to linear systems. The algorithm gained prominence in the West through contributions from figures like Isaac Newton in the 17th century and was extended by Wilhelm Jordan in 1888 into the Gauss-Jordan elimination variant, which fully reduces the matrix to reduced row echelon form for direct solution without back-substitution.
+In modern computational contexts, Gaussian elimination underpins numerical linear algebra libraries and is fundamental to fields like engineering, physics, and data science, though it exhibits cubic time complexity O(n) for an nn system, prompting optimizations such as LU decomposition for repeated solves. Its reliability and simplicity make it a cornerstone of introductory linear algebra, with pivoting strategies enhancing accuracy in floating-point arithmetic implementations.
+
+Fundamentals
+
+Elementary row operations
+
+Elementary row operations are the fundamental manipulations applied to matrices during Gaussian elimination to simplify systems of linear equations without altering their solutions. There are three types of these operations: (1) interchanging any two rows of the matrix, (2) multiplying all entries in a single row by a nonzero scalar ccc, and (3) adding a scalar multiple ccc of the entries in one row to the corresponding entries in another row. These operations are defined for an mnm \times nmn matrix A=(aik)A = (a_{ik})A=(aik) as follows: for interchanging rows iii and jjj, swap aika_{ik}aik with ajka_{jk}ajk for all k=1k = 1k=1 to nnn; for multiplying row iii by c0c \neq 0c=0, replace aikcaika_{ik} \leftarrow c a_{ik}aikcaik for k=1k = 1k=1 to nnn; for adding ccc times row jjj to row iii, replace aikaik+cajka_{ik} \leftarrow a_{ik} + c a_{jk}aikaik+cajk for k=1k = 1k=1 to nnn.
+When applied to the augmented matrix of a linear system Ax=bAx = bAx=b, these operations generate an equivalent system that preserves the original solution set. Interchanging rows merely reorders the equations, which does not affect the solutions; multiplying a row by a nonzero scalar ccc scales the equation by ccc on both sides, maintaining equality for any solution; adding a multiple of one row to another performs a valid algebraic manipulation that keeps the solution set unchanged, as the new equations are linear combinations of the originals.
+Each elementary row operation is reversible through another elementary operation, ensuring that the transformations are invertible. Specifically, interchanging rows iii and jjj is its own inverse; multiplying row iii by c0c \neq 0c=0 is inverted by multiplying by c1c^{-1}c1; and adding ccc times row jjj to row iii is inverted by adding c-cc times row jjj to row iii. These operations correspond to left-multiplication by elementary matrices, which are obtained by applying the same operation to the identity matrix ImI_mIm; for instance, the matrix EEE for adding ccc times row jjj to row iii has 111's on the diagonal, ccc in the (i,j)(i,j)(i,j)-entry, and 000's elsewhere, and EAEAEA yields the modified matrix. Since each elementary matrix EEE is invertible with inverse E1E^{-1}E1 also elementary, a sequence of operations represented by U=EkE1U = E_k \cdots E_1U=EkE1 is invertible, confirming that the row-equivalent matrices share the same solution set.
+The motivation for these operations lies in their ability to simplify matrices while preserving the row space, the span of the row vectors, which remains invariant under row interchanges, scalings, and additions. This preservation ensures that the linear dependencies among rows are maintained, allowing Gaussian elimination to reduce the matrix to row echelon form without losing essential structural information.
+
+Row echelon form
+
+A matrix is in row echelon form (REF) if it satisfies three conditions: all nonzero rows are above any rows of all zeros; the leading entry (pivot) in each nonzero row is strictly to the right of the leading entry in the row immediately above it; and all entries below each leading entry are zeros. These forms are achieved through a sequence of elementary row operations.
+Consider the following 33 matrix, which is not in REF because the leading entry in the third row (5) appears in a column to the left of the leading entry in the second row (4):
+(123004050)
+\begin{pmatrix}
+1 & 2 & 3 \\
+0 & 0 & 4 \\
+0 & 5 & 0
+\end{pmatrix}
+100205340
+In contrast, the matrix below is in REF, with pivots at positions (1,1), (2,3), and a zero row at the bottom; note that the leading entries need not be 1 in REF:
+(123004000)
+\begin{pmatrix}
+1 & 2 & 3 \\
+0 & 0 & 4 \\
+0 & 0 & 0
+\end{pmatrix}
+100200340
+
+The reduced row echelon form (RREF) builds on REF by adding two further requirements: each leading entry is 1 (a pivot of 1); and each leading 1 is the only nonzero entry in its column.
+A key property of RREF is its uniqueness: every matrix is row equivalent to exactly one matrix in RREF, which uniquely represents its row space. In REF (or RREF), the positions of the pivots identify the basic variables in systems derived from the matrix, with the number of pivots equal to the dimension of the row space.
+The number of nonzero rows in an REF equals the row rank of the matrix, which is the maximum number of linearly independent rows and remains invariant under elementary row operations. This equivalence holds because the nonzero rows in REF are linearly independent, providing a basis for the row space.
+
+The Algorithm
+
+Forward elimination phase
+
+The forward elimination phase of Gaussian elimination systematically transforms the augmented matrix of a system of linear equations into an upper triangular form by eliminating the entries below the main diagonal using elementary row operations. This phase focuses on processing each column from top to bottom, ensuring that after completion, the matrix is in row echelon form, which simplifies subsequent solving.
+The procedure begins by considering the augmented matrix , where AAA is the nnn \times nnn coefficient matrix and bbb is the right-hand side vector. For each pivot position kkk from 1 to n1n-1n1:
+
+Identify the pivot element akka_{kk}akk; if it is zero, perform partial pivoting by swapping row kkk with a row i>ki > ki>k that has a nonzero entry in column kkk to ensure akk0a_{kk} \neq 0akk=0 and avoid division by zero.
+
+For each row iii from k+1k+1k+1 to nnn, compute the multiplier mik=aik/akkm_{ik} = a_{ik} / a_{kk}mik=aik/akk.
+
+Subtract mikm_{ik}mik times row kkk from row iii to zero out the entry aika_{ik}aik, updating the remaining entries in row iii and the corresponding right-hand side entry bib_ibi accordingly.
+
+This elimination step uses the formula for updating entries: for each column jjj from kkk to nnn,
+aijaijmikakj,
+a_{ij} \leftarrow a_{ij} - m_{ik} \cdot a_{kj},
+aijaijmikakj,
+and similarly for the augmented column:
+bibimikbk.
+b_i \leftarrow b_i - m_{ik} \cdot b_k.
+bibimikbk.
+Partial pivoting, which selects the row with the largest absolute value in column kkk below the diagonal for swapping, enhances numerical stability by minimizing error growth due to finite precision arithmetic.
+The following pseudocode outlines the forward elimination phase for an nnn \times nnn system, assuming partial pivoting is implemented separately if needed:
+for k = 1 to n-1
+ if a_{kk} == 0
+ swap row k with a suitable row i > k where a_{ik} 0
+ for i = k+1 to n
+ m = a_{ik} / a_{kk}
+ for j = k to n
+ a_{ij} = a_{ij} - m * a_{kj}
+ b_i = b_i - m * b_k
+ end
+end
+
+By progressively zeroing out the subdiagonal elements in each column, this phase reduces the original system to an equivalent upper triangular system Ux=cU \mathbf{x} = \mathbf{c}Ux=c, where UUU has nonzero diagonals and zeros below. This triangular structure eliminates the need to solve for multiple variables simultaneously in lower rows, enabling efficient back-substitution to find the solution vector x\mathbf{x}x.
+
+Back-substitution phase
+
+The back-substitution phase follows the forward elimination phase, where the augmented matrix has been transformed into an upper triangular form with nonzero pivots on the diagonal for the leading coefficients. This phase solves for the unknowns by starting from the bottom row and working upwards, substituting previously computed values into earlier equations to isolate each variable sequentially.
+In a system of nnn equations with nnn unknowns, assuming the matrix is square and invertible after elimination, the procedure begins with the last equation, which simplifies to xn=bn/annx_n = b_n' / a_{nn}'xn=bn/ann, where bnb_n'bn and anna_{nn}'ann are the updated right-hand side and pivot entry, respectively. For each preceding row iii from n1n-1n1 down to 1, the iii-th variable is solved as
+xi=bij=i+1naijxjaii,
+x_i = \frac{b_i' - \sum_{j=i+1}^n a_{ij}' x_j}{a_{ii}'},
+xi=aiibij=i+1naijxj,
+where the sum subtracts the contributions of the already-determined variables xjx_{j}xj for j>ij > ij>i. This backward pass yields the unique solution vector xxx in O(n2)O(n^2)O(n2) operations.
+For underdetermined systems, where the number of equations m<nm < nm<n or rank deficiency occurs, back-substitution identifies free variables corresponding to non-pivot columns in the row echelon form. These free variables can be assigned arbitrary values (often set to zero to obtain a particular solution), while pivot variables are expressed in terms of the free ones through the substitution process. The general solution is then the particular solution plus a linear combination of basis vectors spanning the null space, determined by solving the homogeneous system with free variables as parameters.
+Unlike full reduction to reduced row echelon form (RREF), which eliminates entries above pivots for direct solution reading, back-substitution on the row echelon form suffices for extracting solutions from triangular systems and is computationally less intensive for this purpose.
+
+Illustrative example
+
+To illustrate the Gaussian elimination algorithm, consider the system of linear equations $ Ax = b $, where
+A=,b=.
+A = \begin{bmatrix} 2 & 1 & -1 \\ -3 & -1 & 2 \\ -2 & 1 & 2 \end{bmatrix}, \quad b = \begin{bmatrix} 8 \\ -11 \\ -3 \end{bmatrix}.
+A=232111122,b=8113.
+The goal is to solve for $ x = \begin{bmatrix} x_1 \ x_2 \ x_3 \end{bmatrix} $. Begin by forming the augmented matrix $ $:
+.
+\begin{bmatrix}
+2 & 1 & -1 & \mid & 8 \\
+-3 & -1 & 2 & \mid & -11 \\
+-2 & 1 & 2 & \mid & -3
+\end{bmatrix}.
+2321111228113.
+In the forward elimination phase, apply elementary row operations to transform this into row echelon form (upper triangular). First, use the pivot in position (1,1), which is 2. Eliminate the entries below it in column 1. The multiplier for row 2 is $ -3/2 $, so add $ (3/2) $ times row 1 to row 2:
+Row2Row2+32Row1.
+\text{Row 2} \leftarrow \text{Row 2} + \frac{3}{2} \cdot \text{Row 1} \implies \begin{bmatrix} 0 & \frac{1}{2} & \frac{1}{2} & \mid & 1 \end{bmatrix}.
+Row2Row2+23Row1.
+The multiplier for row 3 is $ -2/2 = -1 $, so add row 1 to row 3:
+Row3Row3+Row1.
+\text{Row 3} \leftarrow \text{Row 3} + \text{Row 1} \implies \begin{bmatrix} 0 & 2 & 1 & \mid & 5 \end{bmatrix}.
+Row3Row3+Row1.
+The matrix is now
+.
+\begin{bmatrix}
+2 & 1 & -1 & \mid & 8 \\
+0 & \frac{1}{2} & \frac{1}{2} & \mid & 1 \\
+0 & 2 & 1 & \mid & 5
+\end{bmatrix}.
+20012121211815.
+Next, use the pivot in position (2,2), which is $ 1/2 $. Eliminate the entry below it in column 2. The multiplier for row 3 is $ 2 / (1/2) = 4 $, so subtract 4 times row 2 from row 3:
+Row3Row34Row2.
+\text{Row 3} \leftarrow \text{Row 3} - 4 \cdot \text{Row 2} \implies \begin{bmatrix} 0 & 0 & -1 & \mid & 1 \end{bmatrix}.
+Row3Row34Row2.
+The matrix is now
+.
+\begin{bmatrix}
+2 & 1 & -1 & \mid & 8 \\
+0 & \frac{1}{2} & \frac{1}{2} & \mid & 1 \\
+0 & 0 & -1 & \mid & 1
+\end{bmatrix}.
+20012101211811.
+For clarity in back-substitution, scale row 2 by 2 and row 3 by -1 (optional normalization steps):
+Row22Row2,Row31Row3.
+\text{Row 2} \leftarrow 2 \cdot \text{Row 2} \implies \begin{bmatrix} 0 & 1 & 1 & \mid & 2 \end{bmatrix}, \quad
+\text{Row 3} \leftarrow -1 \cdot \text{Row 3} \implies \begin{bmatrix} 0 & 0 & 1 & \mid & -1 \end{bmatrix}.
+Row22Row2,Row31Row3.
+The upper triangular augmented matrix is
+.
+\begin{bmatrix}
+2 & 1 & -1 & \mid & 8 \\
+0 & 1 & 1 & \mid & 2 \\
+0 & 0 & 1 & \mid & -1
+\end{bmatrix}.
+200110111821.
+In the back-substitution phase, solve from the bottom up. From row 3: $ x_3 = -1 $.
+From row 2: $ x_2 + x_3 = 2 \implies x_2 - 1 = 2 \implies x_2 = 3 $.
+From row 1: $ 2x_1 + x_2 - x_3 = 8 \implies 2x_1 + 3 - (-1) = 8 \implies 2x_1 + 4 = 8 \implies 2x_1 = 4 \implies x_1 = 2 $.
+Thus, $ x = \begin{bmatrix} 2 \ 3 \ -1 \end{bmatrix} $.
+To verify, compute $ Ax $:
+Ax====b.
+A x = \begin{bmatrix} 2 & 1 & -1 \\ -3 & -1 & 2 \\ -2 & 1 & 2 \end{bmatrix} \begin{bmatrix} 2 \\ 3 \\ -1 \end{bmatrix} = \begin{bmatrix} 4 + 3 + 1 \\ -6 - 3 - 2 \\ -4 + 3 - 2 \end{bmatrix} = \begin{bmatrix} 8 \\ -11 \\ -3 \end{bmatrix} = b.
+Ax=232111122231=4+3+16324+32=8113=b.
+
+Applications
+
+Solving systems of linear equations
+
+Gaussian elimination serves as a foundational method for solving systems of linear equations expressed as $ Ax = b $, where $ A $ is an $ m \times n $ matrix, $ x $ is an $ n \times 1 $ vector of unknowns, and $ b $ is an $ m \times 1 $ vector. To apply the method, the system is represented by forming the augmented matrix $ $, which combines the coefficient matrix $ A $ with the constant vector $ b $ as an additional column. The Gaussian elimination algorithm is then performed on this augmented matrix, utilizing elementary row operations to transform it into row echelon form (REF).
+The REF of the augmented matrix provides critical information for determining the nature of the solutions. The system is consistent if and only if there is no row of the form $ $ where $ c \neq 0 $, as such a row indicates an impossible equation $ 0 = c $. For a consistent system, the solution is unique if $ A $ has full column rank, meaning there are $ n $ pivot positions in the REF, corresponding to no free variables. If the rank of $ A $ is less than $ n $, the system has infinitely many solutions, with the number of free variables equal to $ n $ minus the rank; these free variables allow parametrization of the solution set. Otherwise, the system is inconsistent and has no solutions.
+When solutions exist and are not unique, the general solution takes the form $ x = x_p + \sum c_i v_i $, where $ x_p $ is a particular solution obtained from assigning zero to the free variables in the REF and back-substituting, the $ v_i $ form a basis for the null space of $ A $ (derived from the free columns in the REF), and the $ c_i $ are arbitrary scalars. For an underdetermined system where $ m < n $ and the rank is $ m $, the solution can be parametrized by $ n - m $ free variables; for instance, in a system with two equations and three unknowns yielding one free variable $ t $, the solution might express two variables in terms of $ t $, such as $ x_1 = 2 + t $, $ x_2 = 1 - t $, $ x_3 = t $, illustrating the line of solutions in the solution space.
+Compared to alternative methods like Cramer's rule, which explicitly uses determinants to solve square systems and is practical only for small $ n $ (e.g., $ n \leq 3 $) due to its exponential computational cost, Gaussian elimination offers superior efficiency for larger systems through its $ O(n^3) $ time complexity, making it the preferred approach in practice.
+
+Computing matrix inverses
+
+Gaussian elimination can be adapted to compute the inverse of an invertible square matrix ARnnA \in \mathbb{R}^{n \times n}ARnn by forming the augmented matrix , where InI_nIn is the nnn \times nnn identity matrix, and applying row operations to transform the left partition into the identity matrix; upon success, the right partition becomes A1A^{-1}A1. This process, often referred to as Gauss-Jordan elimination, extends the forward elimination and back-substitution phases of the standard algorithm to achieve reduced row echelon form (RREF) directly. The matrix AAA must be square and possess full rank, meaning it yields nnn nonzero pivots during elimination; if a zero pivot occurs after row swaps or if the process fails to produce the identity on the left, AAA is singular and has no inverse.
+The steps mirror the core Gaussian elimination algorithm but operate simultaneously on the nnn columns of the identity matrix as multiple right-hand sides. In the forward elimination phase, row operations are applied to eliminate entries below each pivot in the left partition, propagating the same operations to the right partition. This is followed by a backward elimination phase, where entries above each pivot are zeroed out, again updating the right partition accordingly, until the left side reaches RREF equivalent to InI_nIn. From a formulaic perspective, the columns of A1A^{-1}A1 are the unique solutions xjx_jxj to the systems Axj=ejA x_j = e_jAxj=ej for j=1,,nj = 1, \dots, nj=1,,n, where eje_jej denotes the jjj-th standard basis vector; solving these nnn systems concurrently via the augmented approach avoids redundant factorization.
+This method maintains the O(n3)O(n^3)O(n3) time complexity of standard Gaussian elimination for solving a single linear system, as the additional nnn columns introduce a constant factor increase in operations (approximately twice the flops for the elimination phases), but it efficiently computes the inverse by handling all right-hand sides in one pass rather than repeating the process nnn times separately. Space requirements are O(n2)O(n^2)O(n2) for the augmented matrix, comparable to storing AAA alone.
+
+Calculating determinants
+
+Gaussian elimination provides a method to compute the determinant of a square matrix by transforming it into an upper triangular form while tracking the effects of row operations on the determinant value. The determinant remains unchanged when adding or subtracting a multiple of one row to another row, as this operation preserves the volume spanned by the row vectors. Scaling a row by a nonzero scalar $ c $ multiplies the determinant by $ c $. Swapping two rows changes the sign of the determinant.
+To compute the determinant using Gaussian elimination, perform the forward elimination phase to reduce the matrix $ A $ to an upper triangular matrix $ U $, applying row swaps for pivoting as needed and avoiding unnecessary scalings where possible. The determinant of $ A $ is then given by $ \det(A) = (-1)^k \prod_{i=1}^n u_{ii} $, where $ k $ is the number of row swaps and $ u_{ii} $ are the diagonal entries of $ U $, assuming no row scalings; if scalings by factors $ c_1, \dots, c_m $ occur, multiply by the product $ \prod_j c_j $.
+For singular matrices, a zero pivot encountered during elimination indicates that the matrix is singular and $ \det(A) = 0 $, as the process cannot proceed without a division by zero or a swap to a nonzero entry.
+This approach is more efficient than cofactor expansion for matrices larger than 33, requiring $ O(n^3) $ operations compared to the exponential time of expansion, though floating-point implementations require partial pivoting to mitigate numerical instability from element growth.
+
+Determining rank and nullity
+
+Gaussian elimination provides a systematic method to determine the rank of a matrix, defined as the number of nonzero rows in its row echelon form (REF), which equals the number of pivot positions after row reduction. To compute the rank, apply the Gaussian elimination algorithm to the matrix AAA (of size mnm \times nmn) to obtain its REF; the rank rrr is then the count of these pivots.
+The nullity of AAA, which is the dimension of its null space, follows directly from the rank-nullity theorem: nullity = nrn - rnr. This theorem states that for a linear transformation from Rn\mathbb{R}^nRn to Rm\mathbb{R}^mRm represented by AAA, the dimension of the domain equals the sum of the dimensions of the image (rank) and kernel (nullity).
+To find a basis for the column space of AAA, identify the pivot columns in the REF; the corresponding original columns of AAA form a basis, as row operations preserve linear dependence relations among columns. For the row space, the nonzero rows of the REF constitute a basis, since these rows are linearly independent and span the same space as the original rows.
+A basis for the null space is obtained by solving the homogeneous system Ax=0A \mathbf{x} = \mathbf{0}Ax=0 using the REF, where the pivot variables are expressed in terms of the free (non-pivot) variables. For each free variable, set it to 1 while setting all other free variables to 0, then back-substitute to solve for the pivot variables; the resulting vectors form the basis.
+Consider a general mnm \times nmn matrix with rank r=2r = 2r=2, implying two pivot positions in the REF. The column space basis consists of the two original columns corresponding to these pivots. The null space basis has n2n - 2n2 vectors, each with 1 in one free variable position, 0 in other free positions, and values in pivot positions determined by back-substitution. The row space basis comprises the two nonzero rows from the REF.
+
+History
+
+Origins with Carl Friedrich Gauss
+
+Carl Friedrich Gauss developed the elimination method in the context of his astronomical research, particularly for computing planetary orbits using the method of least squares to handle observational errors. In 1809, he published Theoria Motus Corporum Coelestium in Sectionibus Conicis Solem Ambientium, where he applied least squares to determine the orbit of the asteroid Ceres based on limited observations. This work addressed overdetermined systems of linear equations arising from astronomical data, minimizing the sum of squared residuals to find the best-fit parameters.
+Gauss provided the first explicit description of the systematic elimination procedure in this 1809 Latin publication, presenting it as a practical tool for solving equations derived from least-squares problems in observations. He described the process as "eliminationem vulgarem" (common elimination), applied to the coefficients of linear systems without symbolic manipulation of variables. This method transformed the augmented matrix through row operations to upper triangular form, enabling efficient solution of systems from multiple measurements.
+Although similar elimination techniques had been used in Europe earlierfor instance, by Isaac Newton in the 17th century for solving linear systemsGauss's approach systematized the process independently of non-Western traditions. A key innovation in Gauss's method was the systematic forward elimination that avoided computing the full matrix inverse, instead focusing on progressive reduction to isolate variables sequentially, which was particularly suited to the positive-definite normal equations in orbital calculations. This reduced computational effort by approximately half compared to contemporaneous elimination techniques, as Gauss processed coefficients in a fixed alphabetic order (e.g., solving for x before y). The method was directly applied to planetary orbit determination, such as refining Ceres's elements from Heinrich Olbers's observations.
+In 1810, Gauss introduced an unnamed bracket notation, such as to denote sums like xy + x'y' + x''y'' + ..., which condensed the representation of quadratic forms and successive eliminations without expanding all terms. He later integrated the elimination more fully with his least-squares terminology in 18211823, referring to the resulting equations as "normal" equations and using the notation to facilitate handling the symmetric positive-definite matrices typical in least-squares astronomy.
+While similar elimination techniques for solving linear systems had been known in ancient China since around 200 BCE, as described in The Nine Chapters on the Mathematical Art using counting rods for rectangular arrays, and further refined in 17th-century Japan by Seki Takakazu with determinant concepts, there is no evidence of European awareness of these methods at the time. Gauss's formulation independently systematized the process for European mathematics, emphasizing its role in error minimization for scientific computation.
+
+Developments in the 19th and 20th centuries
+
+In the 19th century, Gaussian elimination became integrated into the developing field of linear algebra through the work of British mathematicians James Joseph Sylvester and Arthur Cayley, who applied elimination techniques to the computation of determinants and the study of linear transformations during the 1860s. Sylvester's contributions included early formulations of resultant theory for polynomial systems, while Cayley extended these ideas to matrix representations, laying groundwork for modern algebraic structures. These advancements shifted the method from practical computation toward theoretical applications in invariant theory and bilinear forms.
+The term "Gaussian elimination" originated in the 19th century, likely coined by Friedrich Bessel in 1838; the complete row reduction variantextending elimination to reduced row echelon formwas termed "Gauss-Jordan" after German geodesist Wilhelm Jordan, who described an improved, more stable version in his 1888 handbook Handbuch der Vermessungskunde. Jordan's adaptation emphasized pivoting to avoid numerical issues in applied computations like surveying.
+During the 20th century, Gaussian elimination gained deeper theoretical significance within the abstract framework of vector spaces, developed in the early 20th century and expanded in finite-dimensional linear algebra, where it computes matrix rank, nullity, and bases for subspaces. Numerical analysis advanced the method's reliability; in 1965, J. H. Wilkinson proved its backward stability under partial pivoting, establishing bounds on error growth for floating-point arithmetic. The algorithm appeared prominently in mid-century textbooks, including C. C. MacDuffee's Vectors and Matrices (1949 edition), which presented it as a core tool for matrix theory.
+In the 1940s, the method played a pivotal role in early computing, as John von Neumann and Herman Goldstine analyzed its implementation on electronic machines at the U.S. Army's Ballistics Research Laboratory, addressing scalability for large-scale linear systems in scientific simulations. Concurrently, 1970s scholarship highlighted non-Western precursors, recognizing ancient Chinese fangcheng procedures from The Nine Chapters on the Mathematical Art (circa 200 BCE200 CE) as early forms of systematic elimination, and 17th-century Japanese determinant methods by Seki Takakazu as independent developments akin to row reduction.
+
+Computational Aspects
+
+Time and space complexity
+
+Gaussian elimination for solving a system of nnn linear equations in nnn unknowns, represented by an nnn \times nnn dense matrix, requires (n3)\Theta(n^3)(n3) arithmetic operations in the worst case, with the average case exhibiting similar behavior. The dominant cost arises from the forward elimination phase, which transforms the matrix into upper triangular form via LU factorization and accounts for approximately 23n3\frac{2}{3}n^332n3 floating-point operations (flops), including roughly 13n3\frac{1}{3}n^331n3 multiplications and an equal number of additions. The subsequent back-substitution phase to solve for the unknowns requires only O(n2)O(n^2)O(n2) operations, which is negligible compared to the elimination cost for large nnn.
+In terms of space complexity, the algorithm requires O(n2)O(n^2)O(n2) storage to hold the input matrix and associated vectors, but it supports an in-place implementation that reuses the original matrix storage without additional asymptotic space beyond this, making it memory-efficient for dense cases. This O(n2)O(n^2)O(n2) space bound is inherent to representing the dense matrix and cannot be reduced further without approximations or specialized representations.
+For dense general matrices, the O(n3)O(n^3)O(n3) time complexity of Gaussian elimination is asymptotically optimal in the standard algebraic model, as it aligns with the complexity of related operations like LU factorization, though faster matrix multiplication algorithms could theoretically reduce it. However, for sparse matriceswhere many entries are zerothe standard implementation performs worse than specialized sparse methods, which can achieve complexities as low as O(nlogn)O(n \log n)O(nlogn) in structured cases like banded or hierarchical sparsity patterns, by minimizing fill-in during elimination.
+
+Bareiss algorithm
+
+The Bareiss algorithm is a variant of Gaussian elimination designed for exact computations over the integers, ensuring that all intermediate values remain integers without introducing fractions. In standard Gaussian elimination applied to integer matrices, divisions typically produce rational numbers, necessitating fraction handling or multiprecision arithmetic to maintain exactness, which can be computationally expensive. The Bareiss algorithm addresses this by employing a division-free update rule that leverages Sylvester's identity to guarantee exact divisions at each step, thereby preserving integrality and minimizing intermediate growth.
+Developed by Erwin H. Bareiss in 1968, the algorithm was originally motivated by the need for efficient determinant computation of integer matrices, where traditional methods lead to rapid growth in the size of coefficients. Bareiss's approach, detailed in his seminal paper, uses multistep integer-preserving elimination to transform the matrix into an upper triangular form while keeping all entries as integers divisible by the appropriate previous pivots. This method builds on earlier ideas but provides a rigorous framework using Sylvester's determinant identity to prove the exactness of the divisions.
+The procedure mirrors forward elimination in Gaussian elimination but modifies the elimination step to avoid fractions. For a matrix A=(aij)A = (a_{ij})A=(aij) with integer entries, the algorithm proceeds in stages k=1k = 1k=1 to n1n-1n1. At stage kkk, assuming the submatrix up to row k1k-1k1 is already processed, the update for elements i>ki > ki>k, j>kj > kj>k is given by
+aij(k+1)=akk(k)aij(k)aik(k)akj(k)ak1,k1(k1)
+a_{ij}^{(k+1)} = \frac{a_{kk}^{(k)} \, a_{ij}^{(k)} - a_{ik}^{(k)} \, a_{kj}^{(k)}}{a_{k-1,k-1}^{(k-1)}}
+aij(k+1)=ak1,k1(k1)akk(k)aij(k)aik(k)akj(k)
+where the superscript denotes the matrix after stage kkk, and a00(0)=1a_{00}^{(0)} = 1a00(0)=1 initializes the division for the first step. Sylvester's identity ensures that the numerator is always divisible by the previous pivot ak1,k1(k1)a_{k-1,k-1}^{(k-1)}ak1,k1(k1), resulting in an integer value with no remainder. The pivot at stage kkk becomes akk(k+1)a_{kk}^{(k+1)}akk(k+1), and the process continues until the matrix is upper triangular. The determinant is then the product of the diagonal entries, up to a sign depending on row swaps if pivoting is used.
+This update preserves integers throughout, with the bit length of entries growing at most quadratically in nnn for an nnn \times nnn matrix, matching the input size bounds without excessive inflation. Unlike standard elimination, it avoids fraction reduction overhead, making it suitable for exact arithmetic in computer algebra systems. The algorithm maintains O(n3)O(n^3)O(n3) time complexity, similar to Gaussian elimination, but achieves exactness over the integers (/page/Z)\mathbb{(/page/Z)}(/page/Z).
+
+Numerical stability
+
+In floating-point arithmetic, Gaussian elimination is susceptible to rounding errors that can be amplified during the forward elimination phase, particularly when small pivots are selected without row exchanges. Pivot growth occurs as elements in the active submatrix can expand exponentially relative to the original matrix entries, leading to loss of precision if the growth factor becomes large. For instance, James H. Wilkinson constructed an ill-conditioned matrix where, without pivoting, the growth factor reaches 2n12^{n-1}2n1 for an nnn \times nnn matrix, causing catastrophic instability even for moderately sized problems with machine epsilon on the order of 101610^{-16}1016.
+To mitigate these issues, partial pivoting selects the row with the largest absolute value in the pivot column as the pivot at each step, swapping rows accordingly to bound the growth factor n2n1\rho_n \leq 2^{n-1}n2n1, though in practice it is typically much smaller (often less than 10 for random matrices). This strategy ensures that the computed solution satisfies a backward error bound where the perturbed matrix A~=A+A\tilde{A} = A + \Delta AA~=A+A has AO(n)A\|\Delta A\| \leq O(n) \epsilon \|A\|AO(n)A, with \epsilon the machine epsilon, limiting error propagation.
+Full pivoting extends this by also searching for the largest element in the entire active submatrix and swapping both rows and columns, providing stronger stability guarantees with a worst-case growth factor bounded by n3/22(n1)/2n^{3/2} 2^{(n-1)/2}n3/22(n1)/2, though it incurs higher computational overhead due to the expanded search at each step. Gaussian elimination with partial pivoting is backward stable for the vast majority of matrices encountered in practice, meaning the computed solution x~\tilde{x}x~ is the exact solution to a slightly perturbed system (A+A)x~=b+b(A + \Delta A) \tilde{x} = b + \Delta b(A+A)x~=b+b with small relative perturbations proportional to O(n)(A)O(n) \epsilon \kappa(A)O(n)(A), where (A)\kappa(A)(A) is the condition number.
+From the perspective of LU factorization, Gaussian elimination without pivoting computes an LU decomposition A=(/page/LUdecomposition)A = (/page/LU_decomposition)A=(/page/LUdecomposition) where LLL is unit lower triangular and UUU upper triangular, but this can fail or be unstable if small pivots lead to division by near-zero elements. Pivoting modifies this to PA=(/page/LUdecomposition)PA = (/page/LU_decomposition)PA=(/page/LUdecomposition) (partial) or PAQ=(/page/LUdecomposition)PAQ = (/page/LU_decomposition)PAQ=(/page/LUdecomposition) (full), where PPP and QQQ are permutation matrices, ensuring the decomposition remains numerically reliable by controlling element growth in LLL and UUU.
+
+Generalizations
+
+Over arbitrary fields
+
+Gaussian elimination, originally formulated for systems over the real numbers, generalizes naturally to matrices with entries in any arbitrary field FFF, where FFF supports addition, multiplication, additive inverses, and multiplicative inverses for all nonzero elements. This extension relies on the field's structure to ensure that the elementary row operationsswapping rows, multiplying a row by a nonzero scalar from FFF, and adding a scalar multiple of one row to anotherremain valid and invertible. Over such a field, the algorithm transforms a matrix into row echelon form or reduced row echelon form, solving linear systems Ax=bAx = bAx=b with AFmnA \in F^{m \times n}AFmn and bFmb \in F^mbFm, while determining properties like rank and nullity.
+The key adaptation in this setting is the division step during pivot normalization, which requires computing the multiplicative inverse of a nonzero pivot element in FFF. Since every nonzero element in a field has an inverse, this operation is always possible when a nonzero pivot is selected, avoiding the issues that arise in integral domains or rings lacking universal inverses. For instance, over the field of rational numbers Q\mathbb{Q}Q, Gaussian elimination performs exact symbolic computation by representing entries as fractions, where intermediate results are ratios of determinants of submatrices, ensuring polynomial-time growth in bit complexity when fractions are appropriately managed. This contrasts with floating-point arithmetic over R\mathbb{R}R, as it eliminates rounding errors but may increase computational overhead due to fraction reduction via the Euclidean algorithm.
+A prominent example occurs over finite fields, such as the Galois field GF(2)={0,1}\mathrm{GF}(2) = \{0, 1\}GF(2)={0,1} with modulo-2 arithmetic, where addition is XOR and multiplication is AND, eliminating the need for fractions since the characteristic is 2 and inverses are simply the elements themselves (1 is its own inverse). In GF(2)\mathrm{GF}(2)GF(2), Gaussian elimination simplifies to bitwise operations, making it efficient for applications like error-correcting codes in coding theory, where matrices represent parity-check equations. The process proceeds without scaling beyond the field elements, directly yielding solutions in binary form.
+However, limitations emerge outside strict field structures. Over rings like the integers Z\mathbb{Z}Z, Gaussian elimination fails because not all nonzero elements (e.g., 2) have multiplicative inverses, preventing reliable pivot division and potentially leading to inconsistent row reductions or loss of solutions. Similarly, in non-commutative division rings like the quaternions H\mathbb{H}H, the algorithm requires modifications to account for non-commutative multiplication, such as careful ordering in elimination steps to maintain stability, though full row reduction may not preserve all equivalence properties without additional pivoting strategies.
+Theoretically, Gaussian elimination over a field FFF preserves row equivalence: two matrices are row equivalent if one can be obtained from the other via a finite sequence of elementary row operations, each corresponding to left-multiplication by an elementary matrix in GLm(F)\mathrm{GL}_m(F)GLm(F), the general linear group over FFF. This equivalence relation ensures that the reduced form uniquely determines the solution space, independent of the path taken in the elimination process.
+
+Block and parallel variants
+
+Block variants of Gaussian elimination partition the matrix into smaller blocks and perform elimination operations block-by-block, enabling the use of high-level matrix operations that improve data locality and reduce memory access overhead on cache-based architectures. This approach, central to the LAPACK library, replaces scalar row operations with Level 3 BLAS routines for matrix-matrix multiplications and updates, which keep data in cache longer and achieve higher flop rates compared to the classical O(n^3) implementation. For instance, in the blocked LU factorization with partial pivoting (xGEF2B in LAPACK), the matrix A is divided into blocks of size b b, where the factorization of each panel uses classical Gaussian elimination, followed by block updates to the trailing submatrix.
+The choice of block size b is critical: larger blocks enhance parallelism and cache efficiency but may degrade numerical stability for ill-conditioned matrices, while smaller blocks (e.g., b=16) better preserve bounds on the growth factor during pivoting. This blocked strategy scales well for dense matrices up to moderate sizes (n 10^4) on shared-memory systems, often achieving 80-90% of peak performance on vector processors or superscalar CPUs by minimizing data movement.
+Parallel variants extend blocked Gaussian elimination to distributed- and shared-memory systems, distributing row and column operations across processors to achieve near-linear speedup for large-scale problems. In distributed-memory environments, ScaLAPACK implements parallel LU factorization (PDGETRF) using a two-dimensional block-cyclic data layout, which balances computational load and facilitates blocked algorithms while minimizing inter-processor communication. This layout maps matrix blocks to a processor grid of size p p for p processors, allowing each node to perform local BLAS-3 updates independently after broadcasting pivot information.
+A key challenge in parallelization is pivot selection for numerical stability, as partial pivoting requires global reduction operations (e.g., finding the maximum in a column across processors), introducing synchronization overhead that can limit scalability beyond hundreds of processors. Variants address this through techniques like incremental pivoting, which tiles the panel factorization to expose more concurrency, or tournament pivoting in communication-avoiding LU (CALU), which uses a binary tree reduction for pivots with O(p) communication phases. These methods, implemented in libraries like PLASMA for tile-based parallelism on multicore systems, can achieve up to 5x speedup over traditional approaches on architectures like the Cray XT4 for n=10^5.
+Theoretically, parallel Gaussian elimination yields an O(n^3 / p) arithmetic complexity speedup relative to the sequential baseline, but communication costssuch as O(n^2 log p / p) words moved in ScaLAPACKdominate for large p, capping efficiency at 50-70% on petascale machines. Optimal block sizes (b M, where M is local memory) further mitigate this by aligning with hardware bandwidth limits. In high-performance computing applications, such as simulating fluid dynamics or quantum chemistry for matrices with n 10^5 to 10^6, these variants in ScaLAPACK and extensions like MAGMA enable solving systems on GPU clusters, though scalability plateaus due to latency-bound broadcasts. Trade-offs include increased implementation complexity and potential instability in low-communication variants without refinement steps, prioritizing reliability in scientific codes.
+
+References
+
+ Gaussian Elimination - Purdue Math
+
+M.7 Gauss-Jordan Elimination | STAT ONLINE
+
+ Lecture 7 - Gaussian Elimination with Pivoting
+
+Gaussian Elimination - CS-Rutgers University
+
+About Gauss-Jordan elimination - Math 22a Harvard College Fall 2018
+
+ Solving a System of Linear Equations Using Ancient Chinese Methods
+
+Linear Algebra, Part 1: Gaussian Elimination (Mathematica)
+
+9-02 Gaussian Elimination
+
+ Gaussian elimination
+
+Gaussian Elimination Linear Algebra, Geometry, and Computation
+
+Gaussian Elimination and Rank - Ximera - The Ohio State University
+
+ Elementary Row Operations - UC Davis Math
+
+ MATH 304 Linear Algebra Lecture 2: Gaussian elimination.
+
+ 2.5 Elementary Matrices
+
+None
+
+ Row Space, Column Space, and Null Space - Sites at Lafayette
+
+ 1.2 Row Reduction and Echelon Forms - UC Berkeley math
+
+https://math.libretexts.org/Bookshelves/Linear_Algebra/A_First_Course_in_Linear_Algebra_(Kuttler
+
+ 4. Gaussian Elimination - Numerical Analysis Lecture Notes
+
+ Lecture 6 - Gaussian Elimination
+
+ 2.2 Gaussian Elimination with Backsubstitution - UNLV Physics
+
+ GAUSSIAN ELIMINATION - REVISITED Consider solving the linear ...
+
+ Chapter 6 Gaussian Elimination, LU-Factorization, Cholesky ...
+
+ Notes on Solving Systems of Linear Equations
+
+ Matrices and Systems of Equations
+
+ Contents 2 Matrices and Systems of Linear Equations - Evan Dummit
+
+ Summer Bootcamp: Linear Algebra - NC State ISE
+
+7.6 Solving Systems with Gaussian Elimination - College Algebra 2e
+
+ (U.John Hopkins) Matrix Computations (3rd Ed.) 
+
+ 1.5 Solution Sets of Linear Systems - UC Berkeley math
+
+ The Gauss-Jordan Method of finding an inverse
+
+Gauss-Jordan Elimination - Department of Mathematics at UTSA
+
+ Golub and Van Loan - EE IIT Bombay
+
+ Gaussian Elimination and Matrix Inverse - Faculty
+
+3.4 Determinants - Understanding Linear Algebra
+
+ Properties of Determinants - Purdue Math
+
+ The 3 3 case. Determinants n n. Formula for the inverse matrix.
+
+ Linear Algebra Primer 1 Introduction - MST.edu
+
+ Linear Algebra Gaussian Elimination Norms Numerical Stability ...
+
+250L03.html
+
+ 3.5 Dimensions of the Four Subspaces - MIT Mathematics
+
+ 14. The rank and nullity - UCSD Math
+
+SYS-0030: Gaussian Elimination and Rank - Ximera
+
+ Rank and Nullity - Sites at Lafayette
+
+ 18.06.14: `Rank-nullity' - MIT
+
+ 4.5 Row and Column Spaces - Purdue Math
+
+notes of finding a basis for the row space of A - Math (Princeton)
+
+ Leture 28: The Null Space of a Matrix - Ohio University
+
+ Linear Systems of m equations for n unknowns - UMD MATH
+
+Vectors, Matrices, and Gauss-Jordan Elimination - UTSA
+
+Lecture 16. Bases of vector spaces - Arizona Math
+
+ Mathematicians of Gaussian Elimination - CIS UPenn
+
+ On the Histories of Linear Algebra: The Case of Linear Systems
+
+Matrices and determinants - MacTutor History of Mathematics
+
+ Sylvester-Cayley vector partitions algorithm and the Gaussian ...
+
+(PDF) Sylvester-Cayley vector partitions algorithm and the Gaussian ...
+
+Earliest Known Uses of Some of the Words of Mathematics (G)
+
+ Gauss-Jordan Reduction: A Brief History - Mathematics
+
+How ordinary elimination became Gaussian elimination
+
+ How Accurate is Gaussian Elimination?
+
+How ordinary elimination became Gaussian elimination - OUCI
+
+John von Neumann's Analysis of Gaussian Elimination and the ...
+
+ The Evolution of Gaussian-Type Elimination
+
+ Solving linear systems through nested dissection - Princeton Math
+
+None
+
+Matrix Generator WILKINSON - math NIST
+
+ AVERAGE-CASE STABILITY OF GAUSSIAN ELIMINATION* .)
+
+Average-Case Stability of Gaussian Elimination
+
+ Gaussian elimination without rounding
+
+ A.1 Basic Algebra - A.1.1 Fields
+
+Accuracy and stability of quaternion Gaussian elimination
+
+ Applied Matrix Theory, Math 464/514, Fall 2023
+
+ Block LU Factorization 1 Introduction - The Netlib
+
+ A Portable Linear Algebra Library for Distributed Memory Computers
+
+ On Algorithmic Variants of Parallel Gaussian Elimination - NetLib.org
+
+ CS 267 Dense Linear Algebra: Parallel Gaussian Elimination
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

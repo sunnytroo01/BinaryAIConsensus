@@ -1,0 +1,241 @@
+Position-independent code Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Position-independent code
+ Ara Eve Leo Sal 
+1x
+ Position-independent code (PIC) is a form of machine code designed to execute correctly regardless of its absolute location in memory, relying on relative addressing, indirection tables, and dynamic resolution mechanisms rather than hardcoded absolute addresses. This allows the code to be loaded and run at any memory address without requiring runtime modifications or relocations, distinguishing it from position-dependent code that assumes a fixed loading address.
+PIC is primarily used to enable efficient sharing of code across multiple processes, as in shared libraries and dynamic linkers, where the same code segment can be mapped once and referenced by many programs simultaneously. It supports key system features such as position-independent executables (PIE), which extend these benefits to entire programs, and address space layout randomization (ASLR), a security measure that randomizes memory layouts to hinder exploitation of vulnerabilities. In modern operating systems like those based on ELF (Executable and Linkable Format), PIC facilitates modular software design, including loadable modules and optimized handling of read-only text segments.
+Compilers such as GCC and Clang generate PIC through specific flags: in GCC, -fPIC produces unrestricted position-independent code suitable for shared objects using a global offset table (GOT) for address resolution, while -fpic imposes machine-specific limits on GOT entries for smaller binaries; analogous options -fPIE and -fpie apply to executables. Clang mirrors this with -fPIC for shared libraries and -fPIE for executables, ensuring compatibility with dynamic loaders that resolve external references at startup. On architectures like ARM, PIC employs PC-relative accesses or static base registers to maintain fixed offsets between code and data, supporting scenarios from embedded systems to full OS environments. Overall, PIC enhances performance by minimizing relocation overhead and promotes secure, flexible software deployment.
+
+Fundamentals
+
+Definition and Principles
+
+Position-independent code (PIC) refers to machine code that can be loaded and executed at any arbitrary memory address without requiring any modifications to the code itself. This contrasts with position-dependent code, also known as absolute code, which embeds fixed, hardcoded memory addresses that assume a specific load location, necessitating adjustments if relocated.
+The core principle of PIC relies on relative addressing modes, where instructions reference targets using offsets from the current position rather than absolute locations. For instance, program counter (PC)-relative addressing computes effective addresses by adding a signed offset to the value of the program counter (the address of the current instruction plus a small increment), enabling branches, jumps, and data accesses to remain valid regardless of the base load address. This approach avoids embedding absolute addresses in the instruction stream, allowing the code to support dynamic loading into non-contiguous memory regions and facilitating efficient sharing across multiple processes. PIC is particularly useful for shared libraries, as it permits a single instance of the library code to be mapped into different processes' address spaces at varying virtual addresses.
+A simple example in x86 assembly illustrates the difference: a relative jump like jmp (/page/Label) encodes the distance to the target label as an offset from the instruction's position (e.g., +10 bytes ahead), making it position-independent, whereas an absolute jump like jmp 0x400000 directly specifies a fixed memory address, rendering it position-dependent and requiring relocation if moved.
+Unlike relocatable code, which can be moved but requires runtime or link-time modifications via a relocation table to update embedded addresses, PIC demands no such adjustments for the code section itself, though data references may still need resolution.
+
+Benefits and Challenges
+
+Position-independent code (PIC) offers several key advantages in software design, particularly in environments requiring flexibility and resource efficiency. One primary benefit is its support for efficient shared libraries, where the same code can be loaded and executed at different memory addresses across multiple processes without modification, thereby reducing overall memory usage by allowing read-only code segments to be shared in physical memory. This sharing eliminates the need for private copies of the text segment in each process, minimizing swap space reservations and improving system-wide memory efficiency. Additionally, PIC facilitates dynamic loading of modules, such as plugins, by enabling code to be relocated at runtime without fixed address dependencies, which is essential for modular systems like loadable libraries in embedded or extensible applications.
+Another significant advantage is enhanced portability, as PIC allows code to be executed from any valid memory location, making it suitable for embedded systems or virtualized environments where address layouts may vary. For instance, in bare-metal embedded targets, self-relocating executables can be loaded dynamically without hardware-specific adjustments. Furthermore, PIC underpins security features like address space layout randomization (ASLR), which randomizes the base addresses of executables and libraries to mitigate exploits such as return-oriented programming by making memory layouts unpredictable.
+Despite these benefits, PIC introduces notable challenges, primarily related to performance and implementation overhead. The use of indirect addressing mechanisms, such as global offset tables for data and procedure linkage tables for function calls, imposes a runtime penalty due to additional memory accesses and register pressure, particularly in code with frequent branches or jumps. On 32-bit x86 architectures, this can result in up to 26% performance degradation in some benchmarks with an arithmetic average of 10%, though the impact is negligible on 64-bit systems like x86_64 or AArch64. Additionally, generating PIC often increases code size because relative references and indirection structures replace direct absolute addressing, leading to larger binaries in some cases. While startup-time overhead from relocations is another concern, it is generally minor compared to runtime effects in branch-intensive applications.
+
+Implementation Techniques
+
+Code Relocation Strategies
+
+Code relocation strategies enable executable code to operate correctly regardless of its load address in memory, primarily through the use of relative addressing that avoids embedding absolute addresses in instructions. These techniques ensure that branches, calls, and loads within the code segment reference locations via offsets from the current program counter (PC), allowing the entire code block to be relocated without modification.
+Relative addressing modes form the foundation of these strategies, where instructions compute target addresses by adding a signed offset to the PC value at the time of execution. For instance, in x86-64 architecture, PC-relative branches and calls use 32-bit relative offsets, while loads and stores leverage RIP-relative addressing, introduced in the Intel 64 architecture to simplify position-independent code generation by treating the instruction pointer (RIP) as the base register for memory accesses. This mode encodes the offset directly in the instruction, enabling efficient access to nearby code or constants without absolute addresses, and supports up to 2^31 bytes displacement. Similarly, absolute jumps are avoided by using relative instructions such as CALL rel32, where the offset is encoded statically by the assembler relative to the instruction location.
+Compilers play a central role in implementing these strategies through targeted code generation flags that enforce relative addressing. In GCC and Clang, the -fPIC flag instructs the compiler to produce position-independent code by favoring PC-relative instructions for branches, calls, and data accesses within the code segment, while deferring absolute references to runtime resolution where necessary. For PIC-compliant jumps in inline assembly, developers use relative opcodes like the x86 CALL rel32, which specifies a relative displacement from the current instruction pointer. These offsets are resolved at link time, ensuring the code remains valid after relocation.
+Architecture-specific optimizations further refine these techniques to align with hardware capabilities. In ARM architectures, such as ARMv8-A, relative branches employ PC-relative addressing modes in load/store instructions and branch operations, where the offset is added to the PC to reach targets within a 26-bit signed range for B and BL instructions, facilitating position-independent execution in Thumb or AArch64 modes. For RISC-V, position-independent instructions rely on the AUIPC (Add Upper Immediate to PC) opcode paired with load/store or jump instructions; AUIPC adds a 20-bit immediate (shifted left by 12 bits) to the current PC and stores the result in a register, enabling PC-relative addressing for jumps via JAL (Jump and Link) with its 20-bit PC-relative offset, supporting relocations up to 1 MiB without absolute dependencies. These methods collectively ensure code segments remain self-contained and relocatable, often integrating briefly with data relocation mechanisms for full executables.
+
+Data Relocation and Tables
+
+In position-independent code (PIC), data relocation addresses the challenge of referencing global variables and functions without embedding absolute addresses, which would break when the code is loaded at different memory locations. The Global Offset Table (GOT) serves as a key mechanism for this, functioning as an array of entries that store absolute addresses for global data and functions. Positioned in the data section of the executable or shared library, the GOT is accessed via relative offsets from the code, allowing the runtime loader to patch these entries with actual addresses post-loading. This indirection ensures that data references remain valid regardless of the load address, maintaining the read-only nature of the code segment.
+Complementing the GOT for function calls is the Procedure Linkage Table (PLT), a series of stubs in the code section that enable indirect invocation of external functions without fixed addresses. Each PLT entry initially points to a resolver routine in the dynamic linker; upon the first call, it triggers lazy binding, where the linker resolves the target function's address and updates the corresponding GOT entry. Subsequent calls then jump directly to the resolved address via the GOT, avoiding repeated resolution overhead. This setup supports efficient dynamic linking while preserving PIC properties, as the PLT uses relative addressing to access the GOT.
+The dynamic relocation process occurs primarily at load time, managed by the runtime loader, which processes relocation entries to adjust GOT contents. For each global symbol, the loader calculates the absolute address based on the library's load base and patches the relevant GOT slot for instance, using relocation types like R_X86_64_GLOB_DAT for data or R_X86_64_JUMP_SLOT for functions. This one-time adjustment ensures all indirect references resolve correctly without modifying the code itself. In assembly, GOT access typically involves PC-relative loading, such as the x86-64 instruction lea rax, , which computes the GOT's base address relative to the instruction pointer before adding a symbol-specific offset to reach the entry; the effective address is then dereferenced to obtain the target's value. Relative code addressing facilitates this table access by providing offsets from the current program counter.
+PIC implementations distinguish between small and large models to optimize GOT usage based on address space constraints, particularly differing in 32-bit and 64-bit systems. In the small model, prevalent in 64-bit environments, the GOT is assumed to lie within a 32-bit offset from any code location, enabling direct PC-relative access without an explicit GOT base register for example, global data is loaded via mov rax, . This simplifies code and reduces instructions. Conversely, the large model, necessary for broader address ranges in 64-bit systems or certain 32-bit scenarios with extended addressing, requires establishing a GOT pointer in a register (e.g., via a multi-instruction prologue loading into rbx), followed by base-plus-offset addressing. The effective address calculation in this case follows the form:
+
+\text{Effective address} = \text{base_register} + \text{offset}
+
+where the base is the GOT pointer, accommodating 64-bit offsets for symbols potentially far from the code. These models balance performance and flexibility, with the small model favored for its efficiency in typical deployments.
+
+Historical Evolution
+
+Early Innovations
+
+The development of position-independent code (PIC) emerged in the 1960s as a response to the demands of early time-sharing systems, which required efficient memory utilization and sharing among multiple users to minimize storage redundancy and enable concurrent access. In these systems, code needed to be relocatable to arbitrary memory locations without modification, driven by the need to support diverse user workloads on limited hardware resources. This motivation was particularly evident in pioneering projects aimed at creating multi-user environments, where static addressing would have hindered dynamic loading and sharing.
+Multics, initiated in 1965 by a collaboration between MIT's Project MAC (led by Fernando J. Corbat), Bell Telephone Laboratories, and General Electric, introduced PIC through its segmented memory model to facilitate time-sharing on the GE-645 computer, delivered in 1967. The virtual address space consisted of up to 2^{14} segments, each up to 2^{18} 36-bit words, referenced via generalized addresses (segment number and word offset) that were location-independent. Procedure segments were designed as pure, non-self-modifying code, allowing them to be loaded at arbitrary physical addresses and shared across processes without recompilation or relocation, a key enabler for its multi-user design serving remote terminals efficiently. Dynamic linking resolved symbolic references to these generalized addresses at runtime, supported by supervisor software and descriptor tables. This approach reduced memory clutter by promoting reusable code segments, aligning with the project's goal of an "information utility" for scalable computing.
+Similarly, IBM's Time Sharing System/360 (TSS/360), made available on a trial basis in 1967 for the System/360 Model 67, employed PIC modules to support dynamic linking in a mainframe time-sharing environment. Each routine maintained separate virtual constants (V-cons) for code addresses and relocatable constants (R-cons) for data, stored in data segments; callers copied the appropriate R-con into a save area before invocation, enabling the code to execute regardless of its load address. This brute-force method separated code from position-dependent data, allowing shared modules to be loaded dynamically without per-process relocation, which was essential for concurrent task execution and resource sharing among programmer-users at terminals. Developed by IBM to compete in multi-user computing, TSS/360's PIC facilitated efficient mainframe utilization but remained experimental and unsupported as a product.
+Early PIC approaches, however, were constrained by their dependence on specialized hardware support, such as the GE-645's segmentation capabilities for Multics or the Model 67's virtual addressing extensions for TSS/360, limiting portability across different architectures. These systems prioritized hardware-software integration for performance in controlled environments, laying groundwork for later, more generalized techniques.
+
+Standardization in Modern OS
+
+In the late 1980s, SunOS 4.x introduced position-independent code (PIC) as a core feature for shared libraries, enabling multiple processes to share the same code segments without requiring relocation at load time. This innovation, detailed in the seminal USENIX paper on SunOS shared libraries, relied on compiler-generated PIC using flags like -pic, which produced relocatable references resolved by the runtime linker at process startup. The a.out object file format was extended with dedicated relocation tables to support this dynamic loading mechanism, marking an early formalization of PIC in Unix-like systems.
+The Executable and Linkable Format (ELF), developed and standardized by Unix System Laboratories in the early 1990s as part of the System V Application Binary Interface (ABI), established a comprehensive standard for PIC across Unix variants. ELF explicitly defines relocation types tailored for position-independent code, such as R_386_PC32, which supports PC-relative addressing to compute symbol offsets without absolute addresses, facilitating efficient shared library usage. This specification, first published in the Tool Interface Standard (TIS), provided a unified structure for sections like .rel.dyn and .rela.plt, where PIC relocations are stored and processed by the dynamic linker.
+The shift from the a.out format to ELF during the 1990s significantly improved the portability of PIC implementations. Whereas a.out relied on ad-hoc vendor extensions for relocation data, often limiting interoperability, ELF's standardized relocation entries and segment mapping enabled consistent PIC support across diverse Unix architectures and vendors, streamlining dynamic linking and reducing compatibility issues in heterogeneous environments.
+Key milestones in ELF's adoption include the 1992 release of the initial specification, which was immediately integrated into Solaris 2.0 (SunOS 5.0) for production use in shared libraries and executables. Linux followed suit in the mid-1990s, with Linux libc 5 providing initial ELF support in 1995, the GNU C Library (glibc) achieving full support with version 2.0 in 1997, and full kernel support by version 1.2 in 1995, accelerating widespread PIC standardization in open-source Unix derivatives.
+In contrast to proprietary formats like COFF, which offered limited or architecture-specific relocation mechanisms, ELF's explicit PIC supportthrough dedicated types for global offset tables (GOT) and procedure linkage tables (PLT)ensured greater flexibility and efficiency for relocatable code, promoting cross-platform adoption without custom modifications.
+
+Applications in Operating Systems
+
+Unix-like Systems
+
+In Unix-like systems, position-independent code (PIC) is primarily implemented through the Executable and Linkable Format (ELF), which serves as the foundation for dynamic linking. In Linux distributions, the GNU Compiler Collection (GCC) enables PIC generation via the -fPIC flag during compilation, producing code that accesses global data and functions through a Global Offset Table (GOT) and Procedure Linkage Table (PLT). These tables allow relocations to be resolved at runtime by the dynamic linker ld.so, avoiding fixed addresses and supporting load-time address randomization.
+Shared object files (.so) in Linux leverage PIC to facilitate memory-efficient library sharing across multiple processes, as the code can be loaded at varying virtual addresses without per-process relocation. For instance, a typical compilation workflow using GCC involves first compiling source files with position independence: gcc -fPIC -c example.c, followed by linking into a shared library: gcc -shared -o libexample.so example.o. The resulting .so file contains deferred relocations that ld.so processes upon loading, updating GOT entries for data accesses and PLT stubs for function calls.
+Solaris implements PIC within the ELF framework using architecture-specific relocation types, such as R_AMD64_GOTPCREL for instruction-pointer-relative GOT addressing and R_AMD64_PLT32 for PLT-based procedure calls, enabling efficient dynamic linking in shared objects. These relocations differ from standard ELF by incorporating Sun Microsystems extensions for SPARC and x64 architectures, optimizing for Solaris's runtime environment while maintaining compatibility with generic ELF tools.
+FreeBSD adopts standard ELF relocations for PIC in shared libraries, with the ld-elf.so.1 dynamic linker handling GOT and PLT resolutions similar to Linux, though it includes BSD-specific variations like optimized thread-local storage support and stricter validation of ELF headers for security. This approach ensures seamless integration with FreeBSD's ports system, where PIC is mandatory for dynamic libraries to support address space layout randomization.
+In macOS, a Unix-like system based on Darwin, PIC is supported through the Mach-O executable format for shared libraries (.dylib files) and frameworks. The dynamic linker dyld resolves symbols at load time using techniques like relative addressing with @rpath paths and a dynamic loader environment, enabling code sharing and ASLR without fixed addresses. Compilers like Clang generate PIC code by default for shared objects via flags such as -dynamiclib, integrating with Xcode build tools for modular app development.
+Shared libraries have long been compiled with PIC by default in GCC-based toolchains. For enhanced security, many contemporary Linux distributions, including Ubuntu since version 16.10 on architectures like amd64, default to position-independent executables (PIE) via flags like -fPIE, promoting features like address space layout randomization and reducing relocation overhead, often set implicitly by build tools such as dpkg-buildflags. For performance tuning, GCC offers -fpic as an alternative to -fPIC for scenarios with limited global references, generating smaller code by assuming a GOT size under 64 KB (e.g., on x86), though -fPIC is preferred for larger libraries to avoid runtime errors from GOT overflow.
+
+Windows Systems
+
+In Windows operating systems, dynamic-link libraries (DLLs) serve as the primary units for position-independent code, allowing them to be loaded at varying base addresses across different processes to support memory sharing and address space layout randomization (ASLR). Unlike static linking, DLLs enable code reuse by resolving external dependencies at runtime through the Import Address Table (IAT), a data structure in the Portable Executable (PE) format that the loader populates with actual function addresses from dependent modules. This mechanism facilitates relocation without requiring the DLL's code to be recompiled, though it relies on the loader to adjust references if the preferred load address is unavailable.
+The PE file format supports this through base relocations, a table in the optional header that lists offsets requiring adjustment when the image is loaded away from its preferred base address. At load time, the Windows loader applies these fixups to code and data pointers, making the DLL operational at the new location. This approach contrasts with the Unix-like Global Offset Table (GOT) mechanism, where position-independent code often uses runtime indirection for symbol resolution, leading to direct addressing in Windows post-relocation but with load-time processing overhead for extensive fixups.
+To compile DLLs compatible with ASLR and position-independent loading, developers use the /DYNAMICBASE linker flag in Microsoft Visual C++ (MSVC), which sets the dynamic base flag in the PE header and generates necessary relocation information. For example, a DLL might export functions using __declspec(dllexport) (e.g., extern "C" __declspec(dllexport) int Add(int a, int b) { return a + b; }), while an executable imports them via __declspec(dllimport) and the IAT, allowing seamless linking without hardcoded addresses.
+DLLs were introduced in Windows 1.0 in 1985 as a means to share code and resources efficiently in 16-bit environments, evolving significantly with the shift to 32-bit in Windows 95 and further with 64-bit architectures in Windows XP (2001), where RIP-relative addressing enabled more efficient position-independent code without as many relocations for instructions.
+A key limitation in Windows is that main executables (EXEs) have traditionally not been compiled as position-independent, relying on a fixed base address unless explicitly enabled with flags like /DYNAMICBASE, in contrast to Unix-like position-independent executables (PIE) that are more routinely supported. This design prioritizes load-time optimization for primary images but can complicate ASLR implementation for standalone applications.
+
+Advanced Topics
+
+Position-Independent Executables
+
+Position-independent executables (PIE) extend position-independent code (PIC) principles to the main program binary, compiling the entire executablecode, data, and dependenciesas relocatable, allowing it to load at any random base address without fixed assumptions about its location in memory. This contrasts with traditional position-dependent executables, which are linked to a specific load address and cannot be relocated without modification. PIE enables full address space layout randomization (ASLR) for the executable itself, randomizing not only libraries and stack but also the program's text and data segments.
+To generate a PIE binary, compilers like GCC use the -pie linker flag alongside PIC options such as -fPIE, producing an ELF file with type ET_DYN (shared object) rather than the conventional ET_EXEC (executable). For instance, the command gcc -fPIE -pie main.c -o main creates a PIE executable. Analysis with tools like readelf confirms this: running readelf -h main displays "Type: DYN (Shared object file)" in the header, indicating its relocatable nature, while a non-PIE binary shows "Type: EXEC (Executable file)." In Linux, the execve system call invokes the dynamic linker (ld.so), which loads the PIE binary into a randomized virtual memory region, applying an offset based on the kernel's ASLR configuration to prevent predictable addressing.
+Adoption of PIE has grown for security hardening, becoming the default in major distributions to enable comprehensive ASLR. Fedora enabled PIE by default for all packages starting with Fedora 23 in 2015, applying it across architectures with exceptions for performance-critical components. Ubuntu introduced default PIE compilation starting in Ubuntu 16.10 (Yakkety Yak) for amd64, ppc64el, and s390x architectures.
+Compared to PIC shared libraries, which relocate only relative to the program's base, PIE requires relocating the entire executable, including global offsets and GOT/PLT entries, leading to higher initial load-time overhead from additional dynamic relocationsaveraging about 16% performance impact on startup (though absolute times are minimal, ranging from 0.2 to 11 ms) but negligible at runtime. This trade-off enhances security by randomizing the executable's base address, making it harder for attackers to predict code locations for exploits like return-oriented programming.
+
+Security Implications
+
+Position-independent code (PIC) and its variant, position-independent executables (PIE), play a crucial role in integrating with Address Space Layout Randomization (ASLR), a defense mechanism that randomizes the loading addresses of program code, libraries, stack, and heap to defeat memory corruption exploits like buffer overflows. Without PIC/PIE, executables are bound to fixed base addresses, allowing attackers to predict and target specific memory locations for payload injection or control hijacking. PIE extends this to the main executable itself, enabling full randomization across the address space and significantly increasing the entropy available for ASLR implementations.
+This randomization directly mitigates advanced exploit techniques such as Return-Oriented Programming (ROP), where attackers chain short sequences of existing instructions (gadgets) to execute arbitrary code while evading data execution prevention. Unpredictable base addresses from PIC/PIE scatter gadget locations, forcing attackers to rely on information leaks for partial address recovery, which modern systems counter with additional controls like pointer authentication. Studies have shown that even without leaks, ASLR with PIC/PIE reduces the effectiveness of code-reuse attacks, though sophisticated bypasses like just-in-time gadget synthesis have emerged, underscoring the value of layered defenses.
+PIC also supports secure code generation in just-in-time (JIT) compilers, such as those powering JavaScript engines in browsers, by producing relocatable machine code that aligns with ASLR without fixed dependencies, thereby preventing attackers from exploiting predictable JIT output for code injection or spraying. In security tools, PIC enables the creation of portable shellcode for tasks like vulnerability testing, allowing self-relocating payloads to execute reliably across diverse memory environments without hardcoded addresses.
+Post-2010, PIE adoption has proliferated in mobile ecosystems for defense-in-depth, with iOS mandating PIE binaries since iOS 4.3 to enable robust ASLR and thwart return-to-libc attacks, while Android introduced PIE support in version 4.1 and required it for system apps by Android 5.0, reducing exploit success rates in constrained environments like smartphones. Browsers such as Chrome and Firefox similarly enforce PIE for renderer processes to isolate potential breaches. Despite these benefits, PIC/PIE carries rare risks of relocation failures from address collisions during loading in memory-limited scenarios, though contemporary operating systems employ fallback mechanisms to resolve such conflicts effectively.
+
+References
+
+Clang command line argument reference - LLVM
+
+Support for Position Independent code - Arm Developer
+
+Position-Independent Code (Linker and Libraries Guide)
+
+Code Gen Options (Using the GNU Compiler Collection (GCC))
+
+HP-UX Linker and Libraries User's Guide - filibeto.org
+
+Lecture 7, Object Codes, Loaders and Linkers - University of Iowa
+
+Linking and Shared Libraries - Cornell: Computer Science
+
+ ECE 152 - Computer Architecture - Duke People - Duke University
+
+Chapter 15: The end of it all - CS, FSU
+
+Position-Independent Code - Linker and Libraries Guide
+
+Compiler Options Hardening Guide for C and C++
+
+Position Independent Executable (PIE) Performance - Red Hat
+
+https://cdrdv2.intel.com/v1/dl/getContent/671110
+
+404 Not Found
+
+Arm Architecture Reference Manual for A-profile architecture
+
+Position Independent Code (PIC) in shared libraries
+
+All about Global Offset Table | MaskRay
+
+All about Procedure Linkage Table | MaskRay
+
+Load-time relocation of shared libraries - Eli Bendersky's website
+
+Understanding the x64 code models - Eli Bendersky's website
+
+History - Multics
+
+ Virtual Memory, Processes, and Sharing in MULTICS - andrew.cmu.ed
+
+ Chapter 8 Loading and overlays
+
+ System/360 Model 67 Time Sharing System Preliminary Technical ...
+
+ Tool Interface Standard (TIS) Executable and Linking Format (ELF ...
+
+Evolution of the ELF object file format - MaskRay
+
+ld.so(8) - Linux manual page - man7.org
+
+Relocation Types - Oracle Solaris 11.2 Linkers and Libraries Guide
+
+ld-elf.so - FreeBSD Manual Pages
+
+ToolChain/CompilerFlags - Ubuntu Wiki
+
+PE Format - Win32 apps - Microsoft Learn
+
+Relocation of PE DLLs - Load-time or like ELF? - Stack Overflow
+
+A dive into the PE file format - Part 6: PE Base Relocations
+
+/DYNAMICBASE | Microsoft Learn
+
+Under the Hood: Happy 10th Anniversary, Windows | Microsoft Learn
+
+Under the Hood: Programming for 64-bit Windows | Microsoft Learn
+
+Six Facts about Address Space Layout Randomization on Windows
+
+Position Independent Executables (PIE) - Red Hat
+
+The Curious Case of Position Independent Executables - eklitzke.org
+
+Link Options (Using the GNU Compiler Collection (GCC))
+
+Security Features - Fedora Project Wiki
+
+SteveBeattie/PIENotes - Ubuntu Wiki
+
+ Q: Exploit Hardening Made Easy - USENIX
+
+ Effective Entropy: Security-Centric Metric for Memory Randomization ...
+
+ Oxymoron: Making Fine-Grained Memory Randomization Practical ...
+
+ Size Does Matter In Turing-complete Return-oriented Programming
+
+Technical Q&A QA1788: Building a Position Independent Executable
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

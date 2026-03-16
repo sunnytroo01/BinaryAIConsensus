@@ -1,0 +1,348 @@
+Simulated annealing Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Simulated annealing
+ Ara Eve Leo Sal 
+1x
+ Simulated annealing is a probabilistic metaheuristic optimization algorithm inspired by the annealing process in metallurgy, where a material is heated and then slowly cooled to reduce defects and reach a low-energy crystalline state. It approximates the global optimum of an objective function in complex, multimodal search spaces by allowing occasional acceptance of worse solutions to escape local minima, with acceptance probability decreasing as a simulated "temperature" parameter cools over iterations.
+The algorithm was independently introduced in 1983 by Scott Kirkpatrick, C. Daniel Gelatt, and Mario P. Vecchi at IBM, who drew analogies from statistical mechanics to apply it to combinatorial optimization problems like circuit design and the traveling salesman problem. In the same vein, Vojtch ern proposed a similar thermodynamical approach in 1985, focusing on efficient simulation for the traveling salesman problem. This method operates on a discrete state space, generating candidate solutions from a current state via a neighborhood structure, and uses a Markov chain Monte Carlo process governed by the Metropolis criterion: a move to a neighbor with energy (objective value) E is accepted with probability 1 if E 0, or exp(-E / T) otherwise, where T is the current temperature.
+The cooling schedule, typically geometric (T_{k+1} = T_k with 0.8 < 1), controls exploration versus exploitation, starting with high T for broad search and ending with low T for fine-tuning. Termination occurs when T falls below a threshold or after a fixed number of iterations without improvement. Unlike deterministic local search methods such as hill climbing, simulated annealing's stochastic nature provides theoretical guarantees of convergence to the global optimum under appropriate cooling rates, though practical implementations balance speed and quality.
+Simulated annealing has been widely applied to NP-hard problems, including job shop scheduling in manufacturing, where it optimizes sequence-dependent setup times; protein structure prediction in bioinformatics; and vehicle routing in logistics. In machine learning, it aids hyperparameter tuning and neural network training by navigating non-convex loss landscapes. Its robustness to problem-specific details makes it a foundational technique in global optimization, often hybridized with other metaheuristics like genetic algorithms for enhanced performance.
+
+Introduction
+
+Overview
+
+Simulated annealing is a probabilistic metaheuristic algorithm designed for global optimization problems in vast, complex search spaces, where traditional local search methods often get trapped in suboptimal solutions. It approximates the global minimum of an objective function by mimicking the physical annealing process in metallurgy, where controlled cooling allows a material to reach a low-energy state.
+The general workflow starts with an initial random state in the solution space. Iteratively, the algorithm generates a neighboring state through a small random perturbation of the current state. Better neighbors (those with lower energy, or improved objective value) are always accepted, while worse ones are accepted probabilistically, with the acceptance likelihood controlled by a decreasing "temperature" parameter that simulates gradual cooling. This mechanism introduces controlled randomness to explore broadly at high temperatures, escaping local optima, and narrows focus at low temperatures to refine toward convergence on a high-quality global solution.
+A classic example is the traveling salesman problem (TSP), which seeks the shortest possible route visiting each of a set of cities exactly once and returning to the origin. Here, a state is represented as a permutation of the cities outlining the tour sequence, and the energy function measures the total tour length based on inter-city distances. Simulated annealing effectively navigates the enormous space of possible tours to yield near-optimal paths, even for instances with hundreds of cities.
+
+Physical Inspiration
+
+In the physical process of annealing in metallurgy, a solid material such as a metal is heated to a high temperature, typically above its recrystallization point, which increases atomic mobility and allows atoms to move freely from their positions in the crystal lattice. This elevated temperature provides sufficient thermal energy for the system to overcome energy barriers, enabling the exploration of a wide range of atomic configurations and the reduction of defects like dislocations, vacancies, and grain boundaries that were introduced during prior processing, such as cold working.
+As the material is then slowly cooled under controlled conditionsoften in a furnace at rates of 2025 K/hthe atoms gradually settle into more stable positions, forming a highly ordered crystal structure with minimized internal stresses and defects. This slow cooling is crucial because it prevents the system from becoming trapped in metastable, higher-energy states; instead, it promotes thermodynamic equilibrium, leading to a low-energy configuration that represents the global minimum in the material's free energy landscape. The process thus transforms the material into a softer, more ductile state suitable for further fabrication.
+This metallurgical phenomenon inspires the simulated annealing algorithm by providing an analogy for navigating complex optimization problems. In the computational domain, the physical "temperature" is mapped to a control parameter T that governs the randomness of transitions between solution states, allowing the algorithm to explore diverse regions of the search space at high T, much like atomic diffusion at elevated temperatures. The "energy" E(s) of a state s corresponds to the value of the objective function to be minimized, while states themselves represent candidate solutions or configurations in the problem's state space. During cooling, decreasing T reduces the acceptance of suboptimal moves, guiding the system toward a global optimum analogous to the defect-free crystal structure.
+A key physical principle underlying this analogy is the Boltzmann distribution from statistical mechanics, which describes the probability of the system occupying a particular state with energy E at temperature T in thermal equilibrium:
+P(E)eE/kT
+P(E) \propto e^{-E / kT}
+P(E)eE/kT
+where kkk is Boltzmann's constant. At high temperatures, higher-energy (worse) states have a non-negligible probability, facilitating broad exploration of the energy landscape; as T decreases, the distribution increasingly favors low-energy states, trapping the system near the global minimum upon slow cooling. This equilibrium behavior justifies the probabilistic acceptance criterion in the algorithm, ensuring it mimics the natural annealing dynamics.
+
+History
+
+Origins in Physics
+
+The foundations of simulated annealing trace back to the 1953 work by Nicholas Metropolis and colleagues, who developed a Monte Carlo method for simulating the behavior of physical systems in equilibrium. This approach, known as the Metropolis algorithm, generates configurations of a system by proposing random changes and accepting or rejecting them based on an acceptance probability that ensures the sampled states follow the desired distribution. The method was applied to compute properties like equations of state for interacting molecules, demonstrating its utility in handling complex, high-dimensional configuration spaces through stochastic sampling.
+Central to this technique is the principle from statistical mechanics that, at thermal equilibrium, the probability of a system occupying a state with energy EEE is proportional to eE/kTe^{-E / kT}eE/kT, where kkk is the Boltzmann constant and TTT is the temperature. This Boltzmann distribution governs the likelihood of different configurations, allowing simulations to model how systems explore energy landscapes and settle into low-energy states as temperature decreases. By enforcing this distribution via the acceptance criterionaccepting moves that lower energy with probability 1 and those that increase it with probability eE/kTe^{-\Delta E / kT}eE/kTthe algorithm mimics the natural thermalization process in physical systems.
+In the 1970s, extensions of these Monte Carlo methods were applied to simulate frustrated magnetic systems, such as the Ising model with random interactions and early spin glass models. Researchers like Kurt Binder used these simulations to investigate the Ising model on lattices where nearest-neighbor couplings were randomly ferromagnetic or antiferromagnetic, revealing complex phase behaviors and the presence of multiple metastable states separated by high energy barriers. For spin glasses, introduced by Edwards and Anderson in 1975, Monte Carlo studies highlighted how random disorder leads to rugged energy landscapes, where cooling the system gradually helps overcome barriers to access lower-energy configurations and approximate ground states.
+This physics-based approach revealed that controlled cooling in Monte Carlo simulations could effectively minimize energy in disordered systems, paving the way for its adaptation as a general optimization strategy by recognizing the analogy between thermal equilibrium sampling and searching for function minima.
+
+Computational Development
+
+The transition of annealing concepts from physical simulations to computational optimization began in earnest in 1983, when Scott Kirkpatrick, C. D. Gelatt Jr., and M. P. Vecchi at IBM introduced simulated annealing as a probabilistic method for solving combinatorial optimization problems. In their seminal work, they applied the technique to very-large-scale integration (VLSI) circuit designspecifically, for placement and routing of components to minimize wire lengthand the traveling salesman problem (TSP), demonstrating its ability to escape local minima by mimicking the cooling process in metallurgy. This paper coined the term "simulated annealing" and established the core framework, including the Metropolis acceptance criterion adapted for discrete state spaces.
+Independently, V. ern developed a thermodynamically inspired algorithm around the same time, published in 1985, which applied a similar Monte Carlo simulation to the TSP and quadratic assignment problems, emphasizing efficient cooling schedules for global optimization. These early computational adaptations marked a shift from purely physical modeling to practical algorithmic tools, with initial implementations focusing on NP-hard problems in computer-aided design.
+Throughout the 1980s and 1990s, simulated annealing gained traction in operations research, VLSI design, and early artificial intelligence, integrating with heuristic methods for problems like graph partitioning and scheduling. Key contributions included theoretical analyses of convergence and practical extensions for parallel computing. A foundational text, Simulated Annealing and Boltzmann Machines by Emile Aarts and Jan Korst (1989), formalized the stochastic approach, bridging combinatorial optimization and neural computing while providing guidelines for parameter tuning. By the mid-1990s, surveys had reviewed numerous applications in operations research, underscoring its robustness across domains.
+Post-2000 developments emphasized adaptive mechanisms to enhance efficiency, such as the Adaptive Simulated Annealing (ASA) algorithm introduced in 2000, which dynamically adjusts temperature and neighborhood sizes based on problem dimensionality for faster convergence in continuous and discrete spaces. Software integration accelerated adoption, with libraries like SciPy incorporating simulated annealing variants in the 2010s, enabling accessible implementations for scientific computing and machine learning tasks. In the 2020s, research has increasingly explored hybrid quantum-classical annealing, combining classical heuristics with quantum annealers like D-Wave systems to tackle large-scale optimization, as demonstrated in applications to scheduling and portfolio management.
+
+Core Algorithm
+
+State Space and Energy Function
+
+In simulated annealing, the optimization problem is formulated over a state space $ S $, which encompasses all feasible configurations or solutions to the problem at hand. This space can be discrete, such as the set of all permutations of cities in the traveling salesman problem (TSP), where each state represents a possible tour order, or continuous, as in parameter tuning for neural networks where states are vectors of real-valued weights. Alternatively, for the 0-1 knapsack problem, $ S $ consists of binary strings of length $ n $, each indicating whether an item is included in the knapsack or not, subject to capacity constraints. The structure of $ S $ depends on the problem's nature, often forming a combinatorial space with exponentially many states that renders exhaustive search impractical.
+The energy function $ E: S \to \mathbb{R} $ assigns a scalar value to each state $ s \in S $, quantifying the "cost" or undesirability of that configuration, with the objective being to minimize $ E(s) $ to reach the global optimum. In the TSP example, $ E(s) $ is defined as the total distance of the tour corresponding to permutation $ s $. For the knapsack, $ E(s) $ typically measures the negative total value of selected items if the weight constraint is satisfied, or a high penalty otherwise to enforce feasibility. Desirable properties of $ E $ include additivity, where the energy decomposes into sums over independent components (e.g., pairwise interactions in graph partitioning), or modularity, allowing evaluation based on modular substructures, which facilitates efficient computation in large spaces. These properties, inspired by physical systems, enable the analogy to thermodynamic energy minimization.
+The initial state $ s_0 \in S $ is selected to start the annealing process, often randomly to ensure broad exploration or via a heuristic method for quicker convergence toward promising regions. In applications like VLSI circuit placement, random initialization avoids bias toward suboptimal layouts, while heuristics such as greedy algorithms provide a strong starting point in problems like TSP. This choice influences the trajectory but is designed to be robust under the annealing dynamics.
+The search landscape refers to the structure induced by $ E $ over $ S $, visualized as a multidimensional surface with peaks and valleys corresponding to high- and low-energy states, respectively. Rugged terrains feature numerous local minimastates where small changes increase energytrapping greedy algorithms, alongside a global optimum representing the lowest energy configuration. Simulated annealing navigates these landscapes by probabilistically escaping local minima, mimicking thermal fluctuations in physical annealing to probabilistically reach the global minimum despite barriers. This capability is particularly valuable in NP-hard problems with deceptive landscapes, such as combinatorial optimization.
+
+Neighbor Generation
+
+In simulated annealing, the neighborhood structure N(s)N(s)N(s) for a current state sss consists of the set of all states reachable through small, local perturbations that maintain the problem's constraints while introducing minimal changes to explore nearby solutions efficiently. This structure ensures that generated candidates remain in the feasible state space, facilitating gradual navigation toward lower-energy configurations without requiring exhaustive search.
+Candidate states, or neighbors ss's, are typically generated by selecting one element uniformly at random from N(s)N(s)N(s), which promotes unbiased exploration of the local landscape at each iteration. This uniform selection mechanism, rooted in the Metropolis algorithm, allows the process to mimic thermal fluctuations in physical annealing by probabilistically sampling adjacent states.
+Specific generation methods vary by problem domain to balance computational efficiency and solution quality. For the traveling salesman problem (TSP), a common approach involves swapping the positions of two cities in the tour sequence, creating a new permutation that alters the path length modestly. In binary optimization problems, such as the knapsack or satisfiability problems, neighbors are produced by flipping a single bit in the binary representation of the state, which corresponds to toggling one decision variable.
+The transition probability P(ss)P(s \to s')P(ss) from the current state sss to a generated neighbor ss's is often set to a uniform value of 1/N(s)1 / |N(s)|1/N(s) when sN(s)s' \in N(s)sN(s), ensuring equal likelihood for all local moves. However, biased probabilities can be employed to favor certain directions, such as those leading to promising regions, thereby improving convergence speed in large-scale applications without violating the algorithm's foundational principles.
+To guarantee thorough exploration of the state space, the neighborhood structure must induce an ergodic Markov chain, meaning that from any state, it is possible to reach any other state through a sequence of allowed transitions, preventing the algorithm from becoming trapped in disconnected components. This connectivity requirement is essential for the theoretical convergence properties of simulated annealing, as demonstrated in analyses of nonstationary Markov processes underlying the method.
+
+Acceptance Mechanism
+
+In simulated annealing, the acceptance mechanism decides whether to transition from the current state $ s $ to a proposed neighbor state $ s' $ based on their respective energy values $ E(s) $ and $ E(s') $. The energy difference is defined as $ \Delta E = E(s') - E(s) $.
+If $ \Delta E \leq 0 $, indicating an improvement or equal energy, the new state is accepted with probability 1. For $ \Delta E > 0 $, an uphill move, acceptance occurs probabilistically with probability $ p = e^{-\Delta E / T} $, where $ T $ is the current temperature parameter. This can be compactly expressed as the acceptance probability:
+paccept=min(1,eE/T).
+p_{\text{accept}} = \min\left(1, e^{-\Delta E / T}\right).
+paccept=min(1,eE/T).
+This rule originates from the Metropolis criterion, which ensures the Markov chain satisfies detailed balance with respect to the Boltzmann distribution $ \pi(s) \propto e^{-E(s)/T} $, allowing the algorithm to sample states according to their energy at a given temperature.
+The rationale for this probabilistic acceptance lies in balancing exploration and exploitation. At high temperatures, the exponential term approaches 1 even for moderately positive $ \Delta E $, enabling the algorithm to frequently accept worse states and broadly explore the state space, thereby escaping local minima. As temperature decreases, the probability sharply drops for positive $ \Delta E $, favoring only improvements and promoting convergence toward lower-energy configurations.
+The standard form assumes symmetric neighborhoods, where the probability of generating $ s' $ from $ s $ equals that of generating $ s $ from $ s' $. For asymmetric neighborhoods, where proposal probabilities differ (e.g., $ g(s'|s) \neq g(s|s') $), the acceptance probability generalizes to the Metropolis-Hastings form:
+paccept=min(1,g(ss)g(ss)eE/T),
+p_{\text{accept}} = \min\left(1, \frac{g(s|s')}{g(s'|s)} e^{-\Delta E / T}\right),
+paccept=min(1,g(ss)g(ss)eE/T),
+preserving detailed balance and ergodicity in the Markov chain. This adjustment accounts for biased transitions, ensuring the stationary distribution remains the Boltzmann distribution.
+
+Temperature Schedule
+
+The initial temperature $ T_0 $ in simulated annealing is typically set sufficiently high to ensure that a large proportion of proposed moves are accepted, often aiming for an initial acceptance rate of around 60-80% for uphill moves based on the average energy change $ \Delta E $. This allows broad exploration of the state space early in the process, mimicking the high-temperature phase of physical annealing where the system can easily escape local minima.
+The most common cooling rule is the geometric schedule, where the temperature at iteration $ k+1 $ is updated as $ T_{k+1} = \alpha T_k $, with $ 0 < \alpha < 1 $ (typically $ \alpha $ between 0.8 and 0.99 to balance speed and thoroughness). This results in an exponential decay expressed as $ T(t) = T_0 \cdot \alpha^t $, where $ t $ denotes the iteration or time step, enabling gradual reduction in randomness over time. Alternative schedules include linear cooling, $ T(t) = T_0 - \beta t $ for some positive $ \beta $, which decreases temperature at a constant rate but may converge faster in practice for certain problems, and adaptive methods that adjust $ \alpha $ dynamically based on recent acceptance rates to maintain equilibrium.
+The annealing process terminates using criteria such as the temperature dropping below a minimum threshold $ T_{\min} $ (often near zero or a small positive value) or after a fixed number of iterations.
+Theoretically, for asymptotic convergence to the global optimum in probability, the cooling schedule must decrease slowly enough, such as the logarithmic form $ T(t) \sim \frac{c}{\log(t+1)} $ where $ c $ exceeds the maximum depth of non-global local minima, ensuring the Markov chain has sufficient time to explore optimal states.
+
+Implementation
+
+Pseudocode
+
+The basic simulated annealing algorithm can be expressed in pseudocode as a straightforward iterative process that requires the user to specify the energy evaluation function E(s)E(s)E(s), the neighbor generation mechanism N(s)N(s)N(s), and key parameters such as the initial temperature T0T_0T0, the minimum temperature TminT_{\min}Tmin, and the cooling rate \alpha (where 0<<10 < \alpha < 10<<1). This template assumes a minimization problem and focuses on the core loop without advanced features like parallelization or adaptive adjustments.
+// Initialize the current state and its energy
+s s_0 // Initial state (random or heuristic)
+E E(s) // Compute initial energy using the provided (/page/Energy) function
+T T_0 // Set initial temperature
+
+// Set best solution tracking (optional, for recording global minimum)
+s_best s
+E_best E
+
+// Main annealing loop: continue until temperature is sufficiently low
+while T > T_min do
+ // Generate a candidate neighbor state
+ s_new N(s) // Sample a neighbor from the neighborhood of current state using N(s)
+ 
+ // Evaluate the energy of the new state
+ E_new E(s_new)
+ 
+ // Compute the energy difference
+ E E_new - E
+ 
+ // Acceptance decision using the Metropolis criterion
+ if E < 0 or random() < exp(-E / T) then // random() generates uniform [0,1)
+ s s_new // Accept the new state
+ E E_new // Update current energy
+ if E < E_best then // Update best if improved
+ s_best s
+ E_best E
+ end if
+ 
+ // Cool the temperature according to the schedule (geometric cooling here)
+ T * T // Reduce temperature multiplicatively
+end while
+
+// Return the best state found
+return s_best
+This pseudocode represents the fundamental serial implementation of simulated annealing, where each iteration explores a single neighbor and updates sequentially, as originally conceptualized in the seminal work on the method. The acceptance mechanism briefly references the standard probability p=exp(E/T)p = \exp(-\Delta E / T)p=exp(E/T) for uphill moves, ensuring probabilistic escape from local minima at higher temperatures.
+
+Parameter Selection Strategies
+
+Selecting appropriate parameters is crucial for the effectiveness of simulated annealing, as they influence exploration of the state space and convergence to optimal solutions. The initial temperature $ T_0 $ is typically estimated through a preliminary run of the algorithm without cooling, aiming for an acceptance rate of approximately 80% for generated neighbors. This ensures sufficient exploration at the outset while avoiding excessive randomness. For instance, one computes the average energy difference $ \Delta E $ over initial iterations and sets $ T_0 $ such that $ e^{-\Delta E / T_0} \approx 0.8 $, as recommended in foundational implementations for balancing acceptance and progress.
+The cooling rate $ \alpha $, which multiplies the current temperature at each step in geometric schedules, is commonly set between 0.8 and 0.99. Values closer to 0.99 promote slower cooling, enhancing convergence to global optima but increasing computational cost, whereas rates near 0.8 accelerate the process at the risk of premature trapping in local minima. Empirical studies on benchmark problems like the traveling salesman suggest around 0.95 as a robust default for many combinatorial tasks, trading off solution quality and runtime effectively.
+Epoch length, or the number of iterations performed at each temperature level, is often chosen as the size of the state space $ |S| $ or a fixed range of 100 to 1000 iterations, depending on problem scale. This allows adequate sampling at each temperature to approximate equilibrium, with larger epochs beneficial for high-dimensional problems to reduce variance in energy estimates. In practice, for problems with $ |S| > 10^6 $, capping at 1000 prevents excessive computation while maintaining statistical reliability.
+Neighbor generation strategies involve selecting perturbation sizes that evolve with the annealing process: smaller perturbations for fine-grained local search in later stages, and larger ones early to facilitate broad exploration. A common heuristic scales the neighbor radius inversely with temperature, starting with perturbations covering 10-20% of the search space and reducing to 1-5% as cooling progresses, which has shown improved performance in continuous optimization landscapes.
+Adaptive methods enhance parameter selection by dynamically adjusting the cooling rate $ \alpha $ based on historical acceptance rates; for example, if the acceptance rate falls below 20% over an epoch, $ \alpha $ is increased toward 0.99 to slow cooling and encourage further exploration. This feedback mechanism, rooted in maintaining a target acceptance profile (e.g., 20-50% overall), has been validated in applications to graph partitioning, yielding better solutions than static schedules. Such adaptations reference basic geometric cooling but tune it reactively without altering the core schedule form.
+
+Advanced Variants
+
+Restart Procedures
+
+Restart procedures in simulated annealing enhance exploration of the state space by executing multiple annealing cycles, thereby mitigating the risk of converging to suboptimal local minima. A basic approach involves running the algorithm multiple times independently, each starting from a random initial state or the best found so far, and selecting the best solution among all runs. The number of runs typically ranges from 10 to 100 depending on the problem scale and available computation time. This method leverages the stochastic nature of the algorithm to sample diverse regions of the solution space. It is straightforward to implement and improves solution quality in combinatorial optimization tasks by reducing sensitivity to starting conditions.
+Adaptive restart strategies dynamically trigger new annealing cycles based on observed search behavior, such as prolonged stagnation where no improvement in the best energy occurs over a fixed number of iterations or when solution diversity falls below a threshold measured by metrics like Hamming distance between candidate states. For instance, if the acceptance rate drops significantly or the temperature schedule reaches a point of minimal progress, the temperature is reset to $ T_0 $, often perturbing the current best state slightly to promote novelty. These techniques balance exploration and exploitation more efficiently than fixed restarts, adapting to the problem's landscape in real-time. Empirical studies demonstrate that adaptive restarts can accelerate convergence while maintaining or enhancing solution robustness compared to single-run annealing.
+Parallel restart procedures exploit concurrent computing by simultaneously executing independent simulated annealing runs on multiple processors or threads, each with its own initial state and cooling trajectory, synchronizing only to track the global best solution periodically. This parallelism not only speeds up the overall searchachieving near-linear speedup for modest numbers of processorsbut also inherently incorporates restart diversity without sequential overhead. In applications like the traveling salesman problem (TSP), parallel implementations have yielded empirical improvements in tour length quality over single-threaded variants on benchmark instances, highlighting their practical efficacy for large-scale optimization.
+
+Barrier Navigation Techniques
+
+In simulated annealing, high energy barriers in the objective function landscape can hinder the acceptance of uphill moves, even at moderate temperatures, resulting in the algorithm becoming trapped in suboptimal local minima before sufficient exploration occurs. This issue arises because the standard Metropolis acceptance criterion, which probabilistically allows deteriorations based on the Boltzmann factor, may fail to generate sufficient thermal energy to surmount steep barriers as cooling progresses.
+To address this, one approach involves temporarily raising the temperatureoften termed a heated plateauwhen the search stagnates near a suspected barrier, thereby increasing the probability of escaping local traps without restarting the entire process. This reheating mechanism, as implemented in adaptive simulated annealing variants, dynamically adjusts the temperature schedule based on recent acceptance rates or energy stagnation, allowing targeted bursts of exploration. For instance, if no improvements are observed over a fixed number of iterations, the temperature is incremented to facilitate crossing the barrier, followed by resumed cooling.
+Another prominent technique is threshold accepting, which modifies the acceptance rule to deterministically accept neighbor states if the energy increase E is below a decreasing threshold value, rather than relying on probabilistic sampling. Introduced by Dueck and Scheuer, this method simplifies computation by avoiding random number generation while still permitting moderate uphill moves to navigate barriers, often outperforming standard simulated annealing in terms of solution quality for combinatorial problems. The threshold starts relatively high to encourage broad exploration and cools geometrically, ensuring convergence similar to annealing schedules.
+Record-to-record travel represents a further variant, where a candidate solution is accepted if its energy is no worse than the best historical record plus a linearly increasing deviation margin, effectively raising an "acceptance water level" over time. Developed by Dueck, this heuristic promotes continued progress by accepting solutions that maintain proximity to the current record, enabling the algorithm to traverse barriers by gradually expanding the feasible region until a new record is achieved. Unlike probabilistic methods, it guarantees acceptance of improving moves and uses the deviation to control exploration breadth.
+In applications such as protein folding, barrier navigation often incorporates expanded neighborhoods to directly jump over high-energy walls; for example, instead of single-residue perturbations, multiple dihedral angle rotations are allowed simultaneously, facilitating transitions between conformational basins in off-lattice models. This approach reduces the effective barrier height by accessing distant states in a single step, though it requires careful calibration to avoid excessive computational overhead.
+These techniques generally trade off efficiency for enhanced global search capability: while they may double or triple the number of evaluations per run due to higher acceptance rates and larger neighborhood explorations, they yield superior final solutions compared to vanilla simulated annealing.
+
+Theoretical Foundations
+
+Convergence Analysis
+
+Simulated annealing can be modeled as a time-inhomogeneous Markov chain, where the transition probabilities satisfy the detailed balance condition with respect to the Boltzmann distribution T(x)exp(E(x)/T)\pi_T(x) \propto \exp(-E(x)/T)T(x)exp(E(x)/T), ensuring that the stationary distribution at fixed temperature TTT favors lower-energy states according to the Metropolis acceptance rule. As the temperature decreases, this stationary distribution approaches the uniform distribution over the global minima of the energy function EEE, provided the chain is irreducible and aperiodic.
+Under a sufficiently slow cooling schedule, such as the logarithmic schedule $ T(t) \geq \frac{c}{\log(t+1)} $ where ccc exceeds the maximum depth of local minima relative to the global minimum, the algorithm converges in probability to the global optimum as tt \to \inftyt. This asymptotic convergence theorem, established by Hajek, relies on analyzing the chain's exit times from basins of attraction around suboptimal minima, guaranteeing that the probability of being trapped in a local minimum vanishes over infinite time.
+For finite-time performance, error bounds on the deviation from the global minimum can be derived using ergodic theorems for the inhomogeneous chain, depending on the initial temperature T0T_0T0, the cooling rate parameter \alpha (for geometric schedules T(t)=T0tT(t) = T_0 \alpha^tT(t)=T0t), and the total number of iterations. These bounds quantify the expected energy excess, showing exponential decay in iterations under reversible chain assumptions, though the required iteration count grows logarithmically with problem size.
+Despite these theoretical guarantees, convergence in practice is often slow due to the need for extremely long runs to approximate the asymptotic regime, and the results assume reversible Markov chains with positive transition probabilities between all states, which may not hold in high-dimensional or constrained spaces.
+
+Performance Bounds
+
+Simulated annealing exhibits a time complexity of O(nlogn)O(n \log n)O(nlogn) in state spaces of size nnn when employing a logarithmic cooling schedule, as the algorithm typically requires O(n)O(n)O(n) iterations per temperature level to approximate equilibrium, with O(logn)O(\log n)O(logn) distinct temperature levels to achieve sufficient precision. For practical implementations on problems like the traveling salesman problem (TSP) with nnn cities, the complexity adjusts to O((n2+n)logn)O((n^2 + n) \log n)O((n2+n)logn) due to neighborhood evaluation costs scaling quadratically with problem size. Overall, runtimes in real-world applications grow polynomially with problem scale, making it feasible for moderate-sized instances but challenging for very large ones without optimizations.
+Regarding approximation guarantees, simulated annealing provides no fixed worst-case ratio for general NP-hard problems like TSP, but empirical results consistently show solutions within 10-20% of the optimal for instances up to hundreds of cities. For maximum cardinality matching in graphs, a variant of the algorithm achieves a (1 + )-approximation in expected polynomial time, where the polynomial degree depends on 1/. These bounds highlight its utility as a heuristic for escaping local optima while delivering near-optimal results in polynomial time for certain structured problems.
+Empirical benchmarks from the 1990s, including instances from the OR-Library collection, demonstrate simulated annealing's superiority over simple hill-climbing methods, often yielding about 1-2% better solutions on TSP and other combinatorial tasks by avoiding premature convergence to local minima.
+In the 2020s, GPU accelerations have significantly enhanced performance, reducing runtimes by up to 100x for large-scale instances in applications like integrated circuit floorplanning and Ising model optimizations. These parallel implementations leverage massive thread counts to evaluate multiple neighbor states simultaneously, enabling simulated annealing to handle problem sizes previously intractable on CPUs while maintaining solution quality. More recent theoretical work (as of 2023) has analyzed the limits of SA in terms of phase transitions, showing robust performance near critical points in optimization landscapes.
+
+Applications
+
+Combinatorial Optimization
+
+Simulated annealing has been extensively applied to combinatorial optimization problems, where the goal is to find optimal configurations in discrete search spaces, such as permutations or assignments, by defining states that represent feasible solutions and energy functions that quantify the objective to minimize. In these applications, the algorithm explores neighborhoods of current states through small perturbations, accepting worse solutions probabilistically to escape local optima, particularly effective for NP-hard problems where exact methods are computationally infeasible.
+A prominent example is the traveling salesman problem (TSP), where the state is represented as a tour visiting each city exactly once, and the energy is the total tour distance to be minimized. Kirkpatrick et al. demonstrated its efficacy in 1983 by applying simulated annealing to two-dimensional TSP instances with up to several thousand cities, achieving near-optimal solutions that surpassed traditional heuristics in quality for large-scale problems.
+In graph partitioning, particularly for very-large-scale integration (VLSI) circuit design, the state consists of assignments of circuit components to chip regions, with the energy defined as the cut sizethe number of connections crossing partitionsto minimize inter-region wiring costs. Historical applications at IBM in the early 1980s used simulated annealing for this purpose, yielding partitions with significantly lower cut sizes compared to earlier greedy methods, facilitating more efficient VLSI layouts.
+For job shop scheduling, states are encoded as permutations of job operations across machines, while the energy corresponds to the makespanthe completion time of the last jobto minimize production delays. van Laarhoven, Aarts, and Lenstra introduced a simulated annealing approach in 1992 for this problem, showing competitive performance on benchmark instances by iteratively swapping operations in the permutation while cooling the temperature schedule to converge on low-makespan schedules.
+In the 1990s, simulated annealing was employed in telecom network design to optimize topology and capacity allocation, minimizing overall infrastructure costs. A case study from that era reported improvements over manual designs by iteratively refining network configurations to balance traffic loads and connection expenses.
+More recently, in the 2020s, simulated annealing has addressed supply chain optimization amid disruptions like those from global events, modeling states as routing and inventory assignments with energy functions incorporating delay and shortage penalties. For instance, applications to multi-vehicle routing in logistics have demonstrated robustness in handling uncertain demands, achieving up to 57% reduction in truck usage (from 142 to 61 trucks) while maintaining 96% demand fulfillment in simulated disruption scenarios compared to static planning.
+
+Machine Learning and AI
+
+Simulated annealing plays a significant role in hyperparameter optimization within machine learning, where states represent configurations of hyperparameters such as learning rates or layer sizes, and the energy function is defined by validation loss to guide the search toward low-error regimes. This formulation allows the algorithm to probabilistically escape suboptimal local minima, integrating seamlessly with gradient-based training methods like stochastic gradient descent for embedded tuning during model optimization. In neural architecture search (NAS), simulated annealing extends this to discrete architectural decisions, treating network topologies as states and evaluating them via performance metrics, as exemplified in SA-CNN frameworks that optimize convolutional architectures for tasks like text classification, achieving competitive accuracy with reduced search overhead.
+Approaches combining simulated annealing with Bayesian optimization have been developed since the 2010s, leveraging annealing's stochastic exploration alongside Gaussian processes as surrogate models to approximate objective functions in expensive black-box settings. These methods use Gaussian processes to model uncertainty and guide annealing perturbations, improving efficiency in high-dimensional hyperparameter spaces compared to standalone annealing. For instance, such hybrid approaches have been applied to global optimization problems, including the design of selective thermal photovoltaic emitters, where annealing complements the probabilistic sampling of Bayesian methods to balance exploration and exploitation.
+In feature selection for machine learning, particularly in genomics, simulated annealing models feature subsets as binary stateswhere each bit indicates inclusion or exclusionand minimizes an energy function incorporating classification accuracy and feature redundancy. This has proven effective for high-dimensional gene expression data in cancer classification during the 2020s, such as combining annealing with partial least squares regression to select discriminative genes from microarray datasets, yielding subsets that enhance model interpretability and performance. Hybrid variants, like those merging annealing with binary coral reefs optimization, further refine selections in biomedical contexts, reducing dimensionality while maintaining predictive power on complex datasets.
+Simulated annealing aids policy optimization in reinforcement learning environments with discrete action spaces by framing action sequences as state transitions under a cooling schedule, allowing probabilistic acceptance of suboptimal policies to explore diverse trajectories. Reinforcement learning-enhanced annealing variants treat neighbor proposals as policies optimized via proximal policy optimization (PPO), improving scalability in combinatorial RL tasks like resource allocation or planning. An illustrative application appears in protein structure prediction inspired by AlphaFold, where annealing searches folding paths on HP lattice models to minimize energy, complementing deep learning predictions and enabling hybrid methods for refining 3D structures in complex biomolecules.
+
+Comparisons with Other Methods
+
+Versus Local Search
+
+Local search methods, exemplified by hill-climbing algorithms, begin from an initial solution and iteratively move to neighboring states that improve the objective function, accepting only superior candidates in a greedy manner. This approach enables rapid convergence to a local optimum but is prone to premature stagnation, as it cannot escape suboptimal regions without additional mechanisms.
+In contrast, simulated annealing addresses this limitation through probabilistic acceptance of inferior moves, governed by the Metropolis criterion, which allows occasional jumps out of local minima early in the process when temperatures are high. This enables broader exploration of the solution space, often yielding higher-quality global approximations. For instance, on the traveling salesman problem (TSP), simulated annealing produces tour lengths substantially closer to optimal than those from standard iterative improvement methods like pairwise interchange. However, this enhanced solution quality comes at the expense of computational efficiency; simulated annealing requires substantially more iterations for cooling and acceptance trials, often resulting in considerably longer runtimes than pure local search on comparable problems.
+The choice between the two depends on the problem landscape: local search is preferable for smooth, convex objectives where greedy progress reliably leads to near-global solutions, while simulated annealing shines in rugged, multimodal spaces riddled with local traps, such as combinatorial problems like TSP or circuit design.
+Hybrid strategies further bridge these paradigms by embedding local search within simulated annealing frameworks, such as applying iterated local search perturbations during cooling epochs to intensify exploitation around promising regions while retaining SA's diversification capabilities. These integrations have demonstrated improved performance on scheduling and routing tasks by balancing exploration and exploitation more effectively than either method alone.
+
+Versus Evolutionary Algorithms
+
+Simulated annealing (SA) and evolutionary algorithms, particularly genetic algorithms (GA), represent two prominent classes of metaheuristic optimization techniques, each drawing inspiration from natural processes but differing fundamentally in their search strategies. Genetic algorithms evolve a population of candidate solutions through mechanisms such as selection, crossover, and mutation, mimicking biological evolution to explore the search space in parallel. This population-based approach makes GA particularly effective for multimodal optimization landscapes, where multiple local optima exist, as it maintains diversity across multiple trajectories simultaneously. In contrast, SA follows a single stochastic trajectory, perturbing a current solution and accepting worse moves probabilistically based on a temperature parameter that decreases over time, inspired by the annealing process in metallurgy.
+The core differences between SA and GA lie in their exploration mechanisms and implementation complexity. SA's single-path nature renders it simpler to implement, with fewer tunable parametersprimarily the initial temperature, cooling schedule, and acceptance criterionmaking it more straightforward for practitioners. However, this sequential exploration limits its parallelism, potentially leading to slower convergence on large-scale problems. GA, while excelling in handling discrete and combinatorial spaces through genetic operators that naturally preserve solution structure, is highly parameter-sensitive, requiring careful tuning of population size, mutation rates, and crossover probabilities to avoid premature convergence or stagnation. Empirical studies highlight these trade-offs: for small problem instances, such as circuit partitioning with modest sizes, SA often converges faster due to its focused search, achieving competitive solution quality with lower computational overhead. In larger or more complex scenarios, GA's parallelizable nature allows it to scale better via distributed computing, though at the cost of increased runtime per iteration. For example, in facilities location problems, GA demonstrated superior solution quality on medium-sized instances but required significantly more evaluations than SA.
+Hybrid approaches combining SA and GA have emerged to leverage the strengths of both, particularly in scheduling domains during the 1990s. These hybrids typically use GA for global exploration via population diversity and SA for local refinement through probabilistic acceptance, improving overall robustness. A notable early example is the integration of GA with SA and tabu search for vehicle routing problems with time windows, where the hybrid method yielded better feasible solutions than standalone GA or SA by balancing exploration and intensification.
+Regarding theoretical underpinnings, SA offers convergence guarantees to the global optimum under specific conditions, such as logarithmic cooling schedules that ensure sufficient exploration time at each temperature level. GA, as a heuristic framework, lacks such rigorous convergence proofs, relying instead on probabilistic models like the schema theorem for expected performance, which do not guarantee optimality but provide insights into building-block assembly. This theoretical edge makes SA preferable in scenarios demanding provable behavior, while GA's empirical versatility suits problems where parallelism and multimodality dominate.
+
+References
+
+Simulated annealing - Optimization Wiki
+
+Optimization by Simulated Annealing - Science
+
+Thermodynamical approach to the traveling salesman problem
+
+Annealing - an overview | ScienceDirect Topics
+
+Equation of State Calculations by Fast Computing Machines
+
+Monte Carlo study of a two-dimensional Ising spin-glass
+
+A survey of simulated annealing applications to operations research ...
+
+ arXiv:cs.MS/0001018 23 Jan 2000
+
+dual_annealing SciPy v1.16.2 Manual
+
+ Hybrid Quantum-Classical Scheduling with Problem ...
+
+ Simulated Annealing and the Knapsack Problem
+
+ Optimization by Simulated Annealing S. Kirkpatrick - Stat@Duke
+
+ HILL CLIMBING
+
+(PDF) Simulated annealing algorithm with adaptive neighborhood
+
+ ERGODICITY IN PARAMETRIC NONSTATIONARY MARKOV CHAINS
+
+(PDF) Optimization by Simulated Annealing - ResearchGate
+
+ A comparison of simulated annealing cooling strategies
+
+ Simulated Annealing with Adaptive Cooling Rates
+
+Cooling Schedules for Optimal Annealing - PubsOnLine
+
+ Restarting search algorithms with applications to simulated annealing
+
+Simulated Annealing with Restart Strategy for the Path Cover ... - MDPI
+
+ Serial and parallel simulated annealing and tabu search algorithms ...
+
+ ADAPTIVE SIMULATED ANNEALING (ASA) - Optimization Online
+
+ Simulated annealing with improved reheating and learning for the ...
+
+Cooling Schedules for Optimal Annealing - PubsOnLine
+
+ Simulated Annealing - SURFACE at Syracuse University
+
+ Different approaches to solve Traveling Salesman Problem - HAL
+
+The time complexity of maximum matching by simulated annealing
+
+ The Traveling Salesman Problem: A Case Study in Local Optimization
+
+Performance Comparison of Simulated Annealing, GA and ACO ...
+
+(PDF) Optimizing simulated annealing on GPU: A case study with IC ...
+
+An efficient implementation of parallel simulated annealing ... - arXiv
+
+Optimization by simulated annealing: Quantitative studies
+
+Using Simulated Annealing To Minimize The Cost Of Centralized ...
+
+Supply Chain Logistics with Quantum and Classical Annealing ...
+
+SA-CNN: Application to text categorization issues using simulated ...
+
+Global Optimization Employing Gaussian Process-Based Bayesian ...
+
+Feature Selection From Gene Expression Data Using Simulated ...
+
+A novel and innovative cancer classification framework through a ...
+
+ Reinforcement Learning Based Simulated Annealing - IFAAMAS
+
+Comparative Analysis of Simulated Annealing in Protein Folding ...
+
+ Hill Climbing Search. - Cornell: Computer Science
+
+2 Simulated Annealing | Probability and Algorithms
+
+ Optimization by Simulated Annealing
+
+ISA: a hybridization between iterated local search and simulated ...
+
+ Genetic Algorithms vs. Simulated Annealing - s2.SMU
+
+ An empirical comparison of Tabu Search, Simulated Annealing, and ...
+
+Hybrid Genetic Algorithm, Simulated Annealing and Tabu Search ...
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

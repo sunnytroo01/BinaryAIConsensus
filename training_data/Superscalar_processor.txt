@@ -1,0 +1,226 @@
+Superscalar processor Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Superscalar processor
+ Ara Eve Leo Sal 
+1x
+ A superscalar processor is a type of central processing unit (CPU) that incorporates a superscalar architecture, allowing it to dispatch and execute multiple instructions simultaneously within a single clock cycle by leveraging instruction-level parallelism (ILP), thereby exceeding the performance limits of traditional scalar processors that handle only one instruction per cycle. This design relies on advanced microarchitectural techniques to identify and process independent instructions in parallel, significantly boosting throughput without increasing clock speed.
+The concept of superscalar processing originated in the mid-to-late 1980s as an evolution of pipelined architectures, with the term "superscalar" first used during that decade by IBM researchers Tilak Agerwala and John Cocke to distinguish processors capable of sustaining execution rates greater than one instruction per clock cycle from earlier scalar designs. By the early 1990s, superscalar techniques had become a cornerstone of high-performance computing, with initial commercial implementations appearing in RISC-based systems that employed static scheduling and no speculation, such as variants of the MIPS and POWER architectures. These processors marked a shift toward dynamic exploitation of ILP, influencing subsequent CISC designs like those in x86 processors.
+Central to superscalar architecture are features like multiple functional units for parallel execution, dynamic instruction scheduling to resolve dependencies on-the-fly, register renaming to eliminate false dependencies, and branch prediction mechanisms to address control flow hazards. These elements enable out-of-order execution and precise exception handling, though they introduce complexities such as increased hardware overhead and power consumption. Notable implementations from the mid-1990s, including the MIPS R10000 with its four-instruction fetch width and 32-entry reorder buffer, exemplified how superscalar designs could achieve high instruction-level parallelism in real-world applications. Over time, superscalar processors have evolved to form the basis of modern multi-core CPUs, continuing to drive performance gains through wider issue widths and deeper pipelines.
+
+Fundamentals
+
+Definition and Principles
+
+A superscalar processor is a microprocessor architecture designed to execute more than one instruction per clock cycle by dynamically identifying and dispatching independent instructions to multiple execution units, thereby achieving an instruction execution rate greater than one instructions per cycle (IPC). This capability stems from the exploitation of instruction-level parallelism (ILP), where instructions that lack data dependencies or control dependencies can be processed concurrently within a single program thread. Unlike single-issue scalar processors, which dispatch only one instruction per cycle, superscalar designs incorporate hardware mechanisms to uncover and utilize ILP at runtime, enabling higher throughput without altering the program's sequential semantics.
+The core principle of superscalar processing involves dynamic hardware scheduling to overcome limitations in sequential instruction streams, such as data dependencies (e.g., read-after-write hazards) and control dependencies (e.g., branches), while maintaining binary compatibility and precise exception handling. Key hardware mechanisms include multiple arithmetic logic units (ALUs) for integer operations, dedicated floating-point units for parallel computation, and branch predictors to anticipate control flow and minimize pipeline disruptions. These elements allow the processor to issue instructions out-of-order, renaming registers to eliminate false dependencies, and speculatively execute paths based on predictions, potentially yielding performance improvements of up to 2-2.5 times over scalar designs under ideal conditions.
+At a high level, a superscalar processor comprises several interconnected components to support parallel instruction handling: an instruction fetch unit that retrieves multiple instructions per cycle from an instruction cache, often guided by branch prediction; a decoder that analyzes dependencies and renames registers for dispatch; a scheduler, such as reservation stations, that monitors operand availability and allocates resources to execution units; and a retire unit, typically implemented via a reorder buffer, that commits results in original program order to ensure architectural correctness. These components form a widened pipeline structure, where the fetch and decode stages support multiple instructions simultaneously, feeding into parallel execution pipelines before ordered retirement.
+For instance, consider a simple code sequence where two independent integer additions (e.g., ADD R1, R2, R3 and ADD R4, R5, R6) and one floating-point multiplication (e.g., FMUL F1, F2, F3) have no interdependencies; a superscalar processor could fetch all three in one cycle, decode and schedule them dynamically, then dispatch the two integer operations to separate ALUs and the floating-point operation to a dedicated unit, completing them in parallel within the same clock cycle. This illustration highlights how superscalar designs extract ILP from straight-line code, contrasting with scalar processors that would serialize the operations across multiple cycles.
+
+Relation to Scalar Processors
+
+A scalar processor executes at most one instruction per clock cycle, processing data items such as integers or floating-point numbers in a strictly sequential manner. This design is constrained by the von Neumann bottleneck, where the shared pathway for fetching both instructions and data from memory limits overall throughput due to inherent sequential access patterns.
+The evolution from scalar to superscalar architectures was driven by advancements enabled by Moore's Law, which predicted the doubling of transistors on integrated circuits approximately every two years, providing the hardware resources to implement multiple parallel execution units without proportional cost increases. Additionally, Amdahl's Law highlighted the theoretical limits of speedup in parallel systems, emphasizing that performance gains are bounded by the fraction of a workload that remains sequential, thus motivating the extraction of instruction-level parallelism (ILP) to maximize effective utilization of additional hardware parallelism.
+Superscalar processors achieve higher performance by increasing instructions per cycle (IPC) from approximately 1 in scalar designs to 2-4 or more, depending on the degree of ILP available in the instruction stream. For instance, under Amdahl's Law, if 50% of a workload is parallelizable, the maximum theoretical speedup approaches 2x even with unlimited parallel resources, illustrating how superscalar designs can double execution rates for balanced workloads by overlapping independent instructions.
+Early theoretical foundations for this shift trace to Joseph A. Fisher's work in the 1980s, which explored ILP through techniques like trace scheduling to identify and exploit parallelism in sequential code, laying the groundwork for dynamic scheduling in superscalar processors.
+
+Design and Mechanisms
+
+Instruction Fetch and Decode
+
+In superscalar processors, the instruction fetch stage is designed to retrieve multiple instructions per cycle to sustain high instruction-level parallelism (ILP), typically prefetching 4 to 16 instructions using multi-way set-associative instruction caches. These mechanisms exploit branch prediction to anticipate control flow, employing advanced predictors such as two-level adaptive schemes that use global branch history registers to achieve prediction accuracies exceeding 90% in many workloads. For instance, a two-level predictor combines pattern history tables indexed by recent branch outcomes with per-branch history to resolve both direction and target addresses, enabling speculative prefetching from predicted paths while buffering mispredicted fetches in recovery structures.
+The decode stage follows, employing wide decoders capable of processing 4 to 6 instructions simultaneously to match the processor's issue width, which involves parsing opcodes, operands, and immediate values in parallel. Register renaming is a core component here, mapping architectural registers to a larger pool of physical registers to eliminate false dependencies like write-after-read (WAR) and write-after-write (WAW), thereby allowing more instructions to proceed independently. Dependency detection logic scans source and destination registers across the instruction group, flagging read-after-write (RAW) hazards for later resolution while renaming eliminates non-true dependencies, supporting sustained throughput in ILP-heavy code.
+Decoded instructions are then dispatched to reservation stations, where they are grouped by execution unit typesuch as integer arithmetic, floating-point, or load/storeto facilitate dynamic scheduling without stalling the front end. This grouping ensures balanced utilization of functional units, with each station holding renamed operands and tags for unresolved dependencies, originating from Tomasulo's algorithm adapted for superscalar widths.
+For variable-length instruction set architectures (ISAs) like x86, instruction alignment and packing units address decoding challenges by scanning unaligned byte streams from the fetch buffer, identifying instruction boundaries, and repacking them into fixed slots for parallel decode. This pre-decoding step, often using length-decoding tables, mitigates the complexity of variable opcodes (1 to 15 bytes), ensuring that wide-issue decoders receive properly aligned groups despite the ISA's irregularity.
+
+Execution and Parallelism
+
+In superscalar processors, the execution phase leverages multiple specialized functional units to process instructions concurrently, enabling instruction-level parallelism (ILP). These units typically include arithmetic logic units (ALUs) for integer operations, floating-point units (FPUs) for decimal computations, and address generation units (AGUs) for calculating memory addresses in load and store instructions. By dispatching instructions to available units simultaneously, the processor can execute independent operations in parallel, such as one ALU handling an addition while an FPU performs a multiplication and an AGU computes a load address, thereby increasing throughput beyond one instruction per cycle.
+Dynamic scheduling is central to achieving this parallelism, often implemented via Tomasulo's algorithm, which uses reservation stations to buffer instructions awaiting operands and a common data bus (CDB) to broadcast results. In this scheme, the wake-up logic monitors the CDB for operand availability, tagging instructions with source register identifiers, while the select logic prioritizes ready instructions for dispatch to functional units based on resource availability and issue bandwidth. This out-of-order execution decouples instruction issue from completion, allowing stalled instructions to be bypassed by independent ones, thus maximizing unit utilization.
+To ensure precise exception handling and maintain architectural state, superscalar processors employ a reorder buffer (ROB), a circular queue that holds the results of in-flight instructions until they can be committed in program order. The ROB tracks instruction completion, renaming registers to avoid write-after-read hazards, and facilitates speculation by buffering speculative results that are discarded on misprediction; for example, it integrates with a store buffer to delay memory writes until commit. This mechanism preserves the illusion of sequential execution despite out-of-order processing.
+Parallelism in superscalar designs is quantified by instructions per cycle (IPC), calculated as the total instructions executed divided by the number of cycles, reflecting sustained throughput influenced by factors like functional unit utilization, dependency chains, and branch accuracy. Out-of-order superscalars can extract more parallelism than in-order variants by executing instructions ahead of unresolved branches or loads, as in-order designs issue multiple instructions but often stall on data hazards without reordering.
+
+Historical Development
+
+Origins and Early Implementations
+
+The theoretical foundations of superscalar processors trace back to the 1960s, when John Cocke at IBM explored instruction-level parallelism in the design of the Stretch supercomputer (IBM 7030), a pioneering system that incorporated multiple functional units capable of executing operations in parallel to overcome the limitations of scalar processing, where only one instruction is issued per cycle. This work laid early groundwork for dynamic scheduling techniques to overlap instruction execution, influencing subsequent architectures by demonstrating the potential for hardware to exploit parallelism beyond traditional pipelining.
+In the 1980s, academic research further formalized superscalar concepts, particularly through James E. Smith's papers on pipelined architectures with multiple instruction issue. Smith's 1989 paper, "Limits on Instruction Level Parallelism," analyzed the upper bounds of parallelism achievable in superscalar pipelines, using trace-driven simulations to show that typical programs could sustain 1.5 to 5 instructions per cycle depending on window size and branch prediction, emphasizing the need for advanced decoding and scheduling mechanisms. Complementing this, Joseph Fisher's 1981 paper, "Trace Scheduling: A Technique for Global Microcode Compaction," introduced compiler-driven parallelism extraction for very long instruction word (VLIW) architectures but profoundly influenced superscalar design by contrasting static compiler scheduling with dynamic hardware scheduling, highlighting how superscalar processors could adaptively resolve dependencies at runtime rather than relying solely on pre-compiled instruction bundles.
+In parallel, the Yale ELI project's 1984 VLIW prototype, building on Fisher's trace scheduling, demonstrated multiple instruction issue in a static scheduling context, providing insights that contrasted with and informed dynamic hardware approaches in superscalar designs. Early patents also advanced these ideas; for instance, IBM's mid-1960s innovations in the ACS project in dynamic scheduling for multiple functional units, as explored in internal projects leading to patents like those on out-of-order issue buffers, enabled processors to dispatch independent instructions to parallel execution units while handling data dependencies through reservation stations, prefiguring core mechanisms in later superscalar implementations.
+
+Evolution in Commercial Processors
+
+The adoption of superscalar architectures in commercial processors began in the early 1990s, marking a shift toward exploiting instruction-level parallelism in mainstream computing. Pioneering this shift was the IBM RS/6000 workstation, released in 1990 with the POWER1 processor, the first commercial superscalar RISC implementation capable of issuing up to three instructions per cycle (one branch, one fixed-point, and one floating-point). The Intel Pentium, released in 1993, was the first widely commercialized superscalar processor, featuring a two-issue design that allowed it to execute up to two instructions per clock cycle through dual integer pipelines and a shared floating-point unit. This innovation delivered approximately 1.5 to 2 times the performance of its predecessor, the 80486, at similar clock speeds, primarily by overlapping instruction fetch, decode, and execution stages.
+Following closely, the MIPS R8000 chipset, introduced in 1994, represented an early superscalar implementation tailored for floating-point-intensive workloads, such as scientific computing and graphics rendering in systems like the Silicon Graphics Indigo2 workstation. Its design emphasized parallel floating-point operations, enabling up to four instructions per cycletwo integer or memory operations alongside two floating-point unitswhile integrating with external caches for high-bandwidth data access. This processor achieved peak floating-point performance of around 300 MFLOPS at 75 MHz, highlighting superscalar potential in specialized high-performance computing environments.
+Advancements in the mid-1990s further refined superscalar designs by incorporating out-of-order execution to mitigate pipeline stalls. The AMD K5, launched in 1996, introduced out-of-order superscalar capabilities to the x86 architecture, with a four-issue core that dynamically reordered instructions for dependency resolution and speculative execution. This allowed the K5 to sustain higher throughput than in-order designs like the Pentium, achieving up to 2.5 instructions per cycle in integer workloads despite its 75-133 MHz clock speeds. Concurrently, the PowerPC 604, released in 1994 by IBM, Motorola, and Apple, employed a superscalar pipeline capable of issuing up to four instructions per cycle, including three integer operations and one load/store, to power desktop and embedded systems. Its out-of-order execution and deep pipeline (six stages) enabled parallel completion of up to six instructions, boosting performance in multimedia and general-purpose applications.
+By the 2000s, superscalar evolution extended to broader markets, including mobile computing. The ARM Cortex-A series, starting with the Cortex-A8 in 2005, adapted superscalar principles for power-sensitive devices, implementing a dual-issue in-order pipeline optimized for low-energy operation in smartphones and tablets. Subsequent iterations, such as the Cortex-A9 (2010) with out-of-order enhancements, scaled issue widths to three or four while prioritizing efficiency, enabling ARM-based processors to dominate mobile performance with up to 2 GHz clocks and integrated graphics.
+In parallel, desktop and server processors pushed issue widths higher. The Intel Core microarchitecture, introduced in 2006 with models like the Core 2 Duo, featured a four-wide issue design with six execution ports, supporting out-of-order execution across 14 pipeline stages for sustained 1.5-2 instructions per cycle in typical workloads. This scaling improved single-thread performance by 40% over prior NetBurst designs at equivalent power envelopes.
+Over time, high-end commercial superscalar processors increased issue widths to 6-8 in dispatch and execution units, as seen in the IBM POWER9 released in 2017, which employed an eight-wide dispatch queue and multiple execution slices for data-center applications. However, these gains were tempered by power constraints; widening pipelines exponentially raised dynamic power dissipation due to larger register files and prediction structures, prompting designs to balance issue width with voltage scaling and clock gating to maintain thermal limits under 100-200W TDP. This trend underscored the ongoing trade-offs in superscalar evolution, where performance uplifts diminished beyond 4-6 issues without complementary techniques like multithreading.
+
+Challenges and Limitations
+
+Structural and Data Hazards
+
+In superscalar processors, structural hazards arise when multiple instructions require access to the same hardware resource simultaneously, leading to resource conflicts that prevent parallel execution. For instance, several load instructions may contend for the data cache ports in the same cycle, causing one or more instructions to stall until the resource becomes available. To mitigate this, designers employ multi-ported caches, which allow concurrent access by multiple instructions, or replicate functional units to increase resource availability.
+Data hazards in superscalar architectures stem from dependencies between instructions that can disrupt the flow of execution if not resolved. Read-after-write (RAW) hazards occur when an instruction reads a register before a prior write to that register completes, potentially yielding incorrect results; these are detected and managed using scoreboarding techniques, which track operand readiness and stall issuing until data is available. Write-after-write (WAW) and write-after-read (WAR) hazards, often artificial due to register reuse, are eliminated through register renaming, where logical registers are mapped to a larger pool of physical registers to break false dependencies and enable true parallelism.
+Control hazards are introduced by conditional branches that alter the instruction fetch direction, stalling the pipeline until the branch outcome is resolved and potentially flushing incorrectly fetched instructions. Branch mispredictions exacerbate this by incurring a penalty measured as the product of the misprediction rate and the cycles lost per misprediction, where the latter depends on pipeline depth and the time to recover (e.g., refetch correct instructions). Basic mitigation involves delayed branching or simple prediction, though advanced dynamic predictors reduce the effective rate.
+A representative example contrasts hazard handling in in-order versus out-of-order superscalar designs: in an in-order superscalar processor, a RAW data hazard or unresolved control hazard triggers stall insertion, halting the entire pipeline until resolution, which limits throughput. In contrast, out-of-order execution with speculation allows dependent instructions to proceed provisionally using predicted outcomes, resolving hazards dynamically via mechanisms like renaming and recovery on misprediction, thereby sustaining higher instruction-level parallelism across multiple execution units.
+
+Complexity and Overhead
+
+Superscalar processors introduce substantial hardware overhead due to the need for duplicate functional units, wider datapaths, and additional structures for dynamic scheduling and speculation. This replication and expansion often result in larger die areas and higher transistor counts compared to scalar designs; for instance, the Intel Core i7, a 4-issue superscalar processor, utilizes approximately 700 million transistors, significantly more than earlier scalar or simpler pipelined architectures. Verification of these wide pipelines becomes increasingly challenging, as the intricate interactions among multiple execution units, reservation stations, and bypass networks demand extensive simulation and testing to ensure correctness under parallel operation.
+Power consumption in superscalar designs scales dynamically with the degree of instruction-level parallelism (ILP) exploited, as more units become active simultaneously. The core dynamic power equation is given by:
+P=CV2fA
+P = C \times V^2 \times f \times A
+P=CV2fA
+where CCC is the effective capacitance, VVV is the supply voltage, fff is the clock frequency, and AAA is the activity factor, which rises with parallelism due to increased switching in execution units and interconnects. For example, the Intel Core i7 consumes up to 130 W under load, reflecting the heightened activity from its superscalar execution compared to lower-power scalar alternatives like mobile processors.
+Design complexity escalates with superscalar width, leading to longer development cycles as engineers address the interplay of out-of-order execution, branch prediction, and hazard resolution. These factors contribute to diminishing returns beyond 4-way issue widths, where ILP wallsstemming from control and data dependencieslimit further performance gains despite added hardware; simulations indicate that exploitable ILP rarely exceeds modest increases of 20-30% in such regimes. Dependence-based clustering techniques can mitigate some complexity by partitioning the processor into smaller windows, but they still require careful balancing of inter-cluster communication to avoid performance degradation.
+Economically, the overhead manifests in higher manufacturing costs for high-end superscalar chips, particularly server CPUs, where die area scales quadratically with yield-impacting defects. Mask set costs alone can exceed $1 million for low-volume production, and larger diessuch as the 263 mm for the Intel Core i7elevate per-unit fabrication expenses, often making these processors 2-4 times costlier than simpler designs at equivalent process nodes.
+
+Modern Alternatives and Extensions
+
+Very Long Instruction Word Architectures
+
+Very Long Instruction Word (VLIW) architectures represent a compiler-centric approach to instruction-level parallelism (ILP), where multiple independent operations are explicitly bundled into a single, wide instruction word that the processor executes in parallel without runtime hardware intervention. This design, pioneered by Joseph A. Fisher in the early 1980s, shifts the burden of scheduling from dynamic hardware mechanisms to static compiler optimizations, enabling the processor to issue several operationstypically 4 to 32per cycle by packing them into fixed-length bundles. A variant, Explicitly Parallel Instruction Computing (EPIC), extends VLIW by incorporating features like predication and speculation hints within bundles to improve compiler efficiency, as seen in Intel's Itanium processors.
+In contrast to superscalar processors, which rely on hardware for dynamic dependency resolution and out-of-order execution to extract ILP at runtime, VLIW eliminates such complexity by requiring the compiler to resolve all data, structural, and control hazards beforehand through techniques like trace scheduling and software pipelining. This static scheduling avoids the power-hungry reservation stations and reorder buffers of superscalar designs but demands sophisticated compilers to fill instruction slots effectively, often inserting no-operation (NOP) instructions or nullifying entire bundles for unresolved hazards. As a result, VLIW achieves parallelism primarily through software-driven ILP extraction, making it less adaptive to varying workloads compared to the hardware flexibility of superscalar systems.
+Prominent implementations include Intel's Itanium family, launched in 2001, which adopted an EPIC-based VLIW model with 128-bit bundles containing three 41-bit instructions, aiming for high-performance computing but ultimately failing commercially due to poor x86 compatibility, immature compilers, and an underdeveloped software ecosystem that hindered adoption in general-purpose markets. In contrast, VLIW has thrived in embedded domains, such as Texas Instruments' TMS320C6000 series digital signal processors (DSPs), where the architecture's predictability and low hardware overhead suit real-time signal processing tasks like multimedia and telecommunications, executing up to eight operations per cycle with compiler-optimized code.
+The advantages of VLIW include simpler hardware designlacking dynamic schedulers, which reduces die area, power consumption, and clock frequency requirementswhile leveraging compiler advancements for scalable parallelism in domain-specific applications. However, its drawbacks stem from brittleness: code modifications can degrade performance if the compiler fails to extract sufficient ILP, and bundle nullification for hazards leads to inefficiencies, particularly in irregular or branch-heavy code, limiting its viability outside controlled environments like embedded systems.
+
+Out-of-Order and Speculative Execution
+
+Out-of-order execution in superscalar processors extends the foundational Tomasulo algorithm by dynamically scheduling instructions based on data dependencies rather than program order, allowing multiple instructions to proceed as soon as their operands are available. This approach, originally developed for the IBM System/360 Model 91, was enhanced in the 1980s with mechanisms like the reorder buffer (ROB) to support speculative execution while ensuring precise interrupts and in-order commit. The ROB acts as a circular queue that tracks in-flight instructions, buffering results until they can be committed in original order, thereby enabling the processor to speculate on branches and data dependencies without violating architectural correctness.
+Speculative execution relies on accurate branch prediction to minimize penalties from control hazards, with modern implementations achieving over 95% accuracy using predictors like TAGE (TAgged GEometric history length), which combines multiple history tables indexed by global branch history and partial tagging for efficient pattern matching. TAGE's geometric increase in history lengths allows it to capture long-range correlations, reducing misprediction rates to below 2% in many workloads on contemporary hardware. Complementing this, speculation mechanisms include load/store reordering, where loads are speculatively issued before prior stores if no dependency is detected via store queue searches, and value prediction, which anticipates instruction outcomes (e.g., constant values or increments) to break true data dependencies and initiate dependent instructions earlier. Recovery from mis-speculation occurs through ROB rollback, where the processor flushes incorrect speculative state and restarts from the correct path, typically incurring a penalty of 10-20 cycles depending on pipeline depth.
+In modern processors, these techniques enable wide-issue superscalar designs, such as Intel's Sapphire Rapids Xeon cores from the early 2020s, which support up to 6-wide micro-op dispatch in out-of-order execution to exploit instruction-level parallelism (ILP) in server workloads. Similarly, ARM's big.LITTLE architecture integrates high-performance superscalar cores like the Cortex-A78, which employ out-of-order execution with speculative features to balance power and performance in heterogeneous systems, dynamically switching between "big" out-of-order cores for bursty tasks and "LITTLE" in-order cores for efficiency. As of 2025, future trends focus on hybrid parallelism, integrating superscalar processors with machine learning (ML) acceleratorssuch as tensor processing units or neural network engineson the same die to offload AI-specific computations while leveraging out-of-order execution for general-purpose control flow, as demonstrated in tiled architectures like VersaTile that combine OoO superscalar cores with associative processors for scalable ML inference.
+
+References
+
+ Super-Scalar Processor Design - Stanford VLSI Research Group
+
+ The Microarchitecture of Superscalar Processors - cs.wisc.edu
+
+Was Stretch Superscalar? -- Mark Smotherman - Clemson University
+
+ Historical Perspective and Further Reading - 4.15
+
+ Two-Level Adaptive Training Branch Predict ion Abstract
+
+ Super-Scalar Processor Design - Stanford VLSI Research Group
+
+ An Efficient Algorithm for Exploiting Multiple Arithmetic Units
+
+ Chapter 3 Instruction-Level Parallelism and Its Exploitation
+
+ Limits on Multiple Instruction Issue - Parallel Programming Laboratory
+
+ Instruction-Level Parallel Processing - Computer Engineering Group
+
+Logical Organization of IBM ACS Project - Clemson University
+
+Architecture of the Pentium microprocessor - IEEE Xplore
+
+An overview of the Intel Pentium processor - IEEE Computer Society
+
+Design of the R8000 Microprocessor - sgistuff.net
+
+Developing the AMD-K5 Architecture - IEEE Computer Society
+
+Developing the AMD-K5 Architecture | IEEE Micro
+
+ PowerPC 604 RISC Microprocessor Technical Summary
+
+Architecture and Implementation of the ARM Cortex-A8 ...
+
+A Walk Through the Cortex-A Mobile Roadmap - Arm Developer
+
+Into the Core: Intel's next-generation microarchitecture - Ars Technica
+
+ Introducing the 45nm Next-Generation Intel Core Microarchitecture
+
+ IBM Power Systems LC921 and LC922 - IBM Redbooks
+
+Compiler-Directed Power Management for Superscalars
+
+ Complexity-effective superscalar embedded processors using ...
+
+ Advanced Processors Superscalar Execution - Cornell University
+
+ Superscalar Processors: Branch Prediction Dynamic Scheduling
+
+ Characterizing the Branch Misprediction Penalty
+
+ computer-architecture-a-quantitative-approach-by-hennessy-and ...
+
+ Optimum Instruction-level Parallelism (ILP) for Superscalar and ...
+
+ Complexity-Effective Superscalar Processors - cs.wisc.edu
+
+ Very Long Instruction Word Architectures and the ELI-512
+
+None
+
+A performance comparison of several superscalar processsor [sic ...
+
+ INTRODUCTION TO THE TMS320C6000 VLIW DSP
+
+Register renaming and dynamic speculation
+
+ A 256 Kbits L-TAGE branch predictor - IRISA
+
+ Using Value Prediction to Increase the Power of Speculative ...
+
+ Speculation Techniques for Improving Load Related Instruction ...
+
+Sapphire Rapids: Golden Cove Hits Servers - Chips and Cheese
+
+Arm Cortex-A76AE: A new age of high-performance processing with ...
+
+VersaTile: Flexible Tiled Architectures via Associative Processors
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

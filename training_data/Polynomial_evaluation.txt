@@ -1,0 +1,361 @@
+Polynomial evaluation Grokipedia
+ 
+
+ Fact-checked by Grok 1 month ago 
+Polynomial evaluation
+ Ara Eve Leo Sal 
+1x
+ Polynomial evaluation is the process of computing the value of a polynomial $ p(x) = a_0 + a_1 x + \dots + a_n x^n $ at a specific point $ x = t $, given its coefficients $ a_0, a_1, \dots, a_n $, and is fundamental in numerical analysis due to polynomials' role in approximating continuous functions, as guaranteed by the Weierstrass approximation theorem. The standard naive approach involves computing powers of $ t $ and accumulating terms, but this is inefficient, requiring up to $ 2n $ multiplications for degree-$ n $ polynomials.
+The most efficient and widely used method for polynomial evaluation is Horner's scheme, also known as nested multiplication or synthetic division, which rewrites the polynomial in a nested form $ p(t) = a_0 + t(a_1 + t(\dots + t a_n)) $ and computes it iteratively with exactly $ n $ multiplications and $ n $ additions, achieving $ \Theta(n) $ time complexity. This method not only minimizes arithmetic operationsmaking it optimal for floating-point computations on hardware like DSP chipsbut also enables simultaneous evaluation of the polynomial and its derivative using the intermediate values, with stability ensured for $ |t| < 1 $ via forward recursion or $ |t| > 1 $ via backward recursion. Horner's method is central to polynomial deflation (removing a known root to obtain the quotient) and factoring high-degree polynomials, such as those up to degree 1,000,000 in signal processing applications.
+Beyond real or complex numbers, polynomial evaluation over finite fields employs specialized algorithms that can achieve sublinear complexity, such as $ O(\sqrt{n}) $ multiplications using recursive partitioning and the Frobenius automorphism, outperforming Horner's $ O(n) $ for sufficiently large degrees (e.g., $ n > 2p^2 - 3p $ in fields of characteristic $ p $). These methods have applications in error-correcting codes like Reed-Solomon decoding, where syndrome computation benefits from reduced operations (e.g., from 8,159 to 6,735 multiplications in specific cases).
+For numerical stability, especially in floating-point arithmetic, the Horner scheme can suffer from error accumulation in additions; alternative representations like the Newton form $ p(x) = a_0 + a_1(x - x_0) + \dots + a_n \prod_{i=0}^{n-1} (x - x_i) $ allow stable evaluation with relative error bounded by $ (6n + 1)E $, where $ E $ is the unit roundoff, by choosing interpolation points to minimize coefficient growth. While algorithms by Motzkin, Belaga, Pan, Cheney, and Knuth reduce total operations below $ 2n $, they often compromise stability, making the adapted Horner method preferable for practical computations.
+Polynomial evaluation underpins diverse fields, including optimization, computer graphics, robotics, data interpolation, and scientific computing, where its efficiency directly impacts performance in tasks like root-finding and function approximation.
+
+Fundamentals
+
+Definition and Notation
+
+Polynomial evaluation refers to the process of computing the value of a polynomial function at a specific point or points within its domain. A univariate polynomial of degree nnn over a field or ring FFF (such as the real numbers R\mathbb{R}R) is formally defined as P(x)=anxn+an1xn1++a1x+a0P(x) = a_n x^n + a_{n-1} x^{n-1} + \cdots + a_1 x + a_0P(x)=anxn+an1xn1++a1x+a0, where the coefficients aiFa_i \in FaiF for i=0,1,,ni = 0, 1, \dots, ni=0,1,,n, and an0a_n \neq 0an=0. The evaluation of this polynomial at a point cFc \in FcF is given by P(c)=i=0naiciP(c) = \sum_{i=0}^n a_i c^iP(c)=i=0naici, obtained by direct substitution of ccc for the variable xxx and applying the arithmetic operations in the standard order.
+Standard notation for univariate polynomials uses a single indeterminate xxx, with terms ordered by descending powers (standard form) for clarity. For multivariate polynomials in kkk variables x1,x2,,xkx_1, x_2, \dots, x_kx1,x2,,xk, the expression generalizes to P(x1,,xk)=axP(x_1, \dots, x_k) = \sum_{\alpha} a_{\alpha} x^{\alpha}P(x1,,xk)=ax, where the sum is over all multi-indices =(1,,k)\alpha = (\alpha_1, \dots, \alpha_k)=(1,,k) with i\alpha_ii non-negative integers, x=x11xkkx^{\alpha} = x_1^{\alpha_1} \cdots x_k^{\alpha_k}x=x11xkk, and only finitely many coefficients a0a_{\alpha} \neq 0a=0. Evaluation in the multivariate case proceeds similarly by substituting specific values for each variable and computing the resulting sum. The degree of a polynomial is the highest power (or total degree in the multivariate case, i\sum \alpha_ii) among its non-zero terms, with the leading coefficient being the coefficient of that highest-degree term and the constant term the coefficient of the degree-zero monomial.
+Consider the univariate polynomial P(x)=3x2+2x1P(x) = 3x^2 + 2x - 1P(x)=3x2+2x1. To evaluate at x=2x = 2x=2, substitute into each term: 3(2)2=34=123(2)^2 = 3 \cdot 4 = 123(2)2=34=12, 2(2)=42(2) = 42(2)=4, and the constant term is 1-11. Summing these gives P(2)=12+41=15P(2) = 12 + 4 - 1 = 15P(2)=12+41=15. The zero polynomial, defined as the expression with all coefficients zero (i.e., P(x)=0P(x) = 0P(x)=0), evaluates to 0 at every point ccc, and its degree is conventionally taken as -\infty or undefined to distinguish it from non-zero constants.
+
+Historical Development
+
+The systematic study of polynomials and their evaluation began in 16th-century Europe with Franois Vite, who introduced symbolic notation for algebraic expressions, enabling the treatment of polynomials as manipulable entities rather than rhetorical problems. Vite's innovations in works like In artem analyticam isagoge (1591) marked a shift toward formal polynomial algebra, laying groundwork for later evaluation techniques by emphasizing coefficients and powers in a structured manner. Precursors to synthetic division, a key tool for root-finding and evaluation, emerged in this period, with early forms of efficient linear division appearing in algebraic texts that built on Vite's framework.
+A major milestone came in the early 19th century with William George Horner's 1819 publication of a method for solving numerical equations through continuous approximation, which optimized polynomial evaluation via nested multiplication and reduced computational steps compared to direct expansion. Although named after Horner, the method is older and can be traced back to the work of tienne Bzout in 1752 and even earlier. This approach, now known as Horner's method, minimized arithmetic operations and error propagation, becoming a standard for single-point evaluation. Later in the century, parallel computing considerations led to Gerald Estrin's 1960 scheme, which structured polynomial evaluation in a binary tree fashion to enable concurrent operations across processors.
+In the mid-20th century, attention turned to minimizing nonscalar multiplications through preprocessing. Theodore S. Motzkin, in his 1955 analysis, established lower bounds on the number of multiplications needed for polynomial evaluation and proposed preprocessing strategies to achieve near-optimal operation counts by restructuring the polynomial form. Building on this, Michael S. Paterson and Larry J. Stockmeyer in 1973 developed an algorithm requiring only O(n) nonscalar multiplications for degree-n polynomials, using a baby-step giant-step technique that preprocesses subpolynomials for matrix and general evaluations. These advances extended to matrix polynomials, influencing numerical linear algebra.
+Post-1965, the Cooley-Tukey fast Fourier transform algorithm facilitated efficient multipoint evaluation by leveraging discrete transforms, integrating spectral methods into polynomial computation without altering core evaluation paradigms. Such developments have sustained interest in polynomial evaluation, particularly in cryptography where rapid modular computations underpin secure protocols.
+
+Applications in Computing and Mathematics
+
+In numerical analysis, polynomial evaluation plays a central role in root-finding algorithms such as the Newton-Raphson method, which iteratively approximates roots of polynomial equations by leveraging the function's value and its derivative. This method is particularly effective for solving high-degree polynomials where direct factorization is computationally infeasible, enabling precise approximations in scientific computing. Additionally, polynomial evaluation underpins Taylor series approximations, where complex functions are represented by finite-degree polynomials to estimate values near a point, facilitating error analysis and function simplification in optimization problems.
+In computer science, polynomial evaluation is integral to hash functions, where strings are treated as coefficients of a polynomial over a finite field to compute collision-resistant hashes efficiently, as seen in rolling hash techniques for string matching. It also supports pseudorandom number generation through linear feedback shift registers defined by primitive polynomials, producing sequences with maximal periods for simulations and cryptography. Furthermore, in computer graphics, polynomial interpolation evaluates curves passing through control points to render smooth shapes, such as Bzier surfaces, enhancing visual realism in rendering pipelines.
+Polynomial evaluation over finite fields is foundational in cryptography and coding theory, particularly for Reed-Solomon codes, where codewords are generated by evaluating message polynomials at distinct field elements to achieve error correction in data transmission. These codes, used in storage systems like CDs and satellite communications, detect and correct up to a specified number of symbol errors through syndrome computations involving polynomial evaluations.
+In machine learning, polynomial kernels in support vector machines (SVMs) evaluate feature mappings implicitly via dot products to handle nonlinear separability, enabling classification of complex datasets without explicit high-dimensional transformations. Emerging trends as of 2025 include polynomial activations in neural networks, where learnable polynomial functions replace traditional nonlinearities to improve interpretability and approximation accuracy in deep architectures. In big data applications, polynomial regression in distributed systems, such as wireless sensor networks, compresses multivariate data by fitting local polynomials across nodes, reducing transmission overhead while preserving analytical fidelity.
+
+Basic Evaluation Techniques
+
+Naive Direct Evaluation
+
+The naive direct evaluation method computes the value of a polynomial $ P(x) = \sum_{i=0}^n a_i x^i $ by independently calculating each power $ x^i $ through $ i $ successive multiplications of $ x $ by itself, scaling the result by the coefficient $ a_i $, and then summing all the terms.
+This approach requires $ \frac{n(n+1)}{2} $ multiplications in totalaccounting for the repeated multiplications to form each power from $ x^2 $ to $ x^n $ and the scalings by coefficients for terms from degree 1 to $ n $along with $ n $ additions to accumulate the sum.
+For example, consider evaluating $ P(x) = 3x^3 + 2x^2 - x + 5 $ at $ x = 3 $. First, compute the powers: $ 3^1 = 3 $ (no multiplication beyond the value itself), $ 3^2 = 3 \times 3 = 9 $ (1 multiplication), $ 3^3 = 3 \times 3 \times 3 = 27 $ (2 multiplications). Then scale by coefficients: $ 3 \times 27 = 81 $ (1 multiplication), $ 2 \times 9 = 18 $ (1 multiplication), $ -1 \times 3 = -3 $ (1 multiplication), and $ 5 \times 1 = 5 $ (no multiplication). Finally, sum the terms: $ 81 + 18 = 99 $, $ 99 + (-3) = 96 $, $ 96 + 5 = 101 $ (3 additions). The total is 101, achieved with 6 multiplications and 3 additions, matching $ \frac{3 \times 4}{2} = 6 $ multiplications for degree $ n=3 $.
+The primary drawback of this method is its high computational cost, stemming from redundant multiplications in computing the powerssuch as repeatedly using the base $ x $ without reusing intermediate resultswhich leads to quadratic scaling in the degree $ n $. This inefficiency contrasts with more optimized techniques like Horner's method.
+
+Horner's Method
+
+Horner's method, also known as Horner's rule or synthetic division, is an efficient algorithm for evaluating a univariate polynomial $ P(x) = a_0 + a_1 x + a_2 x^2 + \cdots + a_n x^n $ of degree $ n $ at a given point $ x $. Developed by William George Horner in 1819, it rewrites the polynomial in a nested form to minimize arithmetic operations. This method transforms $ P(x) $ into the equivalent expression $ P(x) = a_0 + x (a_1 + x (a_2 + \cdots + x a_n) \cdots ) $, which allows evaluation through successive multiplications and additions starting from the highest-degree coefficient.
+The algorithm proceeds iteratively as follows: initialize $ b_n = a_n $, then compute $ b_{i-1} = a_{i-1} + x b_i $ for $ i = n, n-1, \dots, 1 $, with the final result $ b_0 = P(x) $. This nested computation ensures that the evaluation requires exactly $ n $ multiplications and $ n $ additions, achieving optimal linear time complexity $ O(n) $ for a single evaluation point, in contrast to the higher cost of direct expansion.
+Here is pseudocode for Horner's method in a simple iterative form:
+function horner(coefficients a, value x)
+ b = a // Start with highest coefficient
+ for i = n-1 downto 0 do
+ b = a + x * b
+ end for
+ return b // Returns P(x)
+This implementation uses a single loop, requiring minimal storage beyond the coefficient array.
+To verify equivalence, expand the nested form: $ b_{n-1} = a_{n-1} + x a_n $, $ b_{n-2} = a_{n-2} + x (a_{n-1} + x a_n) = a_{n-2} + a_{n-1} x + a_n x^2 $, and continuing yields $ b_0 = a_0 + a_1 x + \cdots + a_n x^n $, matching the original polynomial exactly. This algebraic identity holds by induction on the degree: the base case $ n=0 $ is trivial, and assuming it for degree $ n-1 $, the step $ a_0 + x Q(x) $ where $ Q(x) $ is the reduced polynomial confirms the full expansion.
+Extensions of Horner's method, such as Estrin's scheme, adapt the nesting for parallel computation but retain the sequential core for standard use.
+
+Estrin's Scheme
+
+Estrin's scheme, introduced by Gerald Estrin in 1960, is a divide-and-conquer algorithm for evaluating univariate polynomials that facilitates parallel computation by organizing operations into a binary tree structure. The method recursively splits the polynomial into higher- and lower-degree subpolynomials based on powers-of-two blocks of coefficients, enabling independent evaluation of subexpressions that can be performed concurrently.
+To evaluate a polynomial $ p(x) = \sum_{k=0}^n a_k x^k $ of degree $ n $, the scheme first determines $ m = 2^{\lceil \log_2 (n+1) \rceil - 1} $, the largest power of two less than or equal to $ n $. It then partitions $ p(x) $ into a high-degree part $ p_H(x) = \sum_{k=m}^n a_k x^{k-m} $ and a low-degree part $ p_L(x) = \sum_{k=0}^{m-1} a_k x^k $, such that $ p(x) = p_H(x) \cdot x^m + p_L(x) $. This splitting is applied recursively to $ p_H(x) $ and $ p_L(x) $, forming a balanced binary tree where each non-leaf node represents a multiplication by a power of $ x $ followed by an addition. Precomputed powers of $ x $ (via repeated squaring, such as $ x, x^2, x^4, \dots $) are used to connect levels, minimizing redundant multiplications.
+The tree structure allows for parallelism: at each level, the evaluations of sibling subtrees (corresponding to $ p_H $ and $ p_L $) can proceed independently, making the scheme suitable for hardware with multiple processing units or vectorized execution. The computational depth is $ O(\log n) $, as the recursion halves the problem size at each step, while the total number of arithmetic operations remains $ O(n) $, consisting of roughly $ n $ multiplications and $ n $ additions overall. This contrasts with Horner's method, which has the same serial operation count but requires $ O(n) $ sequential steps, limiting its parallelism; Estrin's scheme achieves equivalent serial cost but reduces latency in parallel environments by distributing work across $ O(n) $ leaves to $ O(\log n) $ levels.
+For a concrete example, consider a degree-4 polynomial $ p(x) = a_4 x^4 + a_3 x^3 + a_2 x^2 + a_1 x + a_0 $. Here, $ m = 4 $, so $ p_L(x) = a_0 + a_1 x + a_2 x^2 + a_3 x^3 $ and $ p_H(x) = a_4 $, yielding $ p(x) = a_4 x^4 + p_L(x) $. Recursing on $ p_L $ with $ m=2 $: inner low $ p_{L2}(x) = a_0 + a_1 x $, inner high $ p_{H2}(x) = a_2 + a_3 x $, so $ p_L(x) = p_{H2}(x) x^2 + p_{L2}(x) $. Thus, $ p(x) = a_4 x^4 + (a_2 + a_3 x) x^2 + (a_0 + a_1 x) $, with $ x^2 $ and $ x^4 = (x^2)^2 $ precomputed. The innermost pairs $ (a_0 + a_1 x) $ and $ (a_2 + a_3 x) $ are computed in parallel at level 1 (each one multiplication and one addition). At level 2, the second result is multiplied by $ x^2 $ and added to the first. At level 3, $ a_4 x^4 $ is added to the result. This tree has three levels, with parallel multiplications and additions at early steps, demonstrating reduced latency compared to Horner's sequential nesting $ p(x) = a_0 + x (a_1 + x (a_2 + x (a_3 + x a_4))) $.
+
+Advanced General Methods
+
+Preprocessing for Reduced Operations
+
+Preprocessing techniques for polynomial evaluation involve transforming the polynomial's coefficients in advance to enable a rewritten form that shares computational subexpressions during evaluation, thereby reducing the number of multiplications required at runtime. These methods, often referred to as preconditioning or initial conditioning, precompute constants based on the original coefficients, allowing the evaluation phase to exploit symmetries or factorizations that minimize multiplications while potentially increasing the number of additions. A seminal approach is due to Motzkin, who demonstrated that such preprocessing can achieve near-optimal operation counts for general polynomials.
+In contrast to Horner's method, which requires n multiplications for a degree-n polynomial, preprocessing can reduce this to approximately n/2 multiplications. Motzkin established a general lower bound of at least (n+1)/2=n/2+1\lceil (n+1)/2 \rceil = \lfloor n/2 \rfloor + 1(n+1)/2=n/2+1 multiplications/divisions in models where operations solely on coefficients are not counted toward the evaluation complexity. This bound holds for schemes with preprocessing over fields of characteristic zero, and algorithms exist that achieve it or come within one multiplication for most degrees. For instance, for a degree-4 polynomial, 3 multiplications suffice, compared to Horner's 4.
+A representative example is the evaluation of P(x)=x4+2x3+3x2+4x+5P(x) = x^4 + 2x^3 + 3x^2 + 4x + 5P(x)=x4+2x3+3x2+4x+5. Through preprocessing, rewrite P(x)P(x)P(x) as u2+rx+su^2 + rx + su2+rx+s, where u=x2+px+qu = x^2 + px + qu=x2+px+q, with precomputed constants p=1p = 1p=1, q=1q = 1q=1, r=2r = 2r=2, and s=4s = 4s=4. To evaluate:
+
+Compute x2=xxx^2 = x \cdot xx2=xx (1 multiplication).
+
+Compute u=x2+px+qu = x^2 + p x + qu=x2+px+q (2 additions, assuming scalar multiplication pxp xpx is preprocessed or counted separately if needed).
+
+Compute u2=uuu^2 = u \cdot uu2=uu (1 multiplication).
+
+Compute rxr xrx (1 multiplication).
+
+Add u2+rx+su^2 + r x + su2+rx+s (2 additions).
+
+This uses exactly 3 multiplications and 4 additions during evaluation, verifying P(x)=(x2+x+1)2+2x+4P(x) = (x^2 + x + 1)^2 + 2x + 4P(x)=(x2+x+1)2+2x+4. The preprocessing step solves for p,q,r,sp, q, r, sp,q,r,s via p=a3/2p = a_3/2p=a3/2, q=(a2p2)/2q = (a_2 - p^2)/2q=(a2p2)/2, r=a12pqr = a_1 - 2 p qr=a12pq, s=a0q2s = a_0 - q^2s=a0q2, where aia_iai are the original coefficients; this requires a fixed number of operations independent of xxx.
+Such techniques trade fewer multiplications for more additions and a one-time preprocessing cost, which is advantageous in resource-constrained environments like early computers or embedded systems where multiplications are significantly more expensive than additions. While optimal for single-point evaluation in terms of multiplications, the increased addition count may affect numerical stability in floating-point arithmetic, though this is mitigated in exact arithmetic settings.
+
+Multipoint Evaluation
+
+Multipoint evaluation refers to the problem of computing the values of a polynomial P(x)P(x)P(x) of degree at most n1n-1n1 at mmm distinct points c1,c2,,cmc_1, c_2, \dots, c_mc1,c2,,cm in a field or ring, yielding the outputs P(c1),P(c2),,P(cm)P(c_1), P(c_2), \dots, P(c_m)P(c1),P(c2),,P(cm). This task arises frequently in computational algebra, where evaluating at many points efficiently is essential for tasks beyond single-point computation.
+The naive approach computes each P(ci)P(c_i)P(ci) independently using direct substitution or Horner's method, resulting in O(nm)O(n m)O(nm) arithmetic operations, which becomes prohibitive when both nnn and mmm are large. To achieve sub-quadratic time, divide-and-conquer strategies partition the points into subsets and exploit polynomial remainder computations. The key structure is the subproduct tree, a binary tree where leaves are the linear factors (xci)(x - c_i)(xci) and internal nodes are products of their children's polynomials, built bottom-up via fast multiplication. Evaluation proceeds top-down: starting with P(x)P(x)P(x), compute remainders modulo each subtree's subproduct polynomial at every level, recursing until linear factors yield the values at individual points. Remainder computations leverage fast polynomial division, often using the fast Fourier transform (FFT) as a subroutine for multiplications and divisions to ensure efficiency.
+This method achieves O((n+m)log2(n+m))O((n + m) \log^2 (n + m))O((n+m)log2(n+m)) operations when nmn \approx mnm, assuming FFT-based multiplication costing O(klogk)O(k \log k)O(klogk) for degree-kkk polynomials; the log2\log^2log2 factor arises from the tree's depth and per-level costs. The preprocessing to build the subproduct tree takes O(mlog2m)O(m \log^2 m)O(mlog2m) time, independent of nnn, allowing reuse for multiple polynomials at the same points.
+Consider evaluating the degree-3 polynomial P(x)=x3+2x2+3x+1P(x) = x^3 + 2x^2 + 3x + 1P(x)=x3+2x2+3x+1 at the 4 points c1=0c_1 = 0c1=0, c2=1c_2 = 1c2=1, c3=2c_3 = 2c3=2, c4=3c_4 = 3c4=3. The subproduct tree has leaves (x0)=x(x - 0) = x(x0)=x, (x1)(x - 1)(x1), (x2)(x - 2)(x2), (x3)(x - 3)(x3). The first level merges into left subproduct TL(x)=x(x1)=x2xT_L(x) = x(x - 1) = x^2 - xTL(x)=x(x1)=x2x and right TR(x)=(x2)(x3)=x25x+6T_R(x) = (x - 2)(x - 3) = x^2 - 5x + 6TR(x)=(x2)(x3)=x25x+6. The root is T(x)=TL(x)TR(x)=x46x3+11x26xT(x) = T_L(x) T_R(x) = x^4 - 6x^3 + 11x^2 - 6xT(x)=TL(x)TR(x)=x46x3+11x26x. Since degP<4\deg P < 4degP<4, the initial remainder is P(x)P(x)P(x) itself. Compute remainders modulo subproducts: divide P(x)P(x)P(x) by TL(x)T_L(x)TL(x) to get quotient x+3x + 3x+3 and remainder QL(x)=6x+1Q_L(x) = 6x + 1QL(x)=6x+1 (verified by P(x)=(x+3)(x2x)+(6x+1)P(x) = (x + 3)(x^2 - x) + (6x + 1)P(x)=(x+3)(x2x)+(6x+1)); similarly for the right, quotient x+7x + 7x+7 and remainder QR(x)=32x41Q_R(x) = 32x - 41QR(x)=32x41 (verified by P(x)=(x+7)(x25x+6)+(32x41)P(x) = (x + 7)(x^2 - 5x + 6) + (32x - 41)P(x)=(x+7)(x25x+6)+(32x41)). Now evaluate at subgroups: for left, QL(0)=1Q_L(0) = 1QL(0)=1 and QL(1)=7Q_L(1) = 7QL(1)=7; for right, QR(2)=23Q_R(2) = 23QR(2)=23 and QR(3)=55Q_R(3) = 55QR(3)=55. Thus, P(0)=1P(0) = 1P(0)=1, P(1)=7P(1) = 7P(1)=7, P(2)=23P(2) = 23P(2)=23, P(3)=55P(3) = 55P(3)=55. This tree construction and reduction halves the degree at each step, avoiding full O(nm)O(n m)O(nm) work.
+As the transpose of interpolation, multipoint evaluation enables fast Lagrange or Newton interpolation by sharing the subproduct tree, filling a gap in direct FFT-based methods by handling arbitrary points without geometric structure.
+
+Dynamic and Online Evaluation
+
+Dynamic and online evaluation of polynomials addresses scenarios where either the coefficients of the polynomial or the evaluation points vary over time, necessitating data structures that support efficient updates and queries to avoid recomputing the entire polynomial from scratch each time. These methods are particularly relevant in online settings, such as interactive computations or streaming processes, where queries arrive sequentially and changes must be incorporated rapidly. Preprocessing the polynomial or points into a tree-based structure enables amortized fast operations, balancing setup costs with query efficiency.
+A key technique involves preprocessing the input into a binary tree or segment tree representation, which allows for an initial setup in O(nlog2n)O(n \log^2 n)O(nlog2n) time, where n is the degree of the polynomial. For fixed evaluation points and a varying polynomial, a subproduct treewhere each node stores the monic polynomial whose roots are the points in its subtreefacilitates multipoint evaluation in O(nlog2n)O(n \log^2 n)O(nlog2n) time. To handle dynamics, incremental algorithms update the structure when coefficients change one at a time. Specifically, Reif and Tate developed dynamic algorithms for multipoint polynomial evaluation that support coefficient updates in O~(n)\tilde{O}(n)O~(n) time each, leveraging algebraic circuit decompositions to incrementally adjust evaluations without full rebuilds. This approach ensures that re-evaluation at the fixed set of points remains efficient after updates. For the converse scenario of a fixed polynomial and varying points, similar tree-based incremental methods treat the evaluation as an algebraic function of the point, achieving comparable update and query times.
+In finite fields, these dynamic evaluation techniques find critical applications in cryptographic protocols, such as those involving elliptic curves, where polynomials define curve equations and operations like point addition require repeated evaluations over Fq\mathbb{F}_qFq. Efficient dynamic methods enable fast adaptations in interactive settings, such as zero-knowledge proofs or multi-party computation, by supporting coefficient or point updates while maintaining security. For instance, in elliptic curve cryptography, polynomial evaluations underpin scalar multiplication, and tree-structured preprocessing accelerates these in resource-constrained environments.
+As of 2025, extensions of these methods have emerged in streaming data applications, where polynomials model evolving time-series data under privacy constraints. Polynomial private stream aggregation protocols, for example, use dynamic evaluation to update coefficients based on incoming streams and compute aggregate evaluations securely, achieving low-latency processing for applications like secure analytics. An illustrative example is updating a single coefficient in the tree structure, followed by re-evaluation at a new point; this can be accomplished in O(nlog2n)O(n \log^2 n)O(nlog2n) time overall, demonstrating the adaptability of these algorithms over naive O(n2)O(n^2)O(n2) recomputations. This builds on static multipoint evaluation as a precursor, extending it to handle changes algorithmically.
+
+Specialized Polynomial Evaluations
+
+Evaluation of Powers and Exponentials
+
+Binary exponentiation, also known as exponentiation by squaring, is an efficient algorithm for computing xnx^nxn where xxx is the base and nnn is a non-negative integer exponent, requiring only O(logn)O(\log n)O(logn) multiplications. The method exploits the binary representation of nnn, recursively breaking down the computation by squaring the base and multiplying by xxx when the corresponding bit is set. Specifically, the recursive formula is xn=(xn/2)2xnmod2x^n = (x^{n/2})^2 \cdot x^{n \mod 2}xn=(xn/2)2xnmod2, with the base case x0=1x^0 = 1x0=1 and x1=xx^1 = xx1=x.
+This approach significantly reduces the number of operations compared to naive repeated multiplication, which requires O(n)O(n)O(n) steps. For example, to compute x13x^{13}x13, note that 13 in binary is 1101, so compute successive squares x2=xxx^2 = x \cdot xx2=xx, x4=(x2)2x^4 = (x^2)^2x4=(x2)2, x8=(x4)2x^8 = (x^4)^2x8=(x4)2 (3 multiplications), then x13=xx4x8x^{13} = x \cdot x^4 \cdot x^8x13=xx4x8 (2 more multiplications), for a total of 5 multiplications. The exact count is log2n+popcount(n)1\lfloor \log_2 n \rfloor + \mathrm{popcount}(n) - 1log2n+popcount(n)1 multiplications, where popcount(n)\mathrm{popcount}(n)popcount(n) is the number of 1-bits in the binary representation of nnn.
+A theoretical lower bound establishes that at least log2n\lceil \log_2 n \rceillog2n multiplications are required to compute xnx^nxn using only multiplications (starting from xxx), confirming the near-optimality of binary exponentiation.
+Power series approximations are commonly used for functions like the exponential, where exp(x)=k=0xkk!\exp(x) = \sum_{k=0}^{\infty} \frac{x^k}{k!}exp(x)=k=0k!xk. For practical computation, the infinite series is truncated to a finite partial sum, forming a polynomial pm(x)=k=0mxkk!p_m(x) = \sum_{k=0}^{m} \frac{x^k}{k!}pm(x)=k=0mk!xk, which approximates exp(x)\exp(x)exp(x) with increasing accuracy as mmm grows. This polynomial can be evaluated efficiently using Horner's method on the partial sum coefficients 1k!\frac{1}{k!}k!1, reducing the operation count to O(m)O(m)O(m) while minimizing numerical instability.
+
+Common Polynomial Families
+
+Common polynomial families, such as orthogonal polynomials, benefit from specialized evaluation techniques leveraging their recurrence relations, enabling efficient computation compared to general methods. These families include Legendre, Chebyshev, Hermite, and Laguerre polynomials, each satisfying three-term recurrences that allow sequential computation from initial values, achieving O(n complexity for a polynomial of degree n. This efficiency stems from the forward recurrence, requiring only n multiplications and additions after initialization, making them preferable for applications requiring repeated evaluations.
+Legendre polynomials Pn(x)P_n(x)Pn(x), defined on with weight function 1, are generated by the recurrence P0(x)=1P_0(x) = 1P0(x)=1, P1(x)=xP_1(x) = xP1(x)=x, and for k2k \geq 2k2,
+Pk(x)=(2k1)xPk1(x)(k1)Pk2(x)k,
+P_k(x) = \frac{(2k-1) x P_{k-1}(x) - (k-1) P_{k-2}(x)}{k},
+Pk(x)=k(2k1)xPk1(x)(k1)Pk2(x),
+which follows from the general three-term relation for classical orthogonal polynomials. This allows evaluation in O(n) operations, superior to the O(n^2) cost of naive summation for arbitrary polynomials. Legendre polynomials are widely used in Gaussian quadrature for numerical integration, where their roots serve as nodes for rules exact for polynomials up to degree 2n-1, and in spectral methods for solving partial differential equations due to their orthogonality properties.
+Chebyshev polynomials of the first kind Tn(x)T_n(x)Tn(x), also on with weight 1/1x21/\sqrt{1-x^2}1/1x2, satisfy T0(x)=1T_0(x) = 1T0(x)=1, T1(x)=xT_1(x) = xT1(x)=x, and for n2n \geq 2n2,
+Tn(x)=2xTn1(x)Tn2(x).
+T_n(x) = 2x T_{n-1}(x) - T_{n-2}(x).
+Tn(x)=2xTn1(x)Tn2(x).
+This simple recurrence enables O(n) evaluation and exploits the trigonometric identity Tn(x)=cos(narccosx)T_n(x) = \cos(n \arccos x)Tn(x)=cos(narccosx) for fast computation in certain domains, though the algebraic form is preferred for numerical stability. They are essential in spectral methods for their minimax approximation properties, facilitating rapid convergence in series solutions to differential equations, and in quadrature schemes like Clenshaw-Curtis rules.
+Hermite polynomials, divided into physicist's Hn(x)H_n(x)Hn(x) (weight ex2e^{-x^2}ex2 on (,)(-\infty, \infty)(,)) and probabilist's Hen(x)\mathrm{He}_n(x)Hen(x), follow three-term recurrences such as H0(x)=1H_0(x) = 1H0(x)=1, H1(x)=2xH_1(x) = 2xH1(x)=2x, and Hn+1(x)=2xHn(x)2nHn1(x)H_{n+1}(x) = 2x H_n(x) - 2n H_{n-1}(x)Hn+1(x)=2xHn(x)2nHn1(x) for the former, allowing O(n) evaluation via forward iteration. Similarly, generalized Laguerre polynomials Ln()(x)L_n^{(\alpha)}(x)Ln()(x) (weight xexx^\alpha e^{-x}xex on [0,)[0, \infty)[0,)) use L0()(x)=1L_0^{(\alpha)}(x) = 1L0()(x)=1, L1()(x)=1+xL_1^{(\alpha)}(x) = 1 + \alpha - xL1()(x)=1+x, and
+(n+1)Ln+1()(x)=(2n++1x)Ln()(x)(n+)Ln1()(x)
+(n+1) L_{n+1}^{(\alpha)}(x) = (2n + \alpha + 1 - x) L_n^{(\alpha)}(x) - (n + \alpha) L_{n-1}^{(\alpha)}(x)
+(n+1)Ln+1()(x)=(2n++1x)Ln()(x)(n+)Ln1()(x)
+for sequential computation in O(n) time. Both families find applications in spectral methods for quantum mechanics and random processes, as well as in Gaussian quadrature for integrals over unbounded or semi-infinite domains, leveraging their orthogonality for accurate approximations.
+
+Computationally Challenging Polynomials
+
+Certain polynomials pose significant computational challenges for evaluation due to lower bounds on the number of arithmetic operations required, even in models allowing preprocessing or parallelism. These challenges arise in algebraic complexity theory, where the goal is to minimize multiplications and additions in arithmetic circuits or straight-line programs. Seminal results from the 1970s established that some degree-n polynomials demand (n) non-scalar multiplications for evaluation, contrasting with efficient methods like Horner's scheme that achieve O(n) operations but cannot be improved upon for general cases.
+A classic hard instance is the lacunary polynomial $ P(x) = \sum_{i=0}^{n-1} x^{2^i} $, which has degree $ 2^n - 1 $ but only n nonzero terms. In the parallel arithmetic model with unbounded processors, evaluating this polynomial requires (n) time steps, as successive squarings are necessary to compute the high-degree terms without exploitable structure for faster parallelism. This bound highlights the near-quadratic scaling relative to the logarithm of the degree (log(degree) n), making it resistant to sublinear-time optimizations in parallel settings. Preprocessing offers limited relief, as the inherent tower-like exponent structure enforces the (n) operation count in sequential models as well.
+The permanent polynomial provides an extreme example of hardness. Defined as $ \mathrm{per}(A) = \sum_{\sigma \in S_n} \prod_{i=1}^n a_{i,\sigma(i)} $ for an n n matrix A with variables $ a_{ij} $, it is a degree-n multilinear polynomial in n variables. Evaluating it at any input is #P-complete, implying no polynomial-time algorithm exists unless P = #P, and arithmetic circuits require exponential size. This computational intractability persists even over finite fields, underscoring the polynomial's resistance to optimization.
+In finite fields like GF(2), evaluation hardness manifests through high circuit complexity for polynomials representing difficult Boolean functions. For instance, polynomials with 0-1 coefficients can require superlinear arithmetic circuit sizes, even with arbitrary preconditioning, as shown by the existence of families needing (n log n) operations for degree-n instances. Specific sparse polynomials over GF(2), such as those encoding the permanent modulo 2, inherit #P-hardness, demanding exponential circuit sizes for evaluation. These results extend to testing low-degree approximations, where distinguishing a degree-k polynomial from others requires (2^k / ) queries, establishing tight lower bounds.
+Recent advancements in the 2020s have highlighted challenging polynomials in post-quantum cryptography, particularly lattice-based schemes like those in NIST-standardized Kyber and Dilithium. These rely on structured polynomials over rings such as $ \mathbb{Z}_q / (x^n + 1) $, where evaluation and multiplication must resist quantum attacks. The underlying hardness stems from lattice problems like Learning With Errors (LWE), believed to require subexponential time even on quantum computers, ensuring that polynomial evaluations in these contexts remain computationally intensive for adversaries. While direct evaluation is efficient via Number Theoretic Transforms (O(n log n)), the overall scheme's security enforces quantum-resistant lower bounds on inversion or decoding tasks involving these polynomials.
+
+Multivariate and Non-Scalar Extensions
+
+Multivariate Polynomial Evaluation
+
+A multivariate polynomial in kkk variables is defined as
+P(x1,,xk)=i1=0d1ik=0dkai1ikx1i1xkik,
+P(x_1, \dots, x_k) = \sum_{i_1=0}^{d_1} \cdots \sum_{i_k=0}^{d_k} a_{i_1 \dots i_k} x_1^{i_1} \cdots x_k^{i_k},
+P(x1,,xk)=i1=0d1ik=0dkai1ikx1i1xkik,
+where the coefficients ai1ika_{i_1 \dots i_k}ai1ik are scalars and the degrees djd_jdj may vary per variable.
+The naive evaluation of a dense multivariate polynomial computes each monomial independently by raising each variable to its power and multiplying them together, followed by summing the scaled terms; this requires (j=1k(dj+1))\Theta\left( \prod_{j=1}^k (d_j + 1) \right)(j=1k(dj+1)) operations, which grows exponentially with kkk for fixed total degree due to the curse of dimensionality.
+The multivariate Horner scheme generalizes the univariate method by recursively nesting the polynomial as a univariate polynomial in one variable whose coefficients are themselves multivariate polynomials in the remaining variables, achieving evaluation with a number of arithmetic operations linear in the number of monomials, i.e., $ O\left( \prod_{j=1}^k (d_j + 1) \right) $, proportional to the number of terms.
+For sparse multivariate polynomials, where most coefficients ai1ika_{i_1 \dots i_k}ai1ik are zero, evaluation optimizes by iterating only over non-zero terms, computing each monomial via repeated multiplication (e.g., Horner's rule per power) and accumulating the sum; this reduces operations to O(td)O\left( t \cdot \bar{d} \right)O(td), with ttt the number of terms and d\bar{d}d the average degree.
+Consider the bivariate quadratic P(x,y)=12x2y2+8x2y+6xy2+4xy+2x+2yP(x, y) = 12x^2 y^2 + 8x^2 y + 6x y^2 + 4x y + 2x + 2yP(x,y)=12x2y2+8x2y+6xy2+4xy+2x+2y, rewritten in nested Horner form as
+P(x,y)=x(x(y(12y+8)+(6y+4))+2)+2y;
+P(x, y) = x \left( x \left( y (12 y + 8) + (6 y + 4) \right) + 2 \right) + 2 y;
+P(x,y)=x(x(y(12y+8)+(6y+4))+2)+2y;
+starting from the inner 12y+812 y + 812y+8, each nesting adds one multiplication by the outer variable, totaling four multiplications and five additions instead of the naive approach's higher count including explicit powers.
+The curse of dimensionality poses significant challenges, as even moderate kkk yields combinatorially explosive term counts for dense polynomials (e.g., (d+k1k1)\binom{d + k - 1}{k - 1}(k1d+k1) terms for total degree ddd), rendering direct evaluation infeasible without sparsity or hierarchical approximations.
+
+Matrix and Operator Polynomial Evaluation
+
+In matrix and operator polynomial evaluation, the task is to compute $ P(A) = \sum_{i=0}^n a_i A^i $, where $ A $ is an $ m \times m $ matrix with scalar coefficients $ a_i $, or more generally a linear operator on a vector space. This arises when applying scalar polynomials to non-scalar arguments, such as in functional calculus for matrices. Unlike scalar evaluation, matrix powers require matrix-matrix multiplications, and the non-commutativity of matrix multiplication necessitates careful preservation of the power order, though powers of the same matrix $ A $ commute since $ A^i A^j = A^{i+j} $. For distinct operators, however, the expansion must respect the specific non-commutative product order to avoid incorrect results.
+The naive approach, such as Horner's method adapted to matrices, computes successive powers iteratively: starting from $ P_n = a_n $, then $ P_k = a_k + A P_{k+1} $ for $ k = n-1 $ down to 0. Each step involves one matrix-matrix multiplication (cost $ O(m^3) $) and one scalar-matrix multiplication (cost $ O(m^2) $), yielding a total complexity of $ O(n m^3) $ for degree $ n $. This is inefficient for high-degree polynomials, as it scales linearly with $ n $. The PatersonStockmeyer method addresses this by reducing the number of costly matrix-matrix multiplications to $ O(\sqrt{n}) $ through a nested squaring and grouping strategy, achieving an overall asymptotic cost of $ O(\sqrt{n} , m^3 + n m^2) $. This method partitions the polynomial into blocks of size approximately $ \sqrt{n} $, computes low-degree sub-polynomials on powers of $ A $, and combines them via higher powers obtained by squaring, minimizing non-scalar operations while using $ O(\sqrt{n}) $ additional storage for intermediate matrices. The approach is optimal in the number of matrix multiplications among similar nested schemes.
+For a degree-4 polynomial $ P(A) = a_0 + a_1 A + a_2 A^2 + a_3 A^3 + a_4 A^4 $, the PatersonStockmeyer method with block size 2 first computes $ B = A^2 $ (one matrix multiplication). It then groups as $ P(A) = Q_0(B) + A Q_1(B) $, where $ Q_0(y) = a_0 + a_2 y + a_4 y^2 $ and $ Q_1(y) = a_1 + a_3 y $. Compute $ B^2 = A^4 $ (one multiplication), then $ Q_0(B) = a_0 I + a_2 B + a_4 B^2 $ and $ Q_1(B) = a_1 I + a_3 B $ using scalar multiplications and additions, followed by one final multiplication $ A Q_1(B) $. The result combines via addition, totaling three matrix multiplications versus four in Horner's method.
+Applications include computing matrix exponentials $ e^A = \sum_{k=0}^\infty \frac{A^k}{k!} $, approximated by truncated polynomials, which solve linear systems of ordinary differential equations $ y' = A y $ via $ y(t) = e^{A t} y(0) $. In quantum computing, polynomial evaluations underpin the quantum singular value transformation, which applies polynomials to singular values of matrices for tasks like Hamiltonian simulation and ground state energy estimation.
+
+Numerical and Implementation Aspects
+
+Error Analysis and Stability
+
+In floating-point arithmetic, the evaluation of polynomials is subject to rounding errors that accumulate during computations. For Horner's method, a standard forward error analysis shows that the relative error in the computed value is bounded by O(n)O(n \epsilon)O(n), where nnn is the degree of the polynomial and \epsilon is the machine precision of the floating-point system. This bound arises from the propagation of rounding errors in each multiplication and addition step, making Horner's method numerically stable for well-conditioned polynomials.
+A classic example illustrating the sensitivity of polynomial evaluation to perturbations is Wilkinson's polynomial, defined as w(x)=i=120(xi)w(x) = \prod_{i=1}^{20} (x - i)w(x)=i=120(xi). When the coefficients of this monic polynomial are rounded to 8 significant decimal digits, the roots become highly unstable, clustering near the origin and deviating dramatically from the integers 1 through 20, even though the original roots are well-separated. This demonstrates how small coefficient perturbations, on the order of machine epsilon, can lead to catastrophic loss of accuracy in ill-conditioned cases.
+Regarding stability, Horner's method is backward stable, meaning the computed result is exact for a slightly perturbed input polynomial whose coefficients are close to the original ones within the bounds of floating-point precision. In contrast, the naive forward evaluation schemesumming terms pkckp_k c^kpkck computed via repeated poweringis unstable for ill-conditioned polynomials, as errors in higher powers amplify rapidly.
+The inherent sensitivity of polynomial evaluation at a point ccc is quantified by the condition number (P,c)=P(c)cP(c)\kappa(P, c) = \frac{|P'(c)| |c|}{|P(c)|}(P,c)=P(c)P(c)c, which measures the relative change in P(c)P(c)P(c) due to relative perturbations in ccc. Large values of (P,c)\kappa(P, c)(P,c) indicate ill-conditioning, as seen in Wilkinson's polynomial near its roots, where the condition number grows exponentially with degree.
+To mitigate these errors, compensated variants of Horner's method have been developed, which use additional error compensation steps to achieve near-correct rounding without increasing the working precision. For instance, the compensated Horner scheme computes an error estimate alongside the primary result, allowing reconstruction of a more accurate value in a single pass. Double-double arithmetic, which represents numbers as sums of two floating-point values to emulate higher precision, further reduces error propagation in polynomial evaluation by handling intermediate results with extended accuracy.
+For applications demanding arbitrary precision, libraries such as MPFR provide reliable polynomial evaluation with guaranteed error bounds.
+
+Parallel and Modern Hardware Evaluation
+
+Parallel evaluation of polynomials leverages modern hardware architectures to achieve significant speedups over sequential methods, particularly for high-degree polynomials and large-scale computations. By distributing the nested multiplications and additions inherent in schemes like Horner's rule across multiple processors or threads, these approaches reduce computational depth and exploit concurrency. On multi-core CPUs, GPUs, and distributed clusters, parallel strategies such as tree-based reductions enable logarithmic-time evaluation, making them essential for applications in scientific simulations, machine learning, and cryptography.
+A key parallelization of Horner's method involves distributing the nested multiplications across threads or processors, transforming the sequential O(n) operations into a tree-like structure with reduced depth. This parallel Horner algorithm achieves O(n/p + \log p) time complexity on p processors, where the logarithmic term arises from the reduction steps in the computation tree, allowing for efficient load balancing on shared-memory systems. For instance, with p = n processors, the depth approaches O(\log n), enabling near-constant time per processor for large n. This method maintains numerical stability similar to the sequential version while scaling well on MIMD architectures.
+On GPUs, Estrin-like schemes provide an effective basis for parallel polynomial evaluation due to their tree structure, which maps naturally to CUDA threads and warps for high-throughput computation. Implementations using CUDA kernels for Estrin-style binary trees distribute sub-polynomial evaluations across thousands of cores, achieving substantial speedups for high-degree polynomials by minimizing sequential dependencies. For example, GPU-accelerated evaluations of multivariate quadratics have demonstrated up to 20x speedup over CPU baselines on NVIDIA architectures, with further gains on modern hardware like the A100 through optimized memory access patterns and fused multiply-add operations. These methods excel in batched evaluations, common in neural network activations and signal processing.
+In distributed systems, MapReduce frameworks facilitate multipoint polynomial evaluation by partitioning coefficients and points across clusters, enabling scalable processing of massive datasets. The approach maps sub-evaluations to worker nodes and reduces results via aggregation, yielding O((n + m)/p + \log p) time complexity for evaluating an n-degree polynomial at m points on p nodes, where the logarithmic factor accounts for communication rounds. This model simulates parallel circuits efficiently in MapReduce, supporting fault-tolerant execution in cloud environments like Hadoop for applications in big data analytics and genomic sequencing.
+Hardware-accelerated FFT libraries, such as NVIDIA's cuFFT, enable fast multipoint evaluation by transforming polynomials into the frequency domain for convolution-based computation on GPUs. cuFFT performs the necessary forward and inverse FFTs with high efficiency, supporting batched operations that evaluate polynomials at thousands of points in parallel, often outperforming traditional methods by orders of magnitude for large m. This is particularly impactful for spectral methods in physics simulations, where cuFFT's integration with CUDA delivers peak floating-point throughput while handling precision requirements via double-precision modes.
+Despite these advances, parallel polynomial evaluation on modern hardware faces challenges from synchronization overhead and memory bandwidth limitations. In GPU kernels, thread divergence and barrier synchronizations can introduce latency, especially in tree reductions, while global memory access patterns often bottleneck performance due to the high data movement required for coefficient loading and result accumulation. On distributed setups, inter-node communication exacerbates these issues, necessitating careful partitioning to balance computation and transfer costs.
+
+References
+
+ Polynomial Evaluation
+
+ Horner's Method for Evaluating and Deflating Polynomials - Rice ECE
+
+https://arxiv.org/pdf/1102.4772.pdf
+
+ Stable evaluation of polynomials
+
+https://math.libretexts.org/Courses/Lumen_Learning/Beginning_Algebra_(Lumen
+
+Lecture 11: Univariate and Multivariate Polynomials
+
+How did Ruffini discover his method of polynomial division?
+
+XXI. A new method of solving numerical equations of all orders, by ...
+
+On the Number of Nonscalar Multiplications Necessary to Evaluate ...
+
+ The Newton-Raphson Method - UBC Mathematics
+
+https://math.libretexts.org/Bookshelves/Calculus/Book%3A_Active_Calculus_(Boelkins_et_al.
+
+ Efficient Design and Implementation of Polynomial Hash Functions ...
+
+Primitive polynomials selection method for pseudo-random number ...
+
+ Interpolation - Stanford Computer Graphics Laboratory
+
+ Reed-Solomon codes
+
+ Polynomial evaluation over finite fields: new algorithms ...
+
+SVC scikit-learn 1.7.2 documentation
+
+Using polynomial regression for data representation in wireless ...
+
+ 1. Nested Arithmetic Evaluating a function is a common step in many ...
+
+ Polynomial Evaluation - 
+
+Long Integers and Polynomial Evaluation with Estrin's Scheme
+
+Estrin's method for polynomial evaluation
+
+ Investigation of different methods of fast polynomial evaluation
+
+ METHODS OF COMPUTING VALUES OF POLYNOMIALS
+
+On the Number of Multiplications/Divisions Evaluating a Polynomial ...
+
+ Polynomial evaluation and interpolation on special sets of points
+
+ Fast Multipoint Evaluation On n Arbitrary Points - CECM, SFU
+
+Binary Exponentiation - Algorithms for Competitive Programming
+
+New Algorithms and Lower Bounds for the Parallel Evaluation of ...
+
+Exponential Function -- from Wolfram MathWorld
+
+DLMF: 18.9 Recurrence Relations and Derivatives Classical ...
+
+DLMF: 3.5 Quadrature Areas Chapter 3 Numerical Methods
+
+18.38 Mathematical Applications
+
+Orthogonal polynomials: applications and computation
+
+On the Number of Multiplications Necessary - to Compute Certain ...
+
+ new algorithms and lower bounds for the parallel evaluation
+
+The complexity of computing the permanent - ScienceDirect.com
+
+https://epubs.siam.org/doi/abs/10.1137/0207004
+
+ Testing Low-Degree Polynomials over GF(2) - TAU
+
+Post-Quantum Cryptography: Computational-Hardness Assumptions ...
+
+ Polynomials in Algorithm Design - CMU School of Computer Science
+
+Breaking the curse of dimensionality in sparse polynomial ...
+
+On the Multivariate Horner Scheme - SIAM.org
+
+ What Can (and Can't) we Do with Sparse Polynomials? - arXiv
+
+How to implement Horner's scheme for multivariate polynomials?
+
+Optimality of the PatersonStockmeyer method for evaluating matrix ...
+
+Efficient Evaluation of Matrix Polynomials beyond the Paterson ...
+
+Boosting the computation of the matrix exponential - DOI
+
+Quantum singular value transformation and beyond: exponential ...
+
+Error Analysis for Polynomial Evaluation *
+
+Accuracy and Stability of Numerical Algorithms | 5. Polynomials
+
+Rounding error analysis of Horner's scheme | Computing
+
+Faithful Polynomial Evaluation with Compensated Horner Algorithm
+
+ Compensated Horner Scheme - DROPS
+
+ Correctly rounded evaluation of a function - HAL
+
+A Fast Parallel Horner Algorithm | SIAM Journal on Computing
+
+ Efficient Parallel Evaluation of Multivariate Quadratic Polynomials on ...
+
+Efficient deterministic MapReduce algorithms for parallelizable ...
+
+ FourierPIM: High-Throughput In-Memory Fast Fourier Transform and ...
+
+1. Introduction cuFFT 13.0 documentation - NVIDIA Docs Hub
+
+ On The Parallelization Of Integer Polynomial Multiplication
+
+ Accelerating Hash-Based Polynomial Commitment Schemes with ...
+
+Parallel Quantum Signal Processing Via Polynomial Factorization
+
+Quantum-inspired algorithms for multivariate analysis - ResearchGate
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

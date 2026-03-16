@@ -1,0 +1,256 @@
+Rejection sampling Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Rejection sampling
+ Ara Eve Leo Sal 
+1x
+ Rejection sampling, also known as the acceptance-rejection method, is a fundamental Monte Carlo algorithm used to generate independent and identically distributed samples from a target probability density function f(x)f(x)f(x) that is difficult to sample directly, by leveraging a simpler proposal density g(x)g(x)g(x) from which samples can be easily drawn. The method works by repeatedly proposing candidates from g(x)g(x)g(x) and accepting them with a probability that ensures the accepted samples follow the target distribution f(x)f(x)f(x), provided that f(x)cg(x)f(x) \leq c g(x)f(x)cg(x) for some finite constant c1c \geq 1c1.
+The core algorithm for the continuous case proceeds as follows: generate a candidate YYY from the proposal distribution with density g(x)g(x)g(x); independently generate a uniform random variable UUniform(0,1)U \sim \text{Uniform}(0,1)UUniform(0,1); accept YYY as a sample XXX if Uf(Y)/(cg(Y))U \leq f(Y)/(c g(Y))Uf(Y)/(cg(Y)), otherwise reject and repeat the process. This acceptance criterion guarantees that the conditional distribution of accepted samples is exactly f(x)f(x)f(x), as the probability of acceptance adjusts for the discrepancy between fff and ggg. Key requirements include the existence of a bounded constant c=supx{f(x)/g(x)}c = \sup_x \{f(x)/g(x)\}c=supx{f(x)/g(x)}, which must be finite, and the ability to evaluate both f(x)f(x)f(x) and g(x)g(x)g(x) up to a normalizing constant if needed. The choice of proposal g(x)g(x)g(x) is crucial; an ideal ggg closely approximates the shape of f(x)f(x)f(x) to minimize ccc, thereby improving efficiency.
+Efficiency is determined by the expected number of iterations, which follows a geometric distribution with success probability 1/c1/c1/c, yielding an expected value of ccc proposals per accepted sample. While the method provides exact samples without bias, it can become inefficient in high dimensions or when ccc is large, leading to high rejection rates, and is often contrasted with alternatives like importance sampling that reuse rejected samples via weights. Rejection sampling applies to both continuous and discrete distributions, with adaptations for unnormalized densities common in Bayesian inference and statistical physics.
+
+Introduction
+
+History
+
+Rejection sampling emerged as a foundational technique within the broader development of Monte Carlo methods during the 1940s, primarily driven by efforts to simulate complex physical processes on early computers. John von Neumann proposed the core accept-reject mechanism in unpublished notes and a 1947 letter to Stanislaw Ulam, while working at Los Alamos National Laboratory on neutron diffusion simulations for nuclear weapons research. This approach addressed the challenge of generating nonuniform random variates from known distributions using uniform random numbers, marking an early innovation in statistical sampling for computational physics.
+The method gained formal recognition in the early 1950s through von Neumann's published work, including a 1951 report detailing rejection algorithms for sampling trigonometric functions, which improved efficiency in three-dimensional simulations. These developments evolved rejection sampling from rudimentary Monte Carlo implementations into a versatile tool for approximating integrals and distributions in reliability and physics contexts.
+Rejection sampling was further popularized in statistics and applied mathematics through John M. Hammersley and David C. Handscomb's influential 1964 monograph Monte Carlo Methods, which systematically described the technique alongside variance reduction strategies and provided theoretical foundations for its use in multidimensional problems. This book solidified its role in transitioning from naive uniform sampling to efficient methods for complex, non-uniform distributions. A significant advancement came in 1992 with W. R. Gilks and P. Wild's introduction of adaptive rejection sampling, tailored for log-concave densities in Gibbs sampling applications, enhancing adaptability and reducing rejection rates in Bayesian inference.
+
+Definition and Motivation
+
+Rejection sampling is a fundamental Monte Carlo method for generating independent and identically distributed (i.i.d.) samples from a target probability density function f(x)f(x)f(x) when direct sampling is intractable. It relies on an auxiliary proposal distribution g(x)g(x)g(x), from which samples can be drawn efficiently, and selectively accepts or rejects these proposals based on the ratio of the target to the proposal density. This approach ensures that the accepted samples are exactly distributed according to f(x)f(x)f(x), making it a cornerstone technique in statistical simulation and inference.
+The primary motivation for rejection sampling arises in scenarios where the target density f(x)f(x)f(x) is known only up to an unknown normalizing constant, such as in Bayesian posterior distributions or complex probabilistic models, rendering methods like inverse transform sampling impractical because they require evaluating and inverting the cumulative distribution function. In contrast, rejection sampling only necessitates pointwise evaluations of the unnormalized f(x)f(x)f(x) and g(x)g(x)g(x), allowing it to handle distributions that are difficult or impossible to sample directly. This is particularly valuable in Monte Carlo applications, where i.i.d. samples are essential for unbiased estimation of integrals, expectations, or probabilities via the law of large numbers.
+At a high level, the technique constructs a bounding "envelope" around the target density using scaled versions of the proposal distribution, ensuring that proposals falling under the target curve are retained while others are discarded. Developed by John von Neumann in the context of early Monte Carlo simulations for physics problems, it provides an exact sampling mechanism without approximation, though efficiency depends on the choice of proposal.
+
+Mathematical Foundations
+
+Target and Proposal Distributions
+
+In rejection sampling, the target distribution refers to the desired probability distribution from which independent samples are to be generated. It is typically defined by an unnormalized density function $ f(\mathbf{x}) $, which is proportional to the true probability density function $ p(\mathbf{x}) = f(\mathbf{x}) / Z $, where $ Z = \int f(\mathbf{x}) , d\mathbf{x} $ is an unknown normalizing constant that often cannot be computed analytically. This setup is particularly useful in contexts such as Bayesian inference, where the target arises as a posterior distribution with an intractable normalization factor.
+The proposal distribution, denoted by density $ g(\mathbf{x}) $, serves as an auxiliary distribution that is easy to sample from directly, such as standard uniforms, normals, or exponentials. A key requirement is that it forms an envelope for the target, satisfying the inequality
+f(x)Mg(x)
+f(\mathbf{x}) \leq M g(\mathbf{x})
+f(x)Mg(x)
+for all $ \mathbf{x} $ in the domain, where $ M \geq 1 $ is a finite constant bounding the supremum of $ f(\mathbf{x}) / g(\mathbf{x}) $. This domination condition ensures that the proposal covers the target without underestimating its density in any region.
+The choice of proposal distribution is critical for practical efficiency, as it directly influences the value of $ M $; a smaller $ M $ reduces wasted computations. Ideally, $ g(\mathbf{x}) $ should approximate the shape of $ p(\mathbf{x}) $ closely, such as using a uniform proposal over a bounded interval for targets with compact support, or a Gaussian proposal matched to the target's mean and variance for approximately normal targets. In higher dimensions, proposals like multivariate normals or mixtures may be employed when they align well with the target's modal structure.
+Both distributions must share compatible supports, meaning the support of $ g(\mathbf{x}) $ must include the entire support of $ p(\mathbf{x}) $ (i.e., $ g(\mathbf{x}) > 0 $ wherever $ f(\mathbf{x}) > 0 $) to ensure complete coverage and avoid biasing the samples toward subsets of the target space. Failure to match supports can lead to incomplete exploration of the target, rendering the method invalid.
+
+Acceptance Probability
+
+In rejection sampling, samples are proposed from the distribution with density $ g(y) $, and an auxiliary uniform random variable $ u \sim \text{Uniform}(0,1) $ is generated independently. The proposal $ y $ is accepted if $ u < \frac{f(y)}{M g(y)} $, where $ f $ is the unnormalized target density and $ M \geq \sup_y \frac{f(y)}{g(y)} $; otherwise, it is rejected and the process repeats.
+To verify correctness, consider the joint density of $ (y, u) $, which is $ g(y) \cdot 1 $ over the support of $ g $ and $ u \in $. The acceptance region is defined by $ 0 \leq u < \frac{f(y)}{M g(y)} $. The marginal density of accepted $ y $ is obtained by integrating the joint density over this region:
+0f(y)/(Mg(y))g(y)du=g(y)f(y)Mg(y)=f(y)M.
+\int_0^{f(y)/(M g(y))} g(y) \, du = g(y) \cdot \frac{f(y)}{M g(y)} = \frac{f(y)}{M}.
+0f(y)/(Mg(y))g(y)du=g(y)Mg(y)f(y)=Mf(y).
+The total probability of acceptance is $ \int \frac{f(y)}{M} , dy = \frac{1}{M} \int f(y) , dy = \frac{Z}{M} $, where $ Z = \int f(y) , dy $. Thus, the conditional density of accepted $ y $ is $ \frac{f(y)/M}{Z/M} = \frac{f(y)}{Z} $, matching the target distribution $ p(y) $.
+The expected acceptance probability is $ \frac{Z}{M} $, which simplifies to $ \frac{1}{M} $ if $ Z = 1 $ (normalized case); this implies the average number of proposals required per accepted sample is $ M $.
+The generated accepted samples are independent and identically distributed (i.i.d.) from $ p(y) $, as each proposal-rejection cycle is independent of previous ones, regardless of the value of $ M $.
+
+Algorithm
+
+Standard Procedure
+
+Rejection sampling begins with identifying a bounding constant M1M \geq 1M1 such that the target density f(x)f(x)f(x) satisfies f(x)Mg(x)f(x) \leq M g(x)f(x)Mg(x) for all xxx in the support, where g(x)g(x)g(x) is the proposal density from which samples can be easily generated. This constant MMM is typically determined as the supremum supxf(x)g(x)\sup_x \frac{f(x)}{g(x)}supxg(x)f(x), which can be found analytically by optimization techniques such as calculus to locate the maximum of the ratio f(x)g(x)\frac{f(x)}{g(x)}g(x)f(x) or through bounding approximations when an exact computation is infeasible.
+Once MMM is established, the procedure proceeds iteratively and independently in each trial to generate samples from f(x)f(x)f(x). Sample a candidate yyy from the proposal distribution with density g(y)g(y)g(y), then independently sample uuu from the uniform distribution on . Accept yyy as a sample from f(x)f(x)f(x) if uf(y)Mg(y)u \leq \frac{f(y)}{M g(y)}uMg(y)f(y); otherwise, reject it and repeat the process. This acceptance step must be performed by evaluating both fff and ggg at the candidate yyy, which requires that these densities (or their unnormalized forms) can be computed efficiently.
+The iterations continue until the desired number of accepted samples is obtained, with each trial producing an independent draw from the target distribution upon acceptance. In practice, when f(x)f(x)f(x) is available only up to a normalizing constant (i.e., as an unnormalized f~(x)\tilde{f}(x)f~(x) where f(x)=f~(x)/Zf(x) = \tilde{f}(x)/Zf(x)=f~(x)/Z and ZZZ is unknown), the procedure adapts by using the ratio f~(y)Mg(y)\frac{\tilde{f}(y)}{M g(y)}Mg(y)f~(y) in the acceptance condition, as the constant ZZZ cancels out and does not affect the validity. Similarly, if g(y)g(y)g(y) is unnormalized, its normalizing constant also cancels in the ratio.
+
+Pseudocode and Simple Example
+
+The rejection sampling algorithm can be implemented as a function that generates a specified number of samples from the target distribution fff using a proposal distribution ggg and bounding constant MMM, where Msupxf(x)/g(x)M \geq \sup_x f(x)/g(x)Msupxf(x)/g(x).
+Here is pseudocode for the continuous case:
+function rejection_sample(n_samples, f, g, M):
+ samples = empty list
+ while length(samples) < n_samples:
+ y = sample from g
+ u = uniform(0, 1)
+ if u <= f(y) / (M * g(y)):
+ append y to samples
+ return samples
+This procedure repeatedly proposes candidates from ggg until the desired number of acceptances is reached, ensuring the accepted samples follow the target fff.
+A simple example illustrates the method for sampling from a truncated standard normal distribution restricted to 
+For implementation, the algorithm applies to both continuous and discrete cases, with the primary difference being whether densities f,gf, gf,g or probability mass functions are used; in the discrete case, Msupkp(k)/q(k)M \geq \sup_k p(k)/q(k)Msupkp(k)/q(k) where ppp and qqq are the target and proposal pmfs, and proposals are drawn accordingly. In software like Python, a basic implementation for the half-normal example might use NumPy for sampling:
+import numpy as np
+
+def rejection_sample_half_normal(n_samples):
+ M = np.sqrt(2 / np.pi) * np.exp(0.5)
+ samples = 
+ while len(samples) < n_samples:
+ y = np.random.exponential(1)
+ u = np.random.uniform(0, 1)
+ f_y = np.sqrt(2 / np.pi) * np.exp(-y**2 / 2)
+ g_y = np.exp(-y)
+ if u <= f_y / (M * g_y):
+ samples.append(y)
+ return np.array(samples)
+
+# Example: 1000 samples
+samples = rejection_sample_half_normal(1000)
+This code handles the continuous case efficiently for moderate nnn; for discrete distributions, replace exponential sampling with appropriate discrete generators like np.random.choice. Similar implementations exist in R using runif and rexp.
+
+Performance Analysis
+
+Advantages
+
+Rejection sampling offers significant simplicity in implementation, as it requires only the ability to evaluate the target density fff and the proposal density ggg, along with a constant MMM such that Mg(x)f(x)Mg(x) \geq f(x)Mg(x)f(x) for all xxx, without needing to invert cumulative distribution functions or employ the intricate transition kernels typical of Markov chain Monte Carlo (MCMC) methods.
+A key advantage is its exactness: the method generates independent and identically distributed (i.i.d.) samples directly from the target distribution fff, bypassing the approximations and correlations inherent in MCMC chains, which require burn-in periods and exhibit reduced effective sample sizes due to autocorrelation.
+The algorithm is particularly well-suited for handling unnormalized densities, making it ideal for sampling Bayesian posteriors where the normalizing constant (evidence) is intractable, as it operates solely on density ratios f(x)/g(x)f(x)/g(x)f(x)/g(x) without requiring the constant's computation.
+Compared to naive approaches like exhaustive enumeration or grid-based sampling, rejection sampling avoids the need to evaluate the entire support, which is especially beneficial for rare event estimation where low-probability regions would otherwise demand prohibitive computational resources; for instance, it bounds wasted proposals via the acceptance rate 1/M1/M1/M rather than scanning all grid points.
+When the envelope constant MMM is small (e.g., M<2M < 2M<2), rejection sampling achieves high computational efficiency, with acceptance probabilities exceeding 50% and minimal rejections, outperforming more complex alternatives in such favorable cases.
+
+Drawbacks
+
+One major drawback of rejection sampling is its potential inefficiency when the constant MMM is large, as the acceptance probability drops to 1/M1/M1/M, resulting in a high number of rejections and requiring many proposal samples to obtain a single accepted one. This issue is particularly pronounced when the proposal distribution ggg poorly envelopes the target density fff, such as in cases involving multimodal target distributions where a simple unimodal proposal struggles to cover all modes without inflating MMM. Consequently, the expected number of iterations needed to generate one sample equals MMM, which can render the method computationally prohibitive if M1M \gg 1M1.
+Rejection sampling also suffers from the curse of dimensionality, where performance degrades exponentially as the dimension ddd increases because the constant MMM typically grows with ddd, leading to vanishingly small acceptance rates. For instance, when sampling from a multivariate normal target using a scaled normal proposal, the acceptance rate can decay as 1/d1/\sigma^d1/d for >1\sigma > 1>1, making the method impractical beyond low dimensions. In high-dimensional spaces, the volume concentration phenomenon further exacerbates this, as most proposal samples fall outside the relevant support region of the target, necessitating an exponential number of trials.
+A key limitation is the stringent requirement for an envelope distribution: the method demands a proposal ggg and constant MMM such that Mg(x)f(x)M g(x) \geq f(x)Mg(x)f(x) for all xxx in the support, which involves computing or bounding the supremum of the ratio f(x)/g(x)f(x)/g(x)f(x)/g(x). Determining this bound can be challenging, especially for complex or unbounded targets, and may require extensive prior analysis or numerical optimization to ensure the envelope holds everywhere.
+Unlike adaptive sampling techniques, rejection sampling employs a fixed proposal distribution ggg and constant MMM throughout the process, with no mechanism to refine them based on observed rejections or samples. This rigidity limits its flexibility in non-stationary or evolving sampling scenarios.
+Finally, the repeated evaluation of the target density fff during the acceptance step imposes a significant computational burden if fff is expensive to compute, as each rejected proposal still incurs the full cost of density evaluation without contributing to the output sample set. In applications where density evaluations dominate runtime, this can lead to substantial overhead, particularly when combined with low acceptance rates.
+
+Variants
+
+Exponential Tilting
+
+Exponential tilting is a variant of rejection sampling that optimizes the proposal distribution by incorporating adjustments from an exponential family, thereby improving efficiency for targets that share structural similarities with the base proposal. The tilted proposal distribution is given by
+gt(x)=exp(th(x))g(x)Zt,
+g_t(x) = \frac{\exp(t \, h(x)) \, g(x)}{Z_t},
+gt(x)=Ztexp(th(x))g(x),
+where g(x)g(x)g(x) is the original proposal density, h(x)h(x)h(x) is a suitable tilting function (often a sufficient statistic), ttt is the tilting parameter, and Zt=EgZ_t = \mathbb{E}_gZt=Eg is the normalizing constant ensuring gtg_tgt integrates to 1. This modification allows the proposal to be "tilted" toward regions where the target density f(x)f(x)f(x) is more prominent, reducing the bounding constant M=supxf(x)/gt(x)M = \sup_x f(x)/g_t(x)M=supxf(x)/gt(x) required for the rejection mechanism and increasing the overall acceptance rate. The approach is particularly effective when ggg belongs to an exponential family, as the tilting preserves the family structure while adapting to the target.
+To select the optimal ttt, one typically minimizes the Kullback-Leibler (KL) divergence between fff and gtg_tgt, or equivalently, maximizes the expected log-likelihood ratio Eg\mathbb{E}_gEg, which can be achieved by solving the moment-matching equation Egt=Ef\mathbb{E}_{g_t} = \mathbb{E}_fEgt=Ef. This optimization often involves numerical methods, such as solving the saddlepoint equation derived from the cumulant generating function of ggg, and results in MMM approaching 1 more closely than with the untitled proposal, especially for targets in or near the exponential family of ggg. In practice, the tilted proposal can be updated iteratively within the rejection sampling loop or precomputed if ZtZ_tZt is tractable, making it suitable for hybrid methods that combine rejection sampling with importance sampling to estimate expectations or normalizing constants. This technique was developed in the context of exponential families within statistical Monte Carlo methods during the late 20th century.
+
+Adaptive Rejection Sampling
+
+Adaptive Rejection Sampling (ARS) is a variant of rejection sampling designed specifically for univariate log-concave target densities, where the logarithm of the unnormalized density $ h(x) = \log f(x) $ is concave. This property allows the construction of piecewise linear upper and lower envelopes that tightly bound the target density, using tangent lines to $ h(x) $ at evaluated points and chords connecting those points. The upper envelope forms a rejection bound that majorizes the target, while the lower envelope serves as a squeezing function to accelerate acceptances without density evaluations. These envelopes are iteratively refined after each acceptance or rejection, incorporating new evaluation points to progressively tighten the bounds and improve sampling efficiency.
+The algorithm begins by initializing a set of abscissae that bracket the support of the target density, typically including points near the mode and boundaries, to define initial piecewise linear hulls for the upper envelope $ u_k(x) $ and lower envelope $ l_k(x) $. A piecewise exponential proposal distribution $ s_k(x) $ is then constructed by normalizing the upper envelope, $ s_k(x) = c_k^{-1} \exp(u_k(x)) $, where $ c_k $ is the normalizing constant computed via numerical integration over the pieces. Sampling proceeds by drawing a candidate $ x^* $ from $ s_k(x) $ and a uniform variate $ w \sim U(0,1) $; if $ w < \exp(l_k(x^) - u_k(x^)) $, accept immediately using the squeezing bound; otherwise, evaluate $ h(x^) $ and accept if $ w < \exp(h(x^) - u_k(x^)) $. Upon acceptance or rejection requiring evaluation, the new point $ x^ $ (along with its derivative if needed) is added to the set of abscissae, and the envelopes are updated to form tighter piecewise linear approximations.
+This adaptive process ensures high efficiency, as the acceptance probability approaches 1 over iterations due to the envelopes converging to the target density, and it avoids the need to compute a global supremum constant $ M $ by relying on local tangent constructions. ARS was introduced by Gilks and Wild in 1992 for application in Gibbs sampling. Extensions to non-log-concave densities incorporate squeezing bounds within an adaptive rejection Metropolis framework to handle deviations from concavity.
+A representative example is sampling from a log-concave posterior distribution in Bayesian inference, such as the full conditional for parameters in a monoclonal antibody reactivity model analyzed via Gibbs sampling.
+
+Applications
+
+Statistical Sampling
+
+Rejection sampling plays a key role in Bayesian computation by enabling the generation of samples from the posterior distribution p(\data)p(\data)p()p(\theta \mid \data) \propto p(\data \mid \theta) p(\theta)p(\data)p(\data)p(), particularly when conjugate priors are unavailable and the normalizing constant is intractable. This approach is especially valuable for complex models where direct sampling from the posterior is infeasible, allowing inference through independent and identically distributed (i.i.d.) samples that approximate the target distribution. In modern applications, such as approximate Bayesian computation (ABC), rejection sampling facilitates posterior inference for models with intractable likelihoods by simulating data from the model and accepting parameters that produce auxiliary statistics close to observed data summaries. The original motivation for rejection sampling traces back to John von Neumann's work on neutron transport simulations during the Manhattan Project, where it was used to model particle interactions by sampling from non-uniform distributions in a computationally efficient manner.
+In Monte Carlo integration, rejection sampling supports the estimation of expectations Ep=h(x)p(x)dx\mathbb{E}_p = \int h(x) p(x) \, dxEp=h(x)p(x)dx by generating i.i.d. samples from the target density p(x)p(x)p(x), which can then be averaged to approximate the integral with reduced bias under suitable proposal distributions. This method ensures unbiased estimates while leveraging the ability to evaluate unnormalized densities, making it suitable for high-dimensional integrals in statistical inference.
+For rare event simulation, rejection sampling aids in bounding tail probabilities in reliability analysis and queueing theory by proposing samples from an enveloping distribution and accepting those that fall within the rare event region, thereby estimating low-probability outcomes like system failures without excessive computational waste. To enhance efficiency, rejection sampling is often integrated with importance sampling for variance reduction; in this hybrid approach, proposals from an importance distribution are weighted and selectively accepted, improving the estimation of expectations in ABC and other Monte Carlo settings by mitigating the high rejection rates of pure rejection methods.
+
+Machine Learning Contexts
+
+In generative models such as Generative Adversarial Networks (GANs) and Variational Autoencoders (VAEs), rejection sampling is employed to draw samples from implicit densities by rejecting proposals that deviate from the learned data manifold. In GANs, Discriminator Rejection Sampling (DRS) leverages the discriminator's output as an importance weight to filter generated samples, improving quality by discarding those with low discriminator scores to approximate the true data distribution. This approach addresses the challenge of implicit sampling in GANs, where direct likelihood evaluation is unavailable, and has been shown to enhance sample fidelity without retraining the model.
+As an alternative to Markov Chain Monte Carlo (MCMC) methods, rejection sampling is particularly useful in scenarios where MCMC chains exhibit poor mixing, such as in particle filters for sequential data processing in machine learning tasks like time-series forecasting or tracking. In particle filters, rejection-based variants, such as Variational Rejection Particle Filtering (VRPF), integrate rejection steps to resample particles more efficiently, reducing degeneracy in high-variance environments while maintaining unbiased estimates of the filtering distribution. This makes it suitable for dynamic models in reinforcement learning or robotics, where rapid adaptation to new observations is critical.
+Compared to Metropolis-Hastings (MH), a core MCMC algorithm, rejection sampling provides exact samples from the target distribution but becomes inefficient in high dimensions due to the curse of dimensionality, often requiring an impractically large number of proposals. In contrast, MH offers scalability through approximate sampling via Markov chains, making it preferable for deep learning applications with complex, high-dimensional posteriors, though it may suffer from autocorrelation in samples. Rejection sampling also relates to slice sampling, another MCMC technique, but differs by using a uniform envelope over the entire support rather than auxiliary variables to define slice regions, leading to simpler implementation at the cost of higher rejection rates in multimodal distributions.
+Post-2010 developments have integrated rejection sampling into normalizing flows for exact likelihood-based sampling, where learned rejection mechanisms serve as flexible base distributions to handle multimodal targets more effectively than standard Gaussian priors. For instance, resampling base distributions via rejection in flows enables modeling of complicated densities in tasks like density estimation for anomaly detection. However, its limitations in high-dimensional deep learning settings, such as those exceeding 100 dimensions, often render it less practical than MCMC alternatives due to exponential growth in rejection rates. A notable recent application appears in diffusion models, where Diffusion Rejection Sampling (DiffRS) rejects noisy intermediates during the reverse process to better match the target data distribution, improving generation quality in image synthesis tasks by aligning transition kernels with the true posterior.
+
+References
+
+ 1 Acceptance-Rejection Method
+
+ Chapter 4 Generating non-uniform random variables - Arizona Math
+
+ Introduction 1 Introduction 2 Naive Sampling
+
+ Stan Ulam, John von Neumann, and the Monte Carlo Method - MCNP
+
+Model World: Tales from the Time LineThe Definition of OR and ...
+
+Acceptance-rejection method - Encyclopedia of Mathematics
+
+Monte Carlo Methods - J. Hammersley - Google Books
+
+ Monte Carlo Methods - Second Revised and Enlarged Edition
+
+Adaptive Rejection Sampling for Gibbs Sampling - Gilks - 1992
+
+ Various Techniques Used in Connection With Random Digits - MCNP
+
+ Pattern Recognition and Machine Learning - Microsoft
+
+ Non- Uni form - Random Variate Generation
+
+ Lecture 4: Importance Sampling and Rejection Sampling
+
+ Monte Carlo Sampling - People @EECS
+
+ Intro to Monte Carlo, Part II - Stat@Duke
+
+6.3 Rejection Sampling | Advanced Statistical Computing - Bookdown
+
+Chapter 6 Rejection sampling | Computational Statistics with R
+
+ How well does your sampler really work?
+
+ In most problems, posterior distribution is not available in closed ...
+
+ Lecture 5: Advanced Bayesian Inference Methods
+
+ An Easy Rejection Sampling Baseline via Gradient Refined Proposals
+
+ 17 : Markov Chain Monte Carlo
+
+ Lecture 17 1 Sampling in High Dimensions - Rice University
+
+Another look at rejection sampling through importance sampling
+
+Adaptive rejection sampling with fixed number of nodes
+
+ Pliable Rejection Sampling
+
+ 9 Importance sampling - Art Owen
+
+Adaptive Rejection Metropolis Sampling Within Gibbs Sampling
+
+Scalable Rejection Sampling for Bayesian Hierarchical Models - arXiv
+
+Approximate Bayesian Computation in Population Genetics
+
+Monte Carlo Integration With Acceptance-Rejection
+
+ An Introduction to Rare Event Simulation and Importance Sampling
+
+Adapting the ABC Distance Function - Project Euclid
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

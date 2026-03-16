@@ -1,0 +1,265 @@
+File carving Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+File carving
+ Ara Eve Leo Sal 
+1x
+ File carving is a digital forensics technique used to recover files from digital storage devices, such as hard drives or disk images, by scanning raw data for recognizable file signaturessuch as headers and footersrather than depending on the file system's metadata or directory structures. This method enables the extraction of deleted, fragmented, corrupted, or hidden files from unallocated space, slack space, or even volatile memory like RAM, making it essential when traditional file recovery fails due to damage or intentional obfuscation.
+The technique was developed around 1999 by security researchers Dan Farmer and Wietse Venema as part of The Coroner's Toolkit (TCT), emerging as a response to the need for recovering data after files are deleted but their contents remain on storage media until overwritten. Over the subsequent decades, file carving has become a cornerstone of forensic investigations, applied in high-profile cases such as criminal probes into child exploitation and counter-terrorism operations, including the U.S. Navy SEALs' raid on Osama bin Laden's compound in 2011.
+Key techniques in file carving include header-footer analysis, which identifies the start (e.g., JPEG's FF D8) and end (e.g., FF D9) markers of files to reassemble them; structure-based carving, which leverages internal file layouts for more complex formats; and content-based carving, which uses patterns like entropy or keywords for unstructured data such as emails or web pages. Advanced implementations also handle fragmentation by validating extracted data and employing statistical methods to reduce false positives, though challenges persist with encrypted or heavily overwritten content. Tools like Scalpel, Foremost, and commercial suites such as Belkasoft X and FTK facilitate these processes by supporting hundreds of file types and integrating carving into broader forensic workflows.
+
+Introduction
+
+Definition and Purpose
+
+File carving is a technique in digital forensics and data recovery that reconstructs files from unstructured data sources, such as disk images or raw storage media, by analyzing the content of the files themselves rather than relying on file system metadata like allocation tables or directories. This method identifies files through recognizable structural elements, such as headers and footers specific to file formats (e.g., JPEG or PDF signatures), enabling extraction even when traditional file system structures are unavailable.
+The primary purpose of file carving is to recover data in scenarios where metadata has been damaged, deleted, or intentionally obscured, including disk corruption, formatting, or deliberate attempts to hide information by overwriting file system entries while leaving the underlying data intact. For instance, it is particularly useful for retrieving deleted files whose data sectors remain unallocated but preserved on the media, or for analyzing fragmented storage in cases of partial overwrites.
+In legal and investigative contexts, file carving plays a crucial role in preserving the integrity of digital evidence by allowing non-destructive analysis of original media images, ensuring that recovered files can serve as admissible artifacts without altering the source data. Key benefits include its ability to recover partially overwritten or fragmented files that might otherwise be inaccessible, thereby supporting comprehensive forensic examinations and enhancing the evidential value of investigations.
+
+Historical Development
+
+The roots of file carving trace back to the 1980s and 1990s, when data recovery efforts primarily involved manual techniques such as hex editing and basic signature searches to retrieve deleted files from disk unallocated space. Tools like Norton DiskEdit, introduced as part of the Norton Utilities suite in the mid-1980s, enabled investigators to view and manipulate raw disk sectors, facilitating the identification and extraction of file remnants based on simple structural patterns without relying heavily on file system metadata. These methods were rudimentary, often requiring expert knowledge to interpret binary data, and were initially applied in general data recovery rather than formalized forensics, amid growing concerns over electronic crimes in financial sectors.
+The technique of file carving was invented around 1999 by independent security researcher Dan Farmer. File carving emerged as a distinct technique in digital forensics during the early 2000s, propelled by the rise in cybercrime and the limitations of metadata-dependent recovery in cases of disk corruption or deliberate wiping. This period saw a shift toward metadata-independent approaches that analyzed raw data streams for file signatures, enabling recovery from fragmented or overwritten storage. A key milestone was Nicholas Mikus's 2005 master's thesis, "An Analysis of Disc Carving Techniques," which evaluated and enhanced open-source tools like Foremost for UNIX environments, emphasizing the need for efficient carving in forensic investigations.
+Academic research significantly influenced the field's development, particularly through contributions from the Digital Forensics Research Workshop (DFRWS). The 2005 DFRWS presentation on Scalpel introduced a high-performance, open-source carver optimized for legacy hardware, focusing on header-footer matching for contiguous files. Subsequent efforts, including the 2006 DFRWS challenge on realistic datasets and Simson Garfinkel's 2007 paper on carving contiguous and fragmented files with fast object validation, advanced automated schemes to handle fragmentation using graph-based algorithms and entropy analysis. These works established foundational benchmarks for recovery of fragmented files, driving the adoption of carving in forensic workflows.
+By the mid-2010s, file carving evolved to address modern storage challenges, including the wear-leveling in solid-state drives (SSDs) that induced natural fragmentation and complicated sequential recovery, as well as encrypted files requiring preprocessing to access raw data. Techniques like bifragment gap carving and smart carving algorithms, building on earlier DFRWS research, improved handling of multi-fragment files, with reported accuracies exceeding 80% for images in controlled tests. Integration into comprehensive forensic suites became widespread, embedding carving modules alongside imaging and analysis tools to support investigations involving diverse media.
+
+Fundamental Principles
+
+Core Process of File Carving
+
+The core process of file carving involves a systematic workflow to recover files from raw digital evidence without relying on file system metadata. It commences with the acquisition of a raw data image, typically a forensic bit-for-bit copy of the storage media, such as a hard disk drive or memory dump, to preserve the integrity of the original data and prevent any alterations during analysis. This step ensures that investigators work with an exact replica, often created using tools that maintain chain-of-custody documentation.
+Following acquisition, the process advances to scanning the raw data for known file headers and footers, which are predefined byte patterns characteristic of specific file formats. This linear or pattern-matching scan examines the byte stream sequentially to identify potential starting and ending points of files, focusing on unallocated or fragmented space where metadata may be absent. File signatures, such as the hexadecimal sequence 0xFF 0xD8 for JPEG headers, serve as these patterns during scanning.
+Once signatures are located, extraction occurs by isolating the content between matching headers and footers, coupled with an initial validation of the file structure to confirm coherence. This step involves copying the relevant byte ranges while checking for basic structural elements, such as embedded metadata or expected sequence lengths, to filter out false positives.
+The final phase encompasses reconstruction and export of the carved files, where extracted segments are assembled into usable formats and subjected to validity checks, including checksum computations like MD5 or SHA-256 to verify integrity against known originals. Successful reconstruction may require manual adjustments for partial files, followed by export to standard file types for further examination.
+A general text-based representation of the workflow can be depicted as follows:
+
+Input: Raw data image (e.g., disk sector dump).
+
+Scan Phase: Traverse bytes Detect header (H1) at offset X Detect footer (F1) at offset Y.
+
+Extract Phase: Copy bytes from X to Y Validate structure (e.g., check for internal markers).
+
+Reconstruct Phase: Assemble file Compute checksum Export if valid.
+
+Output: Recovered file(s) with metadata log (e.g., offsets, type).
+
+File Signatures and Structural Elements
+
+File signatures, also known as magic numbers, are unique sequences of bytes typically located at the beginning (headers) or end (footers) of files to identify their format. These signatures provide a reliable indicator of file type in digital forensics, particularly during file carving where filesystem metadata is unavailable or corrupted.
+Beyond basic signatures, files incorporate structural elements such as metadata offsets, which point to locations containing descriptive information like creation dates or author details, and embedded length fields, which specify the size of individual sections or the entire file to facilitate precise boundary detection. These elements enhance identification accuracy by allowing tools to validate potential matches against expected internal layouts rather than relying solely on header presence. For example, in image formats, embedded length fields in segment headers enable parsing of variable-sized components without prior knowledge of total file length.
+Common file types exhibit distinct signatures that support carving across categories like images, documents, and executables. For images, JPEG files begin with the header FF D8 (start of image) and end with FF D9 (end of image), while PNG files start with 89 50 4E 47 0D 0A 1A 0A. Documents such as PDF files open with %PDF or 25 50 44 46 in hexadecimal, and Microsoft Word .doc files (using OLE compound format) have the header D0 CF 11 E0 A1 B1 1A E1. Executables like Windows PE files for .exe begin with the DOS header 4D 5A (MZ signature).
+Signatures may vary by format version to reflect evolving standards, though core bytes often remain consistent. In PDF, the header extends beyond the initial bytes to include version markers such as %PDF-1.7 or %PDF-2.0, distinguishing compliance with different ISO specifications. Similarly, older Microsoft Office formats might incorporate additional offset-based elements for compatibility, while newer versions like .docx (ZIP-based) use a different PKZIP header 50 4B 03 04. These variations require carving tools to maintain updated signature databases for comprehensive detection.
+A key challenge in using file signatures is their potential lack of uniqueness, leading to false positives where random byte sequences in non-file data coincidentally match a signature, resulting in erroneous extractions. This issue is exacerbated in large datasets or compressed files, where partial matches can occur without corresponding structural validation.
+
+Carving Methods
+
+Traditional Block-Based Carving
+
+Traditional block-based carving represents a foundational technique in digital forensics for recovering files from unallocated or raw storage space by scanning data in fixed-size blocks and matching known file signatures. This method divides the storage medium into sequential blocks, typically aligned to sector sizes such as 512 bytes, and examines each block for header signatures that indicate the start of a file. Upon detecting a header, the carving process extracts subsequent blocks until a corresponding footer signature is found or a predefined file length is reached, assuming the file is contiguous and unfragmented.
+The core process begins with a linear scan of the disk image using efficient string-matching algorithms, such as Boyer-Moore, to locate headers and footers within buffered blocks of data. For instance, common signatures include the JPEG header \xFF\xD8 and footer \xFF\xD9, which trigger extraction of the byte range between them. This approach ignores filesystem metadata and fragmentation, treating the data stream as a continuous sequence of potential files. Tools like Foremost and Scalpel implement this by configuring signature patterns in files that define block offsets and extraction rules, enabling automated recovery without prior knowledge of file allocation.
+Key advantages of traditional block-based carving include its simplicity, which allows for rapid implementation and low computational overhead, making it suitable for large datasets where files are expected to be intact and non-fragmented. It achieves high speed through sequential processing and minimal validation, often completing scans of gigabyte-scale images in minutes on standard hardware. Additionally, its reliance on universal file signatures ensures broad applicability across file types without needing complex models.
+However, the method's limitations become evident with fragmented or variable-length files, as it cannot bridge gaps between non-contiguous blocks, leading to incomplete recoveries. It also suffers from a high false positive rate, where random data matches signatures but fails to form valid files, necessitating post-extraction validation that increases manual effort. Furthermore, alignment to fixed block sizes may overlook files that span block boundaries irregularly, reducing overall accuracy in diverse storage environments.
+
+Bifragment Gap Carving
+
+Bifragment gap carving addresses scenarios in digital forensics where files have been fragmented into exactly two non-contiguous parts, often due to deletion, overwriting, or disk defragmentation processes that leave a gap of extraneous data between the fragments. This technique is particularly relevant for recovering files from unallocated disk space, where the first fragment contains the file header and the second contains the footer, separated by a gap of unknown but positive size. Unlike contiguous carving methods, bifragment gap carving explicitly accounts for this separation by attempting to bridge the gap through systematic validation.
+The core algorithm begins by scanning the disk image for potential first fragments that start with a valid file header signature specific to the file type, such as JPEG's FF D8 for headers. If a candidate region ends with a valid footer (e.g., JPEG's FF D9) but fails overall validationindicating possible fragmentationthe method identifies potential second fragments following the presumed gap. Gap estimation relies on file type knowledge, including structural signatures and expected content patterns, combined with brute-force iteration over possible gap sizes g, where g ranges from 1 up to the maximum feasible separation (e.g., e - s, with s, e as start and end sectors of the first fragment, and s, e for the second). For each g, the algorithm concatenates the first fragment with sectors starting after the gap and attempts to locate a matching footer in the second fragment, validating the reassembled candidate using fast object validation techniques. This validation checks internal consistency, such as proper sequence of markers in JPEG files, without requiring full file reconstruction.
+A key innovation in bifragment gap carving is the integration of fast object validation to efficiently assess reassembled fragments, reducing computational overhead from O(n) in naive implementations for all potential pairs. This validation leverages file-specific rules, such as entropy thresholds for compressed data or metadata consistency, to quickly discard invalid candidates and confirm viable reconstructions. By focusing on bifragmentation onlyavoiding multi-fragment complexitythe method enables practical recovery in minutes rather than hours for typical disk images.
+For example, in recovering JPEG images, the algorithm detects the header in the first fragment and uses knowledge of JPEG structure (e.g., APP0/APP1 markers for metadata) to guide footer location after the gap. If the initial region fails validation, it iterates gap sizes to pair with subsequent sectors containing the FF D9 footer, validating via checks on marker sequences and scan data integrity. This approach successfully reassembled fragmented JPEGs from the DFRWS 2006 forensics challenge dataset.
+The following pseudocode outlines the gap calculation and validation process:
+Let f1 be the first fragment from sectors s1 to e1
+Let potential f2 start from sector s2 > e1 + 1
+
+For g = 1 to (e2 - s1): // Iterate possible gap sizes
+ candidate_start = e1 + 1 + g
+ For each potential e2 in subsequent sectors:
+ If sector at e2 contains valid footer:
+ Reassemble: temp_file = f1 + sectors
+ If fast_validate(temp_file) == true:
+ Output reconstructed file
+ Break
+This brute-force yet optimized iteration ensures comprehensive coverage for two-fragment cases.
+
+SmartCarving
+
+SmartCarving represents an adaptive approach to file carving that incorporates post-extraction validation to enhance the accuracy of recovering fragmented files without relying on file system metadata. The method was first detailed by Pal, Sencar, and Memon in 2008 at the Digital Forensics Research Workshop (DFRWS), emphasizing intelligent decision-making through statistical testing to score file completeness and minimize erroneous reconstructions.
+The core mechanism begins with signature-based extraction of candidate file headers from the unallocated space, followed by a validation phase that assesses potential file blocks for completeness and correctness. Validation employs a combination of entropy analysis to evaluate content randomness and compatibilitysuch as boundary continuity in image filesalongside structural checks to verify adherence to file format specifications. Machine learning classifiers, trained on datasets of known correct and incorrect block mergings, further refine these assessments by predicting whether a block belongs to an ongoing fragment. This multi-layered validation uses sequential hypothesis testing (SHT), a statistical model that iteratively computes a decision statistic based on matching metrics between hypotheses (block belongs vs. does not belong), allowing adaptive thresholds to control error rates like false alarms (P_fa) and misses (P_fe).
+A key specific technique in SmartCarving involves carving state machines that model the reassembly process as a state transition system, enabling iterative refinement of extractions. Starting from a header, the system transitions through states of block collation and validation, using greedy heuristics and alpha-beta pruning to explore possible fragment paths efficiently without exhaustive computation. For multi-fragmented files, parallel unique path algorithms reassemble non-overlapping sequences, incorporating user-guided feedback if needed to resolve ambiguities. This state-based iteration leverages prior validations to adjust carving parameters dynamically, improving handling of complex fragmentation patterns where blocks are scattered across the disk.
+SmartCarving offers significant advantages over static methods by reducing false positives through rigorous post-extraction scoring, leading to higher recovery rates in benchmark tests. In evaluations on the DFRWS 2006 dataset, it successfully recovered 7 out of 7 fragmented JPEG images in 13 seconds, compared to limitations in bi-fragment approaches. On the more challenging DFRWS 2007 dataset, it achieved 16 out of 17 recoveries in 3.6 minutes, with the single failure attributed to data corruption rather than methodological flaws. These results demonstrate superior performance in managing multi-fragmentation, scaling effectively to large datasets with millions of blocks while maintaining low computational overhead.
+
+Applications
+
+Recovery from Storage Media
+
+File carving serves as a critical technique in digital forensics for recovering data from persistent storage media, such as hard disk drives (HDDs) and solid-state drives (SSDs), particularly when file systems like FAT, NTFS, or ext4 are corrupted, damaged, or intentionally wiped. In these scenarios, investigators work with raw disk images or unallocated space, where filesystem metadata is unavailable or unreliable, allowing the extraction of files based solely on their structural signatures and content patterns. This approach is especially valuable in cases involving formatted drives or overwritten allocation tables, enabling the reconstruction of evidence without relying on the underlying filesystem integrity.
+The recovery process requires adaptations to the characteristics of storage media. On HDDs, carving accounts for sector alignment, typically using 512-byte blocks, and examines slack spacethe unused portion of allocated clustersfor residual file fragments. For SSDs, additional challenges arise from wear-leveling algorithms, which distribute data across cells to extend lifespan, and TRIM commands, which notify the drive to erase deleted data blocks, potentially making recovery impossible if executed. Investigators often create forensic images to preserve the original media before applying carving, scanning sequentially or using gap-based methods to handle fragmentation. For instance, deleted JPEG photos can be recovered from a formatted USB drive by identifying image headers (e.g., FF D8) in unallocated space and reconstructing files up to the footer (FF D9), provided the data has not been overwritten.
+These recoveries highlight carving's role in bypassing anti-forensic measures like secure deletion.
+Success rates for file carving vary by media type and file condition, with non-fragmented files on HDDs achieving 70-100% recovery in controlled tests, as data persists in unallocated space until overwritten. On SSDs, rates drop to 20-50% or lower due to TRIM and garbage collection, which proactively erase blocks; one study reported only 8.3% recovery (1 out of 12 files) using standard tools on internal SSDs with TRIM enabled. External SSDs or those without TRIM may yield higher results, up to 92% for specific file types, but overall efficacy remains reduced compared to HDDs.
+
+Analysis of Memory Dumps
+
+File carving applied to memory dumps, also known as memory carving, involves extracting files and artifacts from volatile RAM captures, hibernation files, or page files where traditional file system metadata is absent or unreliable. Unlike disk-based carving, memory dumps feature fragmented data due to paging and swapping mechanisms, where portions of files may be distributed across non-contiguous physical pages or compressed in hibernation artifacts. This adaptation targets in-memory file caches, such as those held by applications, network packet buffers, or process address spaces, enabling recovery of transient data that would otherwise be lost upon system shutdown.
+Key techniques in memory carving account for these unique aspects by employing volatility-aware signatures tailored to in-RAM representations of files. For instance, signatures for formats like JPEG images must consider potential modifications from memory allocation, such as altered headers due to dynamic loading, while handling non-linear addressing requires mapping virtual to physical memory layouts using tools that parse page tables. Compression in page files or hibernation files (e.g., hiberfil.sys in Windows) necessitates decompression prior to carving to improve recovery rates; studies show decompression can increase detection of network-related artifacts by over 20-fold in such files. Additionally, hash-based methods like context-triggered piecewise hashing (CTPH) help identify fragmented or incomplete files by comparing chunks against known templates, addressing the interleaved nature of memory data with OS structures.
+Practical examples illustrate the utility of these techniques in forensic investigations. Recovering unsaved documents from hibernation files involves carving application caches, such as Microsoft Word buffers, which retain partial content in compressed RAM snapshots during system sleep states. Similarly, extracting malware payloads from process memory targets injected code or artifacts in running executables, using signature scans to isolate binaries fragmented across heap allocations. In network forensics, carving Ethernet frames or IP packets from memory dumps reveals communication artifacts, validated via checksums and routing table filters to reduce false positives.
+Despite these advances, memory carving faces specific challenges inherent to volatile environments. Short-lived data, such as temporary network buffers, often degrades rapidly due to overwriting, leading to incomplete recoveries with success rates as low as 46-50% for fragmented files like PDFs in RAM. High noise from operating system structures including kernel pools, page tables, and shared librariesgenerates numerous false positives, necessitating integration with memory analysis frameworks like Volatility, which uses plugins such as filescan and dumpfiles to contextualize carvings within process and cache mappings. Adversarial techniques, like memory smearing during acquisition, further complicate analysis by introducing inconsistencies across dump pages. Advanced methods, such as clustering carved chunks via hierarchical algorithms, can mitigate fragmentation but require computational overhead for real-time forensics.
+
+Challenges and Tools
+
+Key Limitations and Issues
+
+File carving faces significant challenges when dealing with fragmentation beyond simple bifragmentation, where files are split into more than two non-contiguous pieces or interleaved with other data. Traditional and even advanced methods like bifragment gap carving are not designed to handle multi-fragment files efficiently, as the computational complexity grows exponentiallyoften requiring O(n2)O(n^2)O(n2) or higher validations per potential object, rendering automatic recovery impractical for highly fragmented cases. Studies on real-world disk images show that while bifragmentation affects 6-22% of forensically relevant files (e.g., JPEGs at 16%, AVIs at 22%), multi-fragment scenarios lead to substantially reduced recovery rates without manual intervention, due to the inability to accurately reassemble scattered clusters.
+Compression and encryption further obfuscate file signatures and structural elements, making detection and extraction difficult or impossible without prior knowledge of keys or algorithms. Compressed files require preprocessing decompression of clusters, which can alter entropy patterns and introduce errors in signature matching, while encrypted data appears as random noise, evading header-footer identification altogether. Anti-forensic techniques, such as secure deletion through multiple overwrites with random patterns, exacerbate these issues by destroying residual data traces, rendering carved recovery unfeasible as no identifiable fragments remain. In cloud environments, additional layers of encryption and deduplication compound the problem, often resulting in zero recovery for affected files.
+Performance bottlenecks limit the scalability of file carving, particularly for big data volumes. Scanning terabyte-scale disk images can take hours to days depending on the tool and scan mode; for instance, brute-force approaches process data at rates as low as 3-62 MB/s, translating to over 90 hours for a 1 TB image in worst-case configurations. This is compounded by the need for extensive validation to minimize errors, making real-time or large-scale forensic analysis resource-intensive and prone to timeouts on standard hardware.
+Error sources, including false positives and negatives, undermine the reliability of carved outputs. False positives arise from ambiguous signatures or entropy similarities (e.g., mistaking ZIP data for JPEG), leading to numerous invalid extractions that require manual verificationsometimes comprising the majority of results in unoptimized scans. False negatives occur when incomplete reconstructions miss fragments, yielding corrupted or partial files that fail validation, such as MSOLE documents with substituted sectors that open but contain incorrect content. These issues persist across methods, with precision dropping below 50% in complex datasets due to overlapping fragments or metadata loss.
+
+Software Tools for Implementation
+
+Several open-source tools facilitate file carving by leveraging signature-based detection and configurable parameters. Foremost, initially released in 2001, is a console-based program that recovers files from disk images or raw data by identifying headers, footers, and internal data structures, supporting over 20 common formats such as JPEG, GIF, OLE, and EXE. Scalpel, an evolution of Foremost from 2005, employs block-based carving with user-defined configuration files for headers and footers, incorporating multithreading and asynchronous I/O to enhance performance on large datasets. PhotoRec, part of the TestDisk suite, specializes in recovering more than 480 file extensions across approximately 300 families, including multimedia like JPEG and PDF, while bypassing file system metadata and attempting recovery of non-fragmented or lightly fragmented files.
+Commercial solutions offer integrated environments for file carving within broader forensic workflows. EnCase Forensic includes dedicated carving modules that excel at extracting contiguous graphic files (e.g., BMP, PNG, JPG) from unallocated space, with support for evidence processing and reporting. Autopsy, a graphical interface built on The Sleuth Kit, embeds PhotoRec for carving deleted files from unallocated clusters, enabling timeline analysis and keyword searches alongside recovery. FTK Imager provides basic carving through hex viewing and data export features, allowing recovery of deleted files by manually selecting and copying relevant byte ranges from images.
+Comparisons highlight trade-offs in speed and accuracy among these tools. Scalpel outperforms Foremost in processing speed for large files due to its multithreading and GPU support (on compatible systems), achieving up to 100% success rates for document formats like PDF and DOCX in controlled tests, though it may generate false positives without refined configurations. Foremost, while slower on voluminous data, offers simpler setup for signature-based recovery but lags in efficiency for multimedia carving compared to PhotoRec, which demonstrates superior accuracy for image and video files by ignoring fragmentation where possible.
+These tools often integrate with operating system forensics suites for comprehensive investigations; for instance, Autopsy combines Sleuth Kit's file system analysis with PhotoRec's carving, while EnCase and FTK Imager link to full-suite platforms like FTK for automated workflows. As of 2025, developments include the Foremost-NG fork, which refactors the original for advanced parsers and analysis, and emerging AI-enhanced approaches like Carve-DL, which use machine learning to detect fragmented files beyond traditional signatures, improving recovery rates in complex scenarios.
+
+References
+
+File carving | Infosec
+
+Carving and its Implementations in Digital Forensics - Belkasoft
+
+Digital Forensics | American Scientist
+
+ Carving Contiguous and Fragmented Files with Fast Object Validation
+
+Forensic Images for File Carving - CFReDS
+
+ A History of Digital Forensics - Hal-Inria
+
+Brief History of Computer Forensics - Graytips
+
+ An Analysis of Disc Carving Techniques - DTIC
+
+(PDF) The evolution of file carving - ResearchGate
+
+ Scalpel A Frugal, High Performance File Carver - DFRWS
+
+https://www.dfrws.org/2006/challenge
+
+Carving Contiguous and Fragmented Files with Object Validation
+
+Carving contiguous and fragmented files with fast object validation
+
+A Survey On Data Carving In Digital Forensics
+
+File Carving What It Is and How to Get Started - eForensics
+
+Forensic File Carving: A Guide to Recovering Critical Digital Evidence
+
+Understanding Forensic Data Carving - The CSI Linux Pro Shop
+
+ Advanced File Carving Approaches for Multimedia Files
+
+GCK File Signatures, Powered by SEARCH
+
+ Introduction to carving File fragmentation Object validation Carving
+
+JPG Signature Format: Documentation & Recovery Example
+
+GCK'S File Signatures Table - Gary Kessler Associates
+
+(PDF) A Review of JPEG File Carving: Challenges, Techniques, and ...
+
+ Fast In-Place File Carving For Digital Forensics - UF CISE
+
+Foremost
+
+ Performance Analysis of File Carving Tools - Hal-Inria
+
+https://doi.org/10.1016/j.diin.2007.06.017
+
+https://www.dfrws.org/2006/challenge/submissions/mora/dfrws2006.pdf
+
+ In-Place File Carving. - IFIP Digital Library
+
+ Comparing SSD Forensics with HDD Forensics
+
+ A Study on the Impact of TRIM and Garbage Collection on Forensic ...
+
+ mCarve: Carving Attributed Dump Sets - USENIX
+
+ Bin-Carver: Automatic recovery of binary executable files - DFRWS
+
+ File carving Analyze of Foremost and Autopsy on external SSD ...
+
+ An Investigation on File Carving Tool Methodologies Using Scenario ...
+
+ Towards Carving-Based Post-Mortem Memory Forensics and the ...
+
+Forensic carving of network packets and associated data structures
+
+None
+
+volatilityfoundation/volatility: An advanced memory ... - GitHub
+
+https://onlinelibrary.wiley.com/doi/10.1111/1556-4029.70174
+
+Scalpel is an open source data carving tool. It is not being ... - GitHub
+
+Digital Picture and File Recovery
+
+Autopsy
+
+What is FTK Imager: A Tool for Digital Forensics Explained? - LinkedIn
+
+Performance Comparison of Forensic Software for Carving Files ...
+
+Foremost-NG: An Open-Source Toolkit for Advanced File Carving ...
+
+AI in Digital Forensics: Revolutionizing Data Recovery and Evidence ...
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion
