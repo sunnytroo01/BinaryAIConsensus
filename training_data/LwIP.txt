@@ -1,0 +1,316 @@
+lwIP Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+lwIP
+ Ara Eve Leo Sal 
+1x
+ lwIP (lightweight IP) is a small, open-source implementation of the TCP/IP protocol suite tailored for resource-constrained embedded systems, enabling efficient networking with minimal memory and code footprint.
+Originally developed by Adam Dunkels at the Swedish Institute of Computer Science in 2001, lwIP focuses on reducing RAM requirements to tens of kilobytes and ROM usage to around 40 kilobytes while supporting a full-scale TCP implementation, making it ideal for devices like microcontrollers with limited resources.
+The stack provides core protocols including IPv4, IPv6, UDP, TCP, ICMP, ARP, IGMP, PPPoE, and PPPoS, along with features such as DHCP and DNS clients, IP forwarding, and TCP congestion control. It offers flexible APIs, including a raw API for low-level access and a Berkeley sockets-compatible API, and can operate with or without an underlying operating system through an optional emulation layer.
+Since its initial release, lwIP has been maintained by a global team of developers under the modified BSD license and is widely adopted in commercial and open-source embedded applications, with the latest stable version being 2.2.1 as of February 2025. Add-on modules extend its capabilities to include HTTP and HTTPS servers, MQTT clients, and SNMP agents, further enhancing its utility in IoT and networked devices.
+
+Introduction
+
+Overview
+
+lwIP is an open-source implementation of the TCP/IP protocol suite designed specifically for resource-constrained environments, such as embedded systems with limited memory. It provides a lightweight alternative to full-featured TCP/IP stacks, focusing on minimal resource usage while supporting essential networking functionalities like TCP and UDP.
+The stack is tailored for microcontrollers and similar devices that typically have only tens of kilobytes of available RAM and around 40 kilobytes of ROM for code storage, making it suitable for applications where heavier implementations, such as those in Linux, would exceed hardware limitations. Primary use cases include embedded devices, Internet of Things (IoT) applications, and real-time systems requiring efficient network connectivity without compromising performance or memory footprint.
+lwIP is licensed under a BSD license, permitting free use, modification, and distribution in both commercial and open-source projects. Starting with version 2.0.0, it includes dual-stack support for both IPv4 and IPv6 protocols, enabling flexible network configurations in modern embedded applications.
+
+Key Features
+
+lwIP's modular architecture enables developers to selectively include or exclude specific protocols and features during compilation, thereby minimizing the code footprint and resource consumption to suit the constraints of embedded applications. This configurability is achieved through the lwipopts.h header file, where options such as LWIP_TCP, LWIP_UDP, and LWIP_IPV6 can be defined or undefined to enable only the necessary components, resulting in a highly customizable stack that can range from a few kilobytes for basic UDP/IP functionality to a full-featured implementation.
+The stack employs an event-driven, non-blocking design optimized for single-threaded operation in resource-limited systems, where the core runs in a single context without relying on a multi-threaded operating system. This approach uses callbacks invoked from interrupt handlers or a main loop to process network events, ensuring low latency and efficient CPU utilization without blocking the application thread, as detailed in the raw API documentation. Such a design is particularly advantageous for bare-metal environments, allowing lwIP to integrate seamlessly into systems with minimal overhead.
+lwIP provides support for both IPv4 and IPv6 protocols in a dual-stack configuration, enabling simultaneous operation of both address families on the same network interface, with IPv6 support added starting in version 1.4.0 (2011) and full dual-stack maturity achieved in release 2.0.0 (2016). This dual-stack approach facilitates gradual migration to IPv6 while maintaining backward compatibility with IPv4 networks, and it includes features like neighbor discovery (ND) for IPv6 and address autoconfiguration.
+Additionally, basic firewall capabilities are provided through netif filters, such as IGMP and MLD MAC filters, which allow applications to implement packet filtering at the network interface level to control multicast traffic and enforce simple access policies.
+The stack's high portability across diverse hardware platforms stems from its abstraction layers for system calls and hardware drivers, making it adaptable to various microcontrollers and RTOSes without requiring virtual memory management. Notably, lwIP supports operation on no-MMU systems, common in low-end embedded devices, by relying on static memory allocation and avoiding dynamic pointer manipulations that depend on memory protection units. This design ensures compatibility with a wide range of architectures, from 8-bit to 32-bit processors, as evidenced by its integration in numerous vendor SDKs.
+
+History
+
+Development Origins
+
+lwIP was created in 2001 by Adam Dunkels at the Swedish Institute of Computer Science (SICS) as part of research into lightweight operating systems for resource-constrained devices, including the early development of Contiki OS. This work emerged from Dunkels' master's thesis project in 2001, which explored the design and implementation of a lightweight TCP/IP stack for applications like monitoring athletes, highlighting the need for efficient protocol implementations on tiny hardware.
+The primary motivation behind lwIP was to address the absence of compact TCP/IP protocol stacks suitable for 8-bit and 16-bit microcontrollers, which dominated embedded systems but lacked support for standard Internet protocols due to high memory and processing demands of traditional implementations. Inspired by the growing demand for networked embedded sensors in areas such as environmental monitoring and wireless ad-hoc networks, Dunkels designed lwIP to minimize code size (around 10 KB) and RAM usage (as low as a few hundred bytes), enabling full TCP/IP functionalityincluding IP, ICMP, UDP, and TCPon systems with severely limited resources. The initial prototype emphasized minimalism, prioritizing UDP for its simplicity in demultiplexing and low-overhead processing over the more resource-intensive TCP, which constitutes about half of lwIP's code due to features like congestion control and reliable byte streams.
+By late 2002, lwIP transitioned from a SICS research project to an independent open-source initiative under the lwIP developers group, hosted on Savannah and maintained by a global community of contributors. This shift allowed broader adoption while preserving its core focus on embedded networking efficiency.
+
+Release Milestones
+
+The initial public release of lwIP, version 1.0.0, occurred on August 10, 2004, providing core support for TCP/IPv4 protocols including TCP, UDP, ICMP, and ARP, tailored for resource-constrained embedded systems.
+Subsequent key upgrades expanded protocol capabilities and performance. Version 1.3.0, released in March 2008, introduced basic IPv6 support through new modules for IPv6 addressing, ICMPv6, and neighbor discovery, though limited to single-stack operation without full IPv4 integration. Version 2.0.0, released on November 10, 2016, marked a significant advancement by enabling full dual-stack IPv4/IPv6 operation, with unified IP address structures (ip_addr_t as a union) and automatic protocol handling in RAW, UDP, and TCP APIs to support concurrent IPv4 and IPv6 traffic. Building on this, version 2.1.0, released on September 26, 2018, enhanced TCP performance through the new altcp API, which allows layering abstractions like TLS for secure connections while optimizing memory and callback efficiency, alongside refinements to IPv6 and socket API stability. Version 2.2.0, released on September 25, 2023, added features including full support for Address Conflict Detection (ACD) and various bug fixes.
+The latest stable release, version 2.2.1, was issued on February 6, 2025, primarily as a maintenance update addressing critical bug fixes, including issues in PPP modules and security vulnerabilities in protocol handling.
+lwIP follows a community-driven maintenance model hosted on the GNU Savannah platform, where releases occur irregularly in response to contributor patches, bug reports, and feature proposals, ensuring ongoing compatibility and minimal footprint for embedded applications.
+
+Architecture
+
+Core Components
+
+The core components of lwIP form the foundational structures and processing pathways that enable its lightweight TCP/IP implementation for embedded systems. Central to this design is the network interface abstraction, represented by the netif structure, which provides a unified layer for interacting with diverse hardware drivers. This abstraction handles packet input and output (I/O) by defining callbacks such as netif_input_fn for delivering incoming packets from the driver to the stack, and output functions like netif->output for transmitting packets to the physical medium. Hardware drivers register with lwIP by initializing a netif instance via netif_add(), specifying IP addresses, netmasks, and gateways, while flags like NETIF_FLAG_ETHARP ensure proper routing to layers such as Ethernet or IP. This modular approach allows lwIP to support multiple interfaces, including loopback and PPP, without tight coupling to specific hardware.
+Protocol control blocks (PCBs) serve as the primary data structures for managing transport and network layer connections, encapsulating state information for active sessions. For TCP, the tcp_pcb structure tracks connection details including local and remote addresses, ports, sequence numbers, and congestion control parameters, created via tcp_new() and transitioned through states like CLOSED, LISTEN, and ESTABLISHED. UDP employs the udp_pcb structure for datagram-oriented communication, handling binding to local ports with udp_bind() and connection setup via udp_connect(), without maintaining persistent state like TCP. At the IP level, the ip_pcb structure supports raw IP packet handling for custom protocols, including socket options and address bindings, enabling direct manipulation of IP headers for specialized applications. These PCBs are dynamically allocated from memory pools and deallocated upon connection closure to conserve resources.
+Incoming packet processing follows a chained sequence of functions to demultiplex and validate data efficiently. The ip_input() function receives a packet buffer (pbuf) and associated netif from the driver, parses the IP header to determine the protocol (e.g., TCP or UDP), performs routing checks based on addresses and TTL, and forwards valid packets to upper layers or discards invalids, returning an err_t status. For TCP segments, tcp_input() extends this by verifying the TCP header, searching matching tcp_pcb instances using source/destination ports and IP addresses, and invoking tcp_process() to advance the finite state machine, handling acknowledgments, retransmissions, and data delivery. These processing chains run in a dedicated TCP/IP thread when OS abstractions are used (NO_SYS=0), or directly from the main loop or interrupt context in no-OS mode (NO_SYS=1), helping to minimize overhead while ensuring proper concurrency handling.
+lwIP's event callback system facilitates asynchronous notifications to applications without blocking the stack, primarily through the raw API. Applications register callback functionssuch as tcp_recv() for incoming data, tcp_sent() for transmission completion, and tcp_err() for errorsassociated with PCBs, allowing the stack to invoke them during event occurrences like data arrival or connection establishment. This callback-driven model, often using err_t return types for status, supports non-blocking operation in resource-constrained environments, with polling via tcp_poll() for idle connections.
+Portability across operating systems and hardware is achieved via the OS abstraction layer in lwip/opt.h, a configuration header that defines compile-time options for system integration. It includes settings for memory management (e.g., MEM_SIZE), threading (e.g., TCPIP_THREAD_PRIO), and protections (e.g., SYS_LIGHTWEIGHT_PROT), allowing selection of no-OS mode (NO_SYS=1) or integration with RTOS via semaphores and mutexes. Custom lwipopts.h files override defaults to tailor the stack, ensuring compatibility without modifying core source code. This layer briefly interfaces with memory pools for PCB and pbuf allocation, as detailed in dedicated management mechanisms.
+
+Memory and Buffer Management
+
+lwIP employs a specialized memory management system tailored for resource-constrained embedded devices, emphasizing efficiency and predictability to minimize overhead in TCP/IP operations. The core of this system revolves around packet buffers (pbufs) and a combination of static memory pools and a dynamic heap, which together handle allocation for protocol control blocks, packet data, and other structures without relying on general-purpose operating system allocators.
+Central to lwIP's buffering is the pbuf structure, a chainable data unit that enables zero-copy packet handling by allowing packets to span multiple non-contiguous buffers. Pbufs support several types to optimize for different scenarios: PBUF_RAM allocates contiguous memory from the heap for transmit packets, including headers; PBUF_POOL draws from a pre-allocated pool for receive packets; PBUF_REF references external data without copying, facilitating zero-copy transfers but requiring careful handling to avoid data volatility; and PBUF_ROM points to read-only memory for immutable content. Chaining occurs via the next pointer, with functions like pbuf_chain() linking buffers while updating total length (tot_len), enabling efficient assembly of fragmented packets without unnecessary data movement. Reference counting via pbuf_ref() and pbuf_free() ensures proper deallocation, supporting shared ownership in multi-layer processing.
+For broader memory allocation, lwIP uses static memory pools (memp) to provide fixed-size blocks for common objects, configurable via options like MEMP_NUM_PBUF (default 16 for pool-allocated pbufs), MEMP_NUM_TCP_PCB (default 5 for TCP control blocks), and others such as MEMP_NUM_UDP_PCB or MEMP_NUM_ARP_QUEUE. These pools are pre-allocated at compile time from a reserved static segment, promoting fragmentation-free operation and deterministic behavior in real-time systems. Complementing this, the heap subsystem offers dynamic allocation through mem_malloc() and mem_free(), implementing a simple first-fit algorithm on a configurable block (default MEM_SIZE 1600 bytes) for variable-sized requests not covered by pools.
+Configuration options further tailor memory handling to hardware constraints, such as MEM_ALIGNMENT (default 1, often set to 4 for 32-bit CPUs) to ensure proper data alignment and reduce access penalties. Enabling MEM_USE_POOLS (default 0) replaces heap allocations with tiered pools of fixed sizes, selecting the smallest fitting pool to further mitigate fragmentation at the cost of flexibility. This design trades the predictability and speed of fixed poolsideal for avoiding runtime allocation failures in embedded contextsagainst the adaptability of the dynamic heap, which supports larger or irregular allocations but risks fragmentation and slower performance.
+
+Protocol Implementations
+
+Network and Transport Layers
+
+lwIP provides robust support for both IPv4 and IPv6 at the network layer, enabling dual-stack operation in resource-constrained environments. IPv4 implementation includes packet forwarding across multiple network interfaces when configured via the IP_FORWARD option, which is disabled by default to conserve resources. Fragmentation of outgoing IPv4 packets exceeding the MTU is handled through the IP_FRAG option, while incoming fragmented packets are reassembled using IP_REASSEMBLY, with configurable limits such as a maximum of 10 packet buffers (IP_REASS_MAX_PBUFS) and a reassembly timeout of 15 seconds (IP_REASS_MAXAGE). For IPv6, similar capabilities are available: forwarding is enabled by LWIP_IPV6_FORWARD, fragmentation by LWIP_IPV6_FRAG, and reassembly by LWIP_IPV6_REASS, with a default reassembly timeout of 60 seconds (IPV6_REASS_MAXAGE). Routing decisions in lwIP are managed through the ip_route() function, which selects the appropriate network interface based on the destination address and local routing table, supporting basic source-based routing hooks for advanced configurations.
+The transport layer in lwIP centers on TCP and UDP implementations optimized for low memory usage. TCP employs a state machine that progresses through key states such as SYN (synchronization) for connection initiation and ESTABLISHED for active data transfer, ensuring reliable, ordered delivery with retransmission mechanisms limited to a maximum of 12 attempts for data segments (TCP_MAXRTX) and 6 for SYN packets (TCP_SYNMAXRTX). Congestion control follows a Reno algorithm variant, incorporating slow start, congestion avoidance, and fast recovery phases to adapt the congestion window dynamically based on acknowledgments and timeouts, as updated from earlier RFC 2001 compliance to align with RFC 5681 principles. Window scaling is supported via the LWIP_WND_SCALE option, allowing larger receive windows beyond the default 4 times the maximum segment size (TCP_WND), while selective acknowledgments (SACK) are enabled through LWIP_TCP_SACK_OUT to report non-contiguous received blocks, improving efficiency in lossy networks with up to 4 SACK blocks (LWIP_TCP_MAX_SACK_NUM).
+UDP in lwIP offers lightweight, connectionless datagram delivery, with packets processed directly without sequencing or retransmission, relying on the IP layer for basic routing and checksum verification. UDP-Lite extends this with optional partial checksum coverage, enabled by LWIP_UDPLITE, allowing applications to receive partially corrupted payloads for error-resilient scenarios like real-time media, where only critical headers are protected while payload errors are tolerated. Both protocols use a default time-to-live value inherited from IP settings (UDP_TTL), and lwIP appends receive information such as source addresses to netbufs when LWIP_NETBUF_RECVINFO is enabled.
+ICMP and ICMPv6 handle error reporting and diagnostics, integral to lwIP's network layer robustness. ICMP for IPv4, enabled by LWIP_ICMP, supports echo request/reply for ping operations via functions like icmp_send_echo, along with destination unreachable and time exceeded messages for error feedback. ICMPv6, activated with IPv6 support, extends this to IPv6-specific errors and includes ping functionality through echo APIs. Multicast group management is facilitated by IGMP for IPv4 (LWIP_IGMP), allowing hosts to join and leave groups for efficient traffic distribution, compliant with RFC 1112. For IPv6, equivalent multicast listener discovery (MLD) is supported, though limited to version 1 per RFC 2710.
+IPv6 address resolution in lwIP relies on the Neighbor Discovery Protocol (NDP), implemented in the nd6.c module and compliant with RFC 4861 for neighbor discovery and RFC 4862 for stateless address autoconfiguration. NDP replaces ARP by using ICMPv6 messages like Neighbor Solicitation and Advertisement to map IPv6 addresses to link-layer addresses, maintaining a neighbor cache of up to 10 entries and a destination cache similarly sized, with reachability confirmed via periodic probes or TCP hints when LWIP_ND6_TCP_REACHABILITY_HINTS is enabled. This enables dynamic discovery of neighbors and routers on the local link without manual configuration.
+
+Link and Application Layers
+
+lwIP provides support for essential link-layer protocols to enable communication over various physical media, particularly suited for resource-constrained embedded environments. The Address Resolution Protocol (ARP) is implemented to resolve IPv4 addresses to hardware (MAC) addresses on local networks, facilitating Ethernet-based connectivity by maintaining an ARP table and handling requests and replies as per RFC 826. This implementation includes options for queuing outgoing packets during resolution and gratuitous ARP for duplicate address detection.
+For serial and dial-up connections, lwIP incorporates the Point-to-Point Protocol (PPP), supporting both PPP over Serial (PPPoS) and PPP over Ethernet (PPPoE) for encapsulating IP packets. PPP in lwIP enables authentication through protocols such as Password Authentication Protocol (PAP), Challenge-Handshake Authentication Protocol (CHAP, including MSCHAPv1), and others, allowing secure link establishment with username/password verification. These features integrate with the IP layer to support dynamic addressing and compression options like Van Jacobson header compression for efficiency.
+At the application layer, lwIP includes lightweight implementations of key protocols for network configuration and management. The built-in DNS resolver supports domain name queries over UDP, with options for secure DNS features and integration with DHCP for automatic server assignment. DHCP client functionality allows automatic IP address assignment, including support for AutoIP (APIPA) for link-local addressing and stateless DHCPv6.
+For web services, lwIP offers a basic HTTP server capable of handling GET/POST requests, Server-Side Includes (SSI), and Common Gateway Interface (CGI) for dynamic content, while HTTP client support is available through the socket or raw API. Network management is facilitated by an SNMPv2c agent, which includes a MIB compiler for custom objects and trap generation. A simple SMTP client is provided as an optional module for sending emails, adhering minimally to RFC 5321, though full email retrieval via POP3 requires external or contrib implementations.
+Multicast operations are supported through IGMP for IPv4 (primarily v2 with partial v3 compatibility for source filtering) and MLD for IPv6 (v1 per RFC 2710), enabling hosts to join/leave multicast groups efficiently. These protocols integrate with the IP layer to manage group memberships without native snooping.
+lwIP does not include native TLS/SSL support at the application layer, necessitating external libraries like mbedTLS integrated via the altcp API for securing protocols such as HTTPS or SNMPv3. This modular approach keeps the core stack lightweight while allowing extensions for encrypted communications.
+
+APIs and Interfaces
+
+Raw API
+
+The raw API in lwIP provides a low-level, event-driven interface for direct interaction with the TCP/IP protocols, optimized for resource-constrained embedded systems without an operating system. It enables applications to handle network events through callbacks, allowing tight integration with the stack while minimizing overhead. This API is non-thread-safe by design, prioritizing efficiency over concurrent access support.
+Central to the raw API is its callback-driven model, where applications register callback functions to respond to protocol events such as incoming data, connection establishment, or errors. For TCP, the tcp_new() function creates a new protocol control block (PCB) in the CLOSED state, which serves as the connection's state structure. Applications then bind the PCB to a local address and port using tcp_bind(), listen for incoming connections with tcp_listen(), and accept them via an accept callback. Data reception is managed through the tcp_recv() callback, invoked by the stack when new data arrives; this callback receives a pointer to the TCP PCB and a pbuf chain containing the data, along with a user-specified argument for context. Upon processing, the application must free the pbuf if returning ERR_OK to acknowledge receipt, or ERR_ABRT to abort the connection. Similar patterns apply to UDP, where udp_new() allocates a UDP PCB, udp_bind() assigns a local endpoint, and udp_recv() registers a callback for incoming datagrams. For raw IP protocols, raw_new() creates a PCB for a specific protocol number, and raw_recv() sets the receive callback to handle matching incoming packets.
+The raw API employs no-copy semantics to enhance performance and reduce memory usage, passing packet data via references to pbuf structures rather than duplicating buffers internally. Pbufs represent packet buffers that can chain multiple segments, allowing direct access to received or transmitted data without unnecessary copying; applications process the pbuf chain in the callback and release it explicitly with pbuf_free() when done. This approach avoids buffering overhead, making it suitable for systems with limited RAM. Sending data follows a similar pattern: for TCP, tcp_write() queues data into the PCB's send buffer (referenced by pbufs), while for UDP, udp_sendto() transmits a pbuf chain directly.
+For implementing custom protocols or sending raw IP packets, the raw API exposes low-level functions like ip_output(), which allows direct transmission of IP datagrams. This function takes a pbuf containing the packet payload, source and destination IP addresses, TTL, TOS, and protocol number, then routes the packet through the appropriate network interface without higher-layer processing. It ensures the pbuf reference count is 1 before output to prevent reference issues, enabling applications to inject non-standard or experimental protocols atop the IP layer.
+Thread-safety in the raw API is limited, as it is intended for single-threaded execution in no-OS environments, with all API calls required to occur from the main lwIP thread to avoid race conditions. Critical sections, such as memory allocation or pbuf manipulation, are protected using lightweight mechanisms enabled by defining SYS_LIGHTWEIGHT_PROT in lwipopts.h; these employ SYS_ARCH_PROTECT() and SYS_ARCH_UNPROTECT() macros to temporarily disable interrupts or acquire a global lock, ensuring atomicity for short operations without full mutex overhead. In multi-threaded ports, applications must serialize access to raw API functions externally.
+A representative example of raw API usage is a simple UDP echo server, which demonstrates the callback model for handling incoming datagrams. The application calls udp_new() to create a UDP PCB, binds it to port 7 (the standard echo port) on any local IP with udp_bind(pcb, IP_ADDR_ANY, 7), and registers a receive callback via udp_recv(pcb, udp_echo_recv, NULL). The udp_echo_recv callback function receives the PCB, a pbuf chain with the datagram, the source IP and port, and the user argument; it then echoes the data back using udp_sendto(pcb, pbuf, &source_ip, source_port) and frees the original pbuf with pbuf_free(pbuf). This setup processes packets zero-copy and integrates directly with the lwIP event loop.
+
+Socket API
+
+The lwIP Socket API provides a Berkeley sockets-compatible interface that allows applications to interact with the TCP/IP stack in a manner similar to POSIX systems, facilitating easier porting of existing code from Unix-like environments. This optional API is designed to be thread-safe and is intended for use from non-TCPIP threads, building upon the sequential API layer to abstract the underlying raw API mechanisms. It supports both TCP and UDP protocols through standard functions, enabling developers to create networked applications without needing to manage low-level protocol details directly.
+To enable the Socket API, the configuration option LWIP_SOCKET must be set to 1 during compilation, which activates the necessary components including the POSIX header sys/socket.h. Key functions mirror POSIX semantics, such as lwip_socket() for creating sockets, lwip_bind() for associating a socket with a local address, lwip_connect() for establishing connections, lwip_listen() for setting up passive TCP sockets, and lwip_accept() for accepting incoming connections. Data transmission and reception are handled via lwip_send(), lwip_recv(), and related variants, while multiplexing is supported through lwip_select() and lwip_poll() to monitor multiple sockets for readiness. These functions internally translate calls to the sequential API, which in turn interfaces with the raw API for protocol handling.
+The Socket API includes IPv6 extensions to support modern networking requirements, such as lwip_getaddrinfo() for hostname resolution to addresses (enabled via the NETDB API) and functions like lwip_inet_ntop() and lwip_inet_pton() for address string conversions. Dual-stack operation is achieved by specifying the appropriate domain (e.g., AF_INET or AF_INET6) in the lwip_socket() call, allowing applications to handle both IPv4 and IPv6 transparently where configured. However, due to inherent limitations in the API specification for resource-constrained environments, some incompatibilities with full POSIX compliance exist, potentially requiring minor code adjustments for ported applications; advanced features like full fork() support are not provided, as the API assumes a single-process model typical of embedded systems.
+Compared to the raw API, the Socket API introduces higher memory overhead owing to the additional abstraction layers and thread-safety mechanisms, making it less suitable for the most memory-tight embedded scenarios but preferable for applications prioritizing code portability and ease of development.
+
+Integration and Porting
+
+No-OS Operation
+
+lwIP operates in no-OS mode, also referred to as bare-metal or standalone mode, for embedded systems lacking an operating system, emphasizing minimal resource usage and single-threaded execution with the raw API. This configuration sets NO_SYS=1 in lwipopts.h, eliminating the need for OS abstractions like semaphores or mailboxes, and instead using stub implementations in sys_arch.h for system calls. The design ensures lwIP's coreIP, ICMP, UDP, and TCPruns deterministically without multi-threading support, making it suitable for real-time applications where predictability is essential.
+In no-OS mode, the application manages a single-threaded main loop to drive lwIP processing. This loop typically polls the network interface driver to retrieve incoming packets, passes them to the stack via ip_input(pbuf, netif), and then invokes sys_check_timeouts() to handle protocol timers. Key timers include tcp_tmr(), called approximately every 250 ms to manage TCP connections, finite state machine advancements, and retransmissions, as well as ip_reass_tmr(), called every IP_TMR_INTERVAL (default 1000 ms) to manage IP fragmentation reassembly timeouts (default duration 3 seconds). Earlier lwIP versions required explicit calls to individual timers like tcp_tmr() and etharp_tmr(); however, since version 1.4.0, sys_check_timeouts() centralizes this, reducing code complexity while relying on a monotonic sys_now() implementation, often based on a hardware timer like SysTick on ARM platforms. A representative loop structure appears as follows:
+while (1) {
+ ethernetif_input(&netif); // Poll for and process incoming packets
+ sys_check_timeouts(); // Handle timers
+}
+This polling ensures all lwIP API calls occur sequentially from one context, avoiding reentrancy issues inherent in OS environments.
+Packet input can be interrupt-driven to respond promptly to network events, with the Ethernet driver calling ethernetif_input(netif) directly from the ISR to enqueue or process received frames into pbuf structures for lwIP consumption. However, since no-OS lwIP assumes a single execution context, interrupt handlers must not invoke reentrant functions like udp_send() or tcp_write() without protection, as this could lead to data corruption or deadlocks. Instead, short, non-blocking operations are permitted if the ISR defers complex processing to the main loop via a simple queue.
+Thread safety in no-OS mode relies on lightweight protection mechanisms defined by SYS_ARCH_PROTECT(old_level) and SYS_ARCH_UNPROTECT(old_level) macros, enabled when LWIP_TCPIP_CORE_LOCKING or SYS_LIGHTWEIGHT_PROT is set to 1 in lwipopts.h. These macros are implemented by disabling global interrupts (e.g., using __disable_irq() and __enable_irq() on ARM Cortex-M) for atomic critical sections, such as pbuf allocation or reference counting, typically lasting microseconds. This interrupt-based locking provides sufficient protection for the non-reentrant core without OS primitives, though prolonged disables should be avoided to prevent system latency. For instance, during netif->input() calls from ISR, protection ensures exclusivity against the main loop's timer processing.
+No-OS lwIP targets bare-metal platforms with limited resources, such as ARM Cortex-M microcontrollers (e.g., STM32, LPC series) and AVR devices, where dependencies are confined to a basic compiler port in cc.h for types and error handling, plus a timestamp provider. These systems achieve lwIP's footprint of under 40 KB RAM and 60 KB ROM for a minimal TCP/IP configuration, enabling networking on 8- or 32-bit MCUs without scheduler overhead.
+A practical example is porting lwIP to STM32 using the Hardware Abstraction Layer (HAL) in FreeRTOS-free setups, as demonstrated in STMicroelectronics' CubeMX-generated projects. Here, HAL APIs like HAL_ETH_ReadPHYRegister() manage the Ethernet MAC and PHY, while the main loop polls via ethernetif_input(&gnetif) and timers through MX_LWIP_Process(). Interrupts for DMA reception trigger HAL_ETH_IRQHandler(), which signals the main context to process packets, ensuring compatibility with STM32F4/H7 devices for applications like UDP telemetry or TCP servers without OS bloat. This integration highlights lwIP's portability, requiring only HAL initialization and lwIP's raw API callbacks for protocol handling.
+
+RTOS and OS Support
+
+lwIP provides an operating system abstraction layer through the sys.h header file, which enables compatibility with various real-time operating systems (RTOS) by implementing wrappers for semaphores, mutexes, mailboxes, and threads. This layer allows lwIP to integrate seamlessly with popular RTOS such as FreeRTOS, where it is commonly used in embedded applications for its raw API and TCP/IP thread support. Similarly, ports exist for Zephyr RTOS, enabling lwIP usage in IoT and networked devices on platforms like NXP MCUs, often alongside Zephyr's native networking but as an alternative stack for specific requirements. For ThreadX, integration is achievable by adapting the abstraction layer, though it requires custom modifications to align with ThreadX's threading model and avoid conflicts with its native NetX Duo stack.
+Beyond RTOS, lwIP has been ported to full operating systems, particularly microkernel-based ones, where it serves as a lightweight network stack. In ReactOS, lwIP forms the core of the network subsystem, with ongoing efforts to enhance TCP support through projects like Google Summer of Code integrations. Genode OS Framework incorporates lwIP via VFS plugins for socket-based networking, supporting HTTP servers and dynamic configurations in its component-based architecture. MINIX 3 adopted an lwIP-based TCP/IP service in 2017, replacing its prior stack to provide POSIX-compliant networking with improved efficiency in its microkernel environment. The GNU Hurd utilizes a dedicated lwIP port as a translator for network servers, enabling TCP/IP functionality atop its Mach microkernel since its integration in Debian GNU/Hurd releases.
+In vendor ecosystems, lwIP is deeply embedded in development tools for specific embedded processors. Intel's (formerly Altera) Nios II soft-core processor supports lwIP through tutorials and HAL drivers, facilitating Ethernet connectivity in FPGA-based systems with MicroC/OS-II or similar RTOS. Xilinx's MicroBlaze processor leverages the standalone lwIP library for TCP/IP operations on Zynq and UltraScale+ devices, configurable via the Xilinx SDK for bare-metal or RTOS environments. STMicroelectronics' STM32Cube middleware includes comprehensive lwIP support, with user manuals detailing application development for STM32 MCUs, including DHCP and socket APIs integrated with CubeMX code generation.
+Porting lwIP to a new OS involves implementing key functions in the sys_arch.c file, such as sys_mbox_post() for posting messages to mailboxes and sys_thread_new() for creating threads, to map lwIP's requirements onto the target's synchronization primitives. These implementations ensure thread safety and handle timeouts, allowing lwIP's core to operate in multi-threaded contexts without direct OS dependencies.
+Despite its versatility, lwIP exhibits scalability limitations when integrated into high-throughput full OS environments like Linux, where its lightweight designoptimized for minimal resource usecannot match the performance of native monolithic stacks, making it unsuitable as a replacement. In such cases, lwIP is better suited for user-space testing or microkernel drivers rather than core kernel integration.
+
+Performance and Optimization
+
+Resource Usage
+
+lwIP's core implementation for TCP/IPv4 typically requires around 40 kilobytes of ROM for code space, making it suitable for resource-constrained embedded systems. This footprint encompasses essential protocol handling without advanced features, while the overall design targets systems with tens of kilobytes of available RAM. For example, on Espressif ESP32-P4 hardware, enabling IPv6 support increases the ROM usage by approximately 39 kilobytes, along with additional RAM of 2 kilobytes at power-up and up to 7 kilobytes during operation.
+RAM requirements are primarily driven by configurable buffer pools and connection states. The packet buffer (pbuf) pool, controlled by PBUF_POOL_SIZE, allocates fixed-size blocks for incoming and outgoing packets; a typical configuration with 16 buffers of 1536 bytes each, plus structural overhead, consumes about 24 kilobytes, though minimal setups can limit this to under 10 kilobytes total RAM for the stack. For TCP connections, each active protocol control block (PCB) and associated buffers demand additional dynamic allocation, often around 2 kilobytes per connection depending on window sizes and queue depths, with defaults like TCP_WND at 2048 bytes contributing to this.
+The event-driven architecture of lwIP minimizes CPU overhead, as it only activates on interrupts or polled events. During packet bursts, usage peaks proportionally to traffic volume, but the non-blocking design prevents sustained high load. Benchmarks on ARM-based microcontrollers, such as the TI AM263P4, demonstrate throughputs below 15 megabits per second for small UDP datagrams.
+Overall stack size varies with enabled features; for instance, software checksum computation increases CPU cycles without significantly altering memory, whereas options like IPv6 or additional protocols directly inflate ROM and RAM footprints. These estimates are based on lwIP version 2.1.x; the latest stable version, 2.2.1 released in February 2025, includes bug fixes but maintains similar core resource characteristics.
+
+Configuration and Tuning
+
+lwIP configuration is primarily managed through the lwipopts.h header file, where users override default settings to tailor the stack's behavior, memory usage, and features to specific embedded applications. This file allows selective enabling or disabling of modules and adjustment of parameters such as heap size and connection limits, ensuring the stack remains lightweight while meeting performance needs. All options must be defined before including core lwIP headers to take effect.
+Key memory and connection parameters include MEM_SIZE, which sets the heap size in bytes (default: 1600), critical for applications handling large data copies to avoid allocation failures. TCP_WND defines the TCP receive window size (default: 4 * TCP_MSS, or 2144 bytes with default MSS), influencing throughput; values below 2 * TCP_MSS may degrade performance, while larger ones boost it at the cost of memory. Similarly, MEMP_NUM_TCP_PCB controls the number of active TCP connections (default: 5), directly limiting concurrent sessions to conserve resources in constrained environments.
+For performance tuning, increasing TCP_MSS beyond the default 536 bytes accommodates larger MTUs, reducing packet overhead in high-bandwidth scenarios, though it requires verifying network compatibility. Enabling LWIP_TCP_KEEPALIVE (set to 1) supports persistent connections by periodically probing idle ones, configurable via socket options like TCP_KEEPIDLE, preventing resource waste from stale links. Optimization techniques involve disabling unused modules, such as setting #define LWIP_DHCP 0 to exclude DHCP code and reduce footprint, or adjusting MEM_ALIGNMENT (default: 1) for platform-specific CPU alignments like 4 bytes on ARM to enhance efficiency.
+Debugging is facilitated by LWIP_DEBUG (set to 1 to enable output) and module-specific flags like ETHARP_DEBUG (for ARP logging), which add conditional logging without affecting release builds when undefined, allowing targeted diagnostics during development. Best practices emphasize balancing parameters against application demands; for instance, tuning MEMP_NUM_UDP_PCB (default: 4) limits UDP "connections" to manage queue latency, preventing overflows in real-time systems while minimizing memory overhead.
+
+References
+
+lwIP - A Lightweight TCP/IP stack - Summary - Savannah.nongnu.org
+
+ Design and Implementation of the lwIP TCP/IP Stack
+
+lwIP: Overview - Savannah.nongnu.org
+
+Upgrading - lwIP - Savannah.nongnu.org
+
+lwIP: Options (lwipopts.h)
+
+IPv6 - lwIP - Savannah.nongnu.org
+
+patch #10111, Hardware checksum offloading 
+
+Network interface (NETIF) - lwIP - Savannah.nongnu.org
+
+https://www.sics.se/~adam/lwip/doc/lwip.pdf
+
+ Programming Memory-Constrained Networked Embedded Systems
+
+news lwIP - A Lightweight TCP/IP stack - Savannah.nongnu.org
+
+lwIP 1.3.0: lwIP Documentation - Savannah.nongnu.org
+
+lwIP: Changelog
+
+A Lightweight TCP/IP stack - News: lwIP 2.1.0 released 
+
+lwIP: Changelog - Savannah.nongnu.org
+
+TCP - lwIP - Savannah.nongnu.org
+
+lwIP: UDP
+
+lwIP: src/include/lwip/ip.h File Reference
+
+tcp_input() - syntax, references, call tree, description - SourceVu
+
+lwIP: "raw" APIs - Savannah.nongnu.org
+
+lwIP: src/include/lwip/opt.h File Reference
+
+lwIP: Heap and memory pools
+
+Packet buffers (PBUF) - lwIP - Savannah.nongnu.org
+
+lwIP: Internal memory pools
+
+IPv4 - lwIP - Savannah.nongnu.org
+
+lwIP: IP - Savannah.nongnu.org
+
+TCP - lwIP - Savannah.nongnu.org
+
+lwIP - Tasks: task #14602, TCP: update/audit congestion... 
+
+ Re: newbie question
+
+lwIP: UDP
+
+ICMP - lwIP - Savannah.nongnu.org
+
+IGMP - lwIP - Savannah.nongnu.org
+
+lwIP - ESP32 - ESP-IDF Programming Guide v5.5.1 documentation
+
+lwIP: src/core/ipv6/nd6.c File Reference - Savannah.nongnu.org
+
+Neighbor discovery - lwIP - Savannah.nongnu.org
+
+lwIP: Overview
+
+PPP - lwIP - Savannah.nongnu.org
+
+DNS - lwIP - Savannah.nongnu.org
+
+SMTP client - lwIP - Savannah.nongnu.org
+
+lwIP: IGMP
+
+lwIP: src/include/lwip/raw.h File Reference
+
+Critical sections - lwIP - Savannah.nongnu.org
+
+Socket API - lwIP - Savannah.nongnu.org
+
+lwIP: NETDB API
+
+APIs - lwIP - Savannah.nongnu.org
+
+lwIP: Common pitfalls - Savannah.nongnu.org
+
+ Developing applications on STM32Cube with LwIP TCP/IP stack
+
+lwIP: Porting (system abstraction layer) - Savannah.nongnu.org
+
+LwIP using FreeRTOS - Kernel
+
+example lwip_dhcp_usb_bm and ZephyrRTOS - NXP Community
+
+Solved: LwIP with Threadx - STMicroelectronics Community
+
+Google SoC lwIP Conclusion - ReactOS Project
+
+System integration and automated testing - Genode
+
+ MINIX 3 has switched to lwIP
+
+A port of LwIP to the Hurd - GitHub
+
+ Using Lightweight IP with the Nios II Processor Tutorial
+
+Standalone LWIP library - Xilinx Wiki - Confluence
+
+Re: lwIP in mainline linux kernel - GNU mailing lists
+
+ recv ok.. send is super slow
+
+lwIP - ESP32-P4 - ESP-IDF Programming Guide v5.5.1 ...
+
+ Implementation of IPv6 in Embedded Device using LWIP TCP/IP Stack
+
+AM263P4: CPSW latency improvements - Arm-based microcontrollers
+
+Sockets - lwIP - Savannah.nongnu.org
+
+lwIP: DHCP
+
+lwIP: Debugging
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

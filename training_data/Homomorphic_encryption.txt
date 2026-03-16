@@ -1,0 +1,423 @@
+Homomorphic encryption Grokipedia
+ 
+
+ Fact-checked by Grok 17 days ago 
+Homomorphic encryption
+ Ara Eve Leo Sal 
+1x
+ Homomorphic encryption is a cryptographic technique that enables computations to be performed directly on encrypted dataknown as ciphertextsuch that the result, when decrypted, corresponds to the outcome of the same operations applied to the original unencrypted data, or plaintext, thereby preserving privacy without requiring decryption during processing.
+The concept was first proposed in 1978 by Ronald Rivest, Len Adleman, and Michael Dertouzos in their paper "On Data Banks and Privacy Homomorphisms," where they envisioned privacy-preserving computations on encrypted information stored in databases. Early schemes were limited to partially homomorphic encryption (PHE), supporting only specific operations like addition (e.g., the Paillier cryptosystem from 1999) or multiplication (e.g., textbook RSA encryption). In 2009, Craig Gentry introduced the first fully homomorphic encryption (FHE) scheme, capable of arbitrary computations on encrypted data, based on ideal lattices and incorporating a bootstrapping mechanism to manage noise accumulation in ciphertexts.
+Subsequent advancements have refined FHE, including somewhat homomorphic encryption (SHE) variants that support a bounded number of operations before noise limits further computation, as demonstrated in Kristin Lauter's 2011 proof-of-concept for genomic data analysis. These developments have addressed initial performance challenges, with libraries like IBM's HElib enabling practical implementations, though FHE remains computationally intensiveoften millions of times slower than unencrypted processing. Homomorphic encryption holds significant promise for applications in secure cloud computing, privacy-preserving machine learning, and sensitive data analysis in fields like healthcare and finance, allowing third parties to process data without accessing its contents.
+
+Fundamentals
+
+Definition and Motivation
+
+Homomorphic encryption is a cryptographic technique that enables computations on encrypted data without requiring decryption, producing an encrypted output that, upon decryption, corresponds to the result of the same computations performed on the underlying plaintext. This property preserves the privacy of the data during processing, distinguishing it from conventional encryption schemes where data must be decrypted before any operations can be applied. The concept was originally termed "privacy homomorphisms" by Rivest, Adleman, and Dertouzos in their 1978 paper, which described encryption functions that map operations on plaintext to corresponding operations on ciphertext while maintaining secrecy.
+Formally, in a homomorphic encryption scheme, the encryption function Enc\text{Enc}Enc satisfies Enc(f(m1,,mk))=f(Enc(m1),,Enc(mk))\text{Enc}(f(m_1, \dots, m_k)) = f(\text{Enc}(m_1), \dots, \text{Enc}(m_k))Enc(f(m1,,mk))=f(Enc(m1),,Enc(mk)) for plaintext messages m1,,mkm_1, \dots, m_km1,,mk and some allowed function fff, such as addition or multiplication, thereby permitting the evaluation of circuits or functions directly on ciphertexts. This allows untrusted parties, such as cloud providers, to perform complex data analysis or machine learning tasks on sensitive information without accessing the raw data, addressing key privacy challenges in modern computing environments.
+The primary motivation for homomorphic encryption stems from the need to outsource computations securely in scenarios like cloud computing, where users send encrypted data to third parties for processing but wish to prevent exposure of plaintexts to potential adversaries or even the service providers themselves. Unlike traditional encryption, which protects data at rest or in transit but requires decryption for computationrisking breaches during processinghomomorphic encryption maintains confidentiality throughout the entire workflow, enabling applications in healthcare, finance, and genomics where data privacy is paramount.
+A simple illustration of this property appears in the Paillier cryptosystem, which is additively homomorphic: Enc(a)Enc(b)=Enc(a+b)\text{Enc}(a) \times \text{Enc}(b) = \text{Enc}(a + b)Enc(a)Enc(b)=Enc(a+b).
+The roots of homomorphic encryption trace back to the 1970s with the emergence of public-key cryptography, but practical schemes supporting arbitrary computations were not achieved until Craig Gentry's 2009 construction of fully homomorphic encryption.
+
+Core Properties
+
+Homomorphic encryption schemes are characterized by their ability to support specific algebraic operations on ciphertexts that correspond to operations on the underlying plaintexts, preserving the homomorphism between the plaintext and ciphertext spaces. These schemes can be additive, allowing homomorphic addition where the encryption of the sum of two messages equals the sum of their encryptions, denoted as \Enc(m1+m2)=\Enc(m1)+\Enc(m2)\Enc(m_1 + m_2) = \Enc(m_1) + \Enc(m_2)\Enc(m1+m2)=\Enc(m1)+\Enc(m2); multiplicative, supporting homomorphic multiplication such that \Enc(m1m2)=\Enc(m1)\Enc(m2)\Enc(m_1 \cdot m_2) = \Enc(m_1) \cdot \Enc(m_2)\Enc(m1m2)=\Enc(m1)\Enc(m2); or fully homomorphic, enabling both operations and thus arbitrary computations expressible as circuits.
+A core operational property in many homomorphic encryption schemes, particularly lattice-based ones, is noise growth, where each homomorphic operationespecially multiplicationincreases the inherent noise in the ciphertext. This noise, introduced during encryption to ensure security, accumulates such that after sufficient operations, it may exceed a threshold, causing decryption failure unless mitigated by techniques like bootstrapping, which refreshes the ciphertext to reduce noise.
+Formally, a homomorphic encryption scheme is defined by algorithms \KeyGen\KeyGen\KeyGen for key generation, \Enc\Enc\Enc for encryption, \Dec\Dec\Dec for decryption, and \Eval\Eval\Eval for evaluation, satisfying correctness: for any function fff supported by the scheme, \Dec(\sk,\Evalf(\Enc(\pk,m)))=f(m)\Dec(\sk, \Eval_f(\Enc(\pk, m))) = f(m)\Dec(\sk,\Evalf(\Enc(\pk,m)))=f(m) with overwhelming probability over the randomness in key generation, encryption, and evaluation. Additionally, these schemes achieve semantic security (or IND-CPA security), ensuring that no efficient adversary can distinguish encryptions of two distinct messages with non-negligible advantage, even after seeing arbitrary ciphertexts.
+Computations in homomorphic encryption are typically represented as boolean circuits (using gates like AND, OR, NOT for bit-level operations) or arithmetic circuits (using addition and multiplication over rings or fields), with non-fully homomorphic schemes limited to circuits of bounded depth or size to control noise growth and maintain correctness.
+Most practical homomorphic encryption schemes are public-key, where encryption uses a public key \pk\pk\pk and evaluation is performed without the secret key \sk\sk\sk, though symmetric variants exist that require a shared secret for both encryption and evaluation, offering efficiency trade-offs in certain settings. A desirable property is compact ciphertexts, where the size of an evaluated ciphertext remains polylogarithmic in the complexity of the computation, independent of the number of input ciphertexts or operations performed, enabling scalable evaluations.
+
+Classification of Schemes
+
+Homomorphic encryption schemes are broadly classified according to the computational capabilities they provide over encrypted data, particularly the types and quantities of operations supported. This taxonomy distinguishes between schemes that handle limited operations and those enabling more complex computations, while also considering factors like noise management and arithmetic domains. The primary categories include partially homomorphic encryption (PHE), somewhat homomorphic encryption (SWHE), and fully homomorphic encryption (FHE), with further subdivisions into leveled and bootstrappable variants, as well as exact (integer-based) and approximate (real-number-based) schemes.
+Partially homomorphic encryption (PHE) schemes support an unlimited number of a single operation typeeither addition or multiplicationon ciphertexts, but cannot combine both indefinitely. Classic examples include the RSA cryptosystem, which enables homomorphic multiplication and relies on the hardness of the integer factorization problem, and the Paillier scheme, which supports homomorphic addition based on the composite residuosity assumption. These schemes are efficient for specific applications like secure voting or financial computations requiring only one operation, but their limitations prevent general-purpose use.
+Somewhat homomorphic encryption (SWHE) extends PHE by allowing a limited number of both additions and multiplications, sufficient for evaluating bounded-depth circuits or polynomials of restricted degree, without the need for ciphertext refreshment. These schemes, prevalent before fully homomorphic breakthroughs, manage noise growth to support a polynomial number of operations, often based on lattice problems like the learning with errors (LWE) assumption. However, exceeding the operation limit leads to decryption failures due to excessive noise accumulation.
+Fully homomorphic encryption (FHE) enables an unbounded number of arbitrary additions and multiplications, realizing computations on any circuit depth by incorporating bootstrapping to periodically refresh noisy ciphertexts and prevent decryption errors. Introduced by Gentry in 2009 using ideal lattices based on the hardness of problems such as the shortest independent vectors problem (SIVP) in ideal lattices, FHE schemes typically rely on ring-LWE (RLWE) for security in modern variants. While theoretically powerful, FHE remains computationally intensive due to the overhead of bootstrapping.
+Within FHE, leveled homomorphic encryption provides a practical alternative by supporting a fixed number of operations (a predetermined depth) without bootstrapping, trading unbounded computation for efficiency. The BGV scheme exemplifies this, using RLWE and modulus switching to control noise for leveled operations on packed integers. Bootstrappable FHE, in contrast, achieves unbounded depth through periodic bootstrapping, as in Gentry's original construction.
+Schemes also differ in their arithmetic domains: exact FHE operates on integers with precise results, as in BGV and BFV, while approximate variants handle real or complex numbers with controlled precision loss, suitable for applications like machine learning. The CKKS scheme, based on RLWE, scales ciphertexts to approximate real arithmetic, introducing small errors but enabling efficient packed computations.
+The following table summarizes key characteristics of these classifications:
+TypeSupported OperationsSecurity BasisLimitations
+PHEUnlimited additions or multiplicationsFactoring (e.g., RSA), composite residuosity (Paillier)Single operation type only
+SWHELimited additions and multiplications (bounded depth)LWE/RLWENoise limits circuit depth
+Leveled FHEFixed-depth additions and multiplicationsRLWENo unbounded computation; depth preset
+Bootstrappable FHEArbitrary additions and multiplicationsRLWEHigh computational overhead from bootstrapping
+Approximate FHEReal/complex arithmetic with scalingRLWEPrecision loss in results
+
+Historical Development
+
+Early Concepts and Predecessors
+
+The concept of homomorphic encryption originated in 1978 with the introduction of "privacy homomorphisms" by Ronald Rivest, Leonard Adleman, and Michael Dertouzos, who envisioned encryption schemes allowing computations on encrypted data to produce encrypted results corresponding to operations on plaintexts, thereby enabling secure data processing without decryption. This idea was inspired by early public-key cryptography, including the Diffie-Hellman key exchange from 1976, which exhibits homomorphic properties in the exponentiation operation over discrete logarithm groups, allowing additive operations on exponents to translate to multiplicative operations on group elements. Shortly thereafter, the RSA cryptosystem, proposed in 1978 by Rivest, Adleman, and Adi Shamir, demonstrated multiplicative homomorphism: the product of two ciphertexts encrypts the product of their plaintexts, supporting unlimited multiplications.
+In 1982, Shafi Goldwasser and Silvio Micali advanced probabilistic encryption with a scheme based on the quadratic residuosity assumption, providing semantic security and homomorphism with respect to bitwise XOR operations on single bits, where the XOR of plaintext bits corresponds to the product of their ciphertexts modulo a Blum integer. This allowed limited logical operations on encrypted bits but suffered from high expansion, as each bit required a full modulus-sized ciphertext. Josh Benaloh extended this in 1994 with dense probabilistic encryption, modifying the Goldwasser-Micali framework to encode multiple bits per ciphertext using higher-degree residues, thereby improving efficiency while preserving XOR homomorphism and semantic security under the higher residuosity assumption.
+Additive homomorphism emerged prominently in 1999 with Pascal Paillier's cryptosystem, based on the composite residuosity class problem, where the product of two ciphertexts encrypts the sum of their plaintexts, and scalar multiplication by a plaintext value can be performed on a ciphertext, enabling unlimited additions and a bounded number of multiplications. These partially homomorphic schemessupporting either addition or multiplication indefinitely, but not both without boundlaid essential groundwork for more general systems.
+Theoretical progress in the 1990s, particularly Mikls Ajtai's 1996 construction of hard lattice instances and his 1997 collaboration with Cynthia Dwork on a lattice-based public-key cryptosystem, demonstrated worst-case to average-case reductions for lattice problems, hinting at the potential for bootstrappable encryption schemes that could support arbitrary computations, including both additions and multiplications. Concurrently, Andrew Yao's 1986 garbled circuits protocol offered an alternative to homomorphic encryption for secure computation, enabling two parties to evaluate any function on private inputs without revealing them, using oblivious transfer and circuit evaluation, though it required interaction and did not operate directly on encrypted data.
+Despite these advances, all pre-2009 schemes remained partially homomorphic, limited to either additive or multiplicative operations without unbounded depth for both, preventing general-purpose computation on encrypted data until Craig Gentry's breakthrough in fully homomorphic encryption.
+
+First-Generation Fully Homomorphic Encryption
+
+In 2009, Craig Gentry introduced the first fully homomorphic encryption (FHE) scheme, marking a breakthrough in allowing arbitrary computations on encrypted data without decryption. This construction builds on prior somewhat homomorphic schemes, such as those based on the Paillier cryptosystem, but extends them to support unlimited depth through a novel refresh mechanism. The scheme relies on ideal lattices over polynomial rings, where computations are performed modulo an irreducible polynomial, enabling efficient representation of both addition and multiplication operations.
+The core construction treats encryption as elements in the ring $ R = \mathbb{Z} / (f(x)) $, where $ f(x) $ is typically $ x^n + 1 $ with $ n $ a power of 2, ensuring the ring supports efficient homomorphic properties. Ciphertexts are represented as single elements $ \psi \in R $, reduced modulo a public basis $ B_{\text{pk}}^J $ of an ideal lattice $ J $, sampled close to a coset of the ideal lattice that encodes the plaintext $ \pi $ plus small noise (e.g., $ \psi \approx \pi + \text{error} \mod J $). The secret key provides a short basis for the ideal lattice $ J $, enabling decryption by reducing $ \psi $ modulo the secret basis to recover the plaintext after removing the noise, provided the error remains sufficiently small. Homomorphic addition and multiplication are performed as ring operations: addition by $ \psi' = \psi_1 + \psi_2 \mod B_{\text{pk}}^J $, and multiplication by $ \psi' = \psi_1 \times \psi_2 \mod B_{\text{pk}}^J $, inducing the corresponding operations on the underlying plaintexts while causing the noise to grow, particularly with multiplication due to the ring's polynomial expansion factors. Noise tracking is essential, as accumulated errors limit the scheme to "somewhat" homomorphic evaluation until refreshed. The scheme incorporates techniques inspired by sparse subset sum problems to generate sparse representations that help control noise growth during initial evaluations.
+A key innovation is the "squashing" technique, which simplifies the decryption circuit to enable bootstrapping by augmenting the public key with hintsshort multiples of the secret keythat allow decryption via a low-degree polynomial evaluation and rounding, reducing the circuit complexity from linear to constant size in the security parameter. Bootstrapping then achieves full homomorphy: to refresh a noisy ciphertext $ \psi $, an auxiliary public key encrypts the secret key under the same scheme, and the evaluator homomorphically computes the decryption circuit on $ \psi $ using these encrypted keys, producing a new ciphertext with reduced noise, thus allowing unbounded computation depth at the cost of evaluating the scheme on itself.
+The security of Gentry's scheme reduces to the hardness of worst-case lattice problems in ideal lattices, specifically the approximate shortest vector problem (SVP) and shortest independent vectors problem (SIVP), assuming the quantum worst-case hardness for subexponential approximation factors. This basis provides a strong foundation, as solving SVP in the full lattice implies breaking the scheme, with reductions holding under the learning with errors (LWE) assumption adapted to ideal lattices.
+Despite its theoretical significance, the scheme suffers from extreme inefficiency due to large parameters and costly bootstrapping. Early implementations, such as the variant by Gentry and Halevi, required public keys up to 2.3 gigabytes for modest security levels (around 72 bits), with key generation taking up to 7.5 hours and bootstrapping (refresh) operations exceeding 2 hours per instance on contemporary hardware. Overall performance equated to seconds per bit for basic operations, rendering it impractical for all but proof-of-concept demonstrations, primarily due to the noise growth and overhead of ring arithmetic in high dimensions.
+
+Second-Generation Fully Homomorphic Encryption
+
+Second-generation fully homomorphic encryption schemes, emerging around 20112012, shifted focus toward efficiency by constructing leveled FHE systems capable of evaluating circuits of predetermined depth without relying on bootstrapping for noise refreshment in many cases. These schemes leverage lattice-based assumptions, particularly the learning with errors (LWE) problem, to achieve exact arithmetic on encrypted integers while dramatically reducing computational overhead compared to first-generation constructions. By introducing techniques for controlled noise growth, they enabled practical implementations for shallow computations, such as those in privacy-preserving machine learning or data analysis with limited circuit depth.
+The Brakerski-Vaikuntanathan (BV) scheme of 2011 establishes a foundation on the standard LWE assumption, utilizing a scale-invariant variant of LWE to manage noise effectively during homomorphic operations. In this approach, the noise distribution remains independent of the plaintext scale, preventing exponential growth that plagued earlier schemes and allowing for more multiplications before noise overwhelms the signal. The BV construction supports addition and multiplication on encrypted data, with security directly reducing to the hardness of LWE, a problem conjectured secure against quantum attacks. This scale-invariant property facilitates modulus reduction techniques that "squash" noise without altering the underlying message, making the scheme suitable for leveled FHE up to moderate depths.
+The Brakerski-Gentry-Vaikuntanathan (BGV) scheme of 2012 extends the BV framework by basing it on the ring-LWE assumption, which operates over polynomial rings to enable packed single-instruction multiple-data (SIMD) operations for batching multiple plaintexts into a single ciphertext. Central techniques include modulus switching, which scales down the ciphertext modulus post-operation to bound noise growth while preserving correctness, and key switching, which replaces the expanded secret key after multiplication with a more compact one to maintain efficiency. Additionally, relinearization applies key switching to quadratic ciphertexts produced by multiplication, ensuring ciphertext sizes remain constant rather than growing linearly with depth. These mechanisms allow BGV to support leveled FHE for circuits of depth 1020 in practice, with security reducing to ring-LWE, an extension of LWE believed to offer comparable hardness.
+Overall, second-generation schemes achieve up to 1,000-fold speedups over first-generation FHE by eliminating frequent bootstrappingreferencing the recryption method from Gentry's 2009 blueprint only for unbounded depth if neededand prioritizing optimized noise control for real-world leveled applications. This efficiency stems from tighter noise bounds and ring-based packing, making them foundational for subsequent libraries like HElib.
+
+Third-Generation Fully Homomorphic Encryption
+
+Third-generation fully homomorphic encryption schemes, developed between 2013 and 2017, marked a shift toward more efficient constructions that support approximate computations on non-integer data, such as real or complex numbers, while maintaining security under the learning with errors (LWE) assumption. These schemes addressed limitations in prior generations by introducing techniques like matrix-based operations and rescaling, enabling practical evaluations of arithmetic circuits with controlled precision loss. Unlike earlier integer-based approaches, third-generation methods prioritize efficiency for applications requiring floating-point-like operations, though they introduce inherent approximation errors that must be managed.
+A foundational scheme in this generation is the Gentry-Sahai-Waters (GSW) construction from 2013, which employs a matrix-based approach over the integers for homomorphic operations. In GSW, ciphertexts are represented as matrices, and homomorphic multiplication corresponds to matrix multiplication, simplifying relinearizationa process to reduce ciphertext degree after multiplicationby avoiding the need for an explicit evaluation key and leveraging efficient matrix computations. This design yields asymptotically faster performance compared to previous LWE-based fully homomorphic encryption schemes, particularly in key-switching operations essential for maintaining low noise growth. Security relies on the hardness of the LWE problem, with the scheme supporting leveled homomorphic properties that can be extended to full homomorphy via bootstrapping techniques inherited from second-generation methods.
+Building on similar LWE foundations, the Cheon-Kim-Kim-Song (CKKS) scheme from 2017 extends support to approximate computations on real and complex numbers by encoding plaintexts as polynomials via the complex canonical embedding. CKKS manages noise through a rescaling operation that truncates the ciphertext modulus, intentionally introducing a small precision loss to control error growth, while an accompanying error analysis bounds the total approximation error to at most one additional bit beyond what occurs in unencrypted floating-point arithmetic over the circuit depth. Homomorphic multiplication in CKKS thus proceeds with controlled precision degradation, and the scheme avoids costly bit-decomposition steps required in prior integer schemes, enabling efficient evaluation of transcendental functions like exponentials and discrete Fourier transforms. For full homomorphy, bootstrapping variants refresh ciphertexts to reset noise, though the leveled version suffices for many approximate applications. Security is based on the ring-LWE (RLWE) problem, with rigorous guarantees on approximation accuracy derived from noise distribution properties.
+These schemes offer key advantages for privacy-preserving machine learning, where approximate arithmetic aligns with the tolerance for floating-point errors in neural network training and inference. CKKS, in particular, facilitates packed operations on vectors of real numbers, supporting batched computations that are significantly more efficientoften by factors of 10 to 100 for matrix multiplications and related operationsthan second-generation integer schemes like BGV for such workloads. The linear growth of the ciphertext modulus with circuit depth in CKKS further enhances practicality, reducing the computational overhead for deep circuits compared to exponential expansions in earlier designs.
+
+Fourth-Generation and Recent Advances
+
+The fourth generation of fully homomorphic encryption (FHE) schemes, emerging post-2018, emphasizes enhanced bootstrapping efficiency and practical deployment, building on prior lattice-based constructions to support faster programmable operations over encrypted data. A seminal advancement is the TFHE scheme, introduced by Ilaria Chillotti, Nicolas Gama, Mariya Georgieva, and Malika Izabachne in 2016 , with key optimizations and performance improvements described in 2018 , which operates over the torus and enables gate-by-gate bootstrapping with a reported time of 13 milliseconds per binary gate on a single CPU core, significantly reducing computational overhead compared to earlier methods. This scheme supports arbitrary Boolean circuits through programmable bootstrapping, allowing evaluation of any function via lookup tables, and has been implemented in an open-source library that facilitates efficient homomorphic operations for privacy-sensitive applications.
+Recent library updates have further optimized approximate FHE variants, particularly the CKKS scheme for real-number computations. In 2024, enhancements to Microsoft SEAL incorporated advanced parameter selection and rescaling techniques, achieving up to 2x speedup in multiplication depth for CKKS bootstrapping while maintaining precision for machine learning workloads. Comparative studies in 2025 have evaluated FHE libraries like SEAL, OpenFHE, and others for privacy-preserving machine learning, highlighting TFHE's superiority in low-latency inference (e.g., under 100ms for small neural networks) but noting CKKS's advantages in vectorized approximate operations for larger datasets. These analyses underscore ongoing efficiency gains, with hybrid schemes reducing overall runtime by 30-50% in encrypted ML tasks.
+Hybrid approaches combining TFHE with CKKS address precision trade-offs by leveraging TFHE for exact Boolean gates in low-precision components and CKKS for approximate arithmetic in high-dimensional data, enabling mixed-precision computations in neural network inference with minimal accuracy loss (under 2% degradation). For instance, the CKKS-FHEW/TFHE hybrid framework switches schemes mid-circuit to optimize for both speed and scalability, achieving end-to-end inference times of 1-5 seconds on standard hardware for models like ResNet-20. Hardware accelerations, including GPU support, have amplified these gains; implementations like GPU-accelerated TFHE bootstrapping report 10-20x speedups for key generation and evaluation, with frameworks such as Concrete v2.7 providing native CUDA integration for parallel polynomial arithmetic.
+Key milestones include the 2021 unification efforts leading to the OpenFHE library, which merged implementations from prior projects like HElib and PALISADE to support multiple schemes (BFV, BGV, CKKS, TFHE) in a single extensible framework, fostering community-driven optimizations and interoperability. NIST's post-quantum cryptography standardization process, ongoing since 2016 with lattice-based candidates advanced in rounds post-2018, indirectly bolsters FHE by validating underlying primitives resistant to quantum attacks. Looking ahead, quantum-resistant variants, such as code-based FHE proposals, aim to diversify beyond lattices for enhanced security margins, while market projections indicate growth to approximately $526 million by 2035, driven by demand in secure cloud computing and AI.
+
+Specific Cryptosystems
+
+Partially Homomorphic Schemes
+
+Partially homomorphic schemes, also known as partially homomorphic encryption (PHE), enable unlimited homomorphic operations of a single typeeither addition or multiplicationon encrypted data without decryption. These schemes emerged as early public-key cryptosystems with inherent homomorphic properties, allowing computations like repeated multiplications or additions on ciphertexts to correspond directly to operations on the underlying plaintexts. Unlike fully homomorphic encryption, PHE supports only one operation type indefinitely, making it efficient for specific applications but limited for general-purpose computation.
+The RSA cryptosystem, introduced in 1978 by Rivest, Shamir, and Adleman, provides multiplicative homomorphicity. In RSA, encryption is performed as $ \Enc(m) = m^e \mod n $, where $ n = pq $ for large primes $ p $ and $ q $, and $ e $ is the public exponent. Multiplication of two ciphertexts $ c_1 = m_1^e \mod n $ and $ c_2 = m_2^e \mod n $ yields $ c_1 \cdot c_2 = (m_1 m_2)^e \mod n $, enabling arbitrary exponentiations that act as multiplications on plaintexts. Its security relies on the hardness of integer factorization, assuming the inability to compute $ \phi(n) $ without knowing $ p $ and $ q $. However, textbook RSA is deterministic and not semantically secure under chosen-plaintext attacks. RSA's homomorphic property has been applied in scenarios requiring product computations on encrypted data, such as secure auctions where bids are multiplied without revealing values.
+ElGamal encryption, proposed by Taher ElGamal in 1985, is multiplicative over elliptic curve or finite field groups and additive in the exponent domain. The scheme uses a cyclic group $ G $ of prime order $ q $ with generator $ g $, where the public key is $ h = g^x $ for secret $ x $. Encryption of message $ m $ (as a group element) produces $ c = (g^r, h^{-r} \cdot m) $ for random $ r $, and multiplication of ciphertexts corresponds to multiplication of plaintexts: $ (g^{r_1}, h^{-r_1} m_1) \cdot (g^{r_2}, h^{-r_2} m_2) = (g^{r_1 + r_2}, h^{-(r_1 + r_2)} (m_1 m_2)) $. In the exponent, this supports addition, as $ \Enc(m_1 + m_2) = \Enc(m_1) \cdot \Enc(m_2) $ when messages are exponents. Security is based on the decisional Diffie-Hellman assumption in the group and provides semantic security when properly randomized. ElGamal has been used in privacy-preserving voting systems, where encrypted votes can be multiplicatively aggregated.
+The Paillier cryptosystem, developed by Pascal Paillier in 1999, offers additive homomorphicity. Encryption is $ \Enc(m) = g^m \cdot r^n \mod n^2 $, where $ n = pq $, $ g $ is a base, and $ r $ is random; decryption uses the discrete logarithm or Carmichael function. Addition of ciphertexts yields $ \Enc(m_1) \cdot \Enc(m_2) = g^{m_1 + m_2} \cdot (r_1 r_2)^n \mod n^2 = \Enc(m_1 + m_2) $, supporting scalar multiplication by exponentiation: $ \Enc(k m) = \Enc(m)^k $. Its security stems from the composite degree residuosity assumption, equivalent to the hardness of the decisional composite residuosity problem, and provides semantic security under chosen-plaintext attacks. Paillier is widely applied in secure auctions and electronic voting, enabling summation of encrypted bids or tallies without exposure.
+The Goldwasser-Micali cryptosystem, introduced by Shafi Goldwasser and Silvio Micali in 1982, is designed for bit encryption and is homomorphic under XOR (addition modulo 2) operations. It uses quadratic residues modulo $ n = pq $, with encryption $ \Enc(b) = s^2 \cdot x^b \mod n $, where $ x $ is a fixed quadratic non-residue modulo $ n $ with Jacobi symbol $ (x/n) = 1 $, and $ s $ is random with $ \gcd(s, n) = 1 $; the Jacobi symbol determines the bit value (residue for 0, non-residue for 1). For bits $ b_1, b_2 $, $ \Enc(b_1) \cdot \Enc(b_2) = \Enc(b_1 + b_2 \mod 2) $ under multiplication, enabling bit-wise XOR operations. Security relies on the quadratic residuosity assumption, assuming the inability to distinguish quadratic residues from non-residues modulo composite n, and provides semantic security. This scheme supports applications like mental poker protocols but is less efficient for large data due to bit-level granularity.
+These schemes are constructed over number-theoretic problems like factoring or discrete logarithms. Except for textbook RSA, they provide semantic security under chosen-plaintext attacks when properly randomized. They find use in privacy-focused protocols, such as mix-nets for anonymous voting or sealed-bid auctions where only aggregates are revealed. However, their limitation to a single operation type prevents indefinite mixing of additions and multiplications, restricting them to linear or multiplicative computations without bootstrapping mechanisms.
+
+Somewhat Homomorphic Schemes
+
+Somewhat homomorphic encryption (SWHE) schemes enable computations on encrypted data supporting both addition and multiplication operations, but only up to a predefined polynomial depth, beyond which the accumulated noise prevents correct decryption. Unlike fully homomorphic schemes, SWHE does not require bootstrapping to manage noise growth, making it suitable for bounded-depth circuits where the number of operations is fixed in advance. The noise in ciphertexts grows linearly with additions and quadratically with multiplications, constraining the scheme to shallow evaluations while maintaining efficiency.
+Prominent examples include early variants of Craig Gentry's 2009 ideal lattice-based scheme without the "squashing" function, which supported homomorphic evaluation of arbitrary circuits of depth up to roughly logn\log nlogn (where nnn is the lattice dimension) before noise overflow. Another key example is the leveled mode of the Brakerski-Gentry-Vaikuntanathan (BGV) scheme, which allows evaluation of circuits of fixed depth LLL without noise refresh, using modulus switching to control noise at each level.
+These schemes are predominantly lattice-based constructions, relying on rings such as R=Z/(xn+1)R = \mathbb{Z} / (x^n + 1)R=Z/(xn+1) for efficient polynomial arithmetic. Key generation typically involves sampling the secret key sss from a discrete Gaussian distribution over the ring, with public key components derived from Ring Learning With Errors (Ring-LWE) samples to ensure semantic security. Encryption adds controlled noise via error terms sampled from narrow Gaussian distributions, while homomorphic operations preserve correctness as long as the total noise remains below a decryption threshold.
+Security for SWHE schemes is grounded in the hardness of the Ring-LWE problem, where distinguishing ring elements perturbed by small errors from uniform random elements is computationally infeasible. Parameters are carefully tuned based on the desired computational depth ddd and security level \lambda: the ring dimension nnn scales as O(log)O(\lambda \log \lambda)O(log), the modulus qqq as (d(log+logd))\theta(d (\log \lambda + \log d))(d(log+logd)) bits, and the error standard deviation to balance noise growth against security, ensuring polynomial-time security against known lattice attacks.
+SWHE finds use in applications requiring evaluation of shallow circuits, such as basic arithmetic operations (e.g., inner products or simple aggregations) in privacy-preserving data analysis, where the fixed depth suffices and performance is significantly faster than fully homomorphic alternatives due to the absence of bootstrapping overhead. For instance, the leveled BGV scheme enables efficient packed evaluations of low-depth Boolean or arithmetic circuits, achieving per-gate costs of O~()\tilde{O}(\lambda)O~() for circuits of width ()\Omega(\lambda)().
+
+Fully Homomorphic Schemes
+
+Fully homomorphic encryption (FHE) schemes enable arbitrary computations on encrypted data by supporting both addition and multiplication operations without decryption, while maintaining semantic security under standard hardness assumptions like the learning with errors (LWE) problem. The general architecture of an FHE scheme includes key generation, which produces a public key $ \mathrm{pk} $ and a secret key $ \mathrm{sk} $ from a security parameter $ \lambda $; encryption, which transforms a plaintext message $ m $ into a ciphertext $ c = \mathrm{Enc}(\mathrm{pk}, m) $ that hides $ m $ amid noise; evaluation, which applies homomorphic operations to ciphertexts to compute encrypted results; and decryption, which recovers the plaintext from a valid ciphertext using $ \mathrm{sk} $, provided the noise remains below a threshold. To achieve unbounded computation, FHE incorporates bootstrapping, a process that refreshes noisy ciphertexts by homomorphically evaluating the scheme's own decryption circuit on an encrypted secret key, thereby reducing noise and allowing further operations.
+Key constructions of FHE span lattice-based approaches, with Craig Gentry's seminal scheme relying on ideal lattices to support bootstrapping via quadratic residues modulo a composite number, enabling the first theoretical realization of unlimited homomorphic operations. The Brakerski-Gentry-Vaikuntanathan (BGV) scheme builds on ring-LWE assumptions, introducing modulus switching to manage noise growth without bootstrapping for leveled computations, where the public key and ciphertexts are polynomials in a ring $ R_q = \mathbb{Z}_q/(x^n + 1) $. For approximate arithmetic on real or complex numbers, the Cheon-Kim-Kim-Song (CKKS) scheme uses ring-LWE with rescaling to control precision loss, encoding plaintexts as vectors scaled by a factor $ \Delta $ and supporting homomorphic operations that approximate the desired computation within a specified error bound. The Torus Fully Homomorphic Encryption (TFHE) scheme, based on the torus $ \mathbb{T} $, optimizes for gate-level evaluations using LWE samples and programmable bootstrapping, allowing efficient homomorphic NAND gates via lookup tables on the torus.
+Homomorphic evaluation in these schemes treats addition as straightforward component-wise operations on ciphertext components, preserving the additive structure of the underlying lattice or ring; for instance, in ring-LWE-based schemes like BGV and CKKS, adding two ciphertexts $ c_1 = (a, b_1) $ and $ c_2 = (a', b_2) $ yields $ c_3 = (a + a', b_1 + b_2) $, modulo the ring parameters, with the resulting noise being the sum of individual noises. Multiplication, however, expands the ciphertext degree, requiring relinearization to restore compactness: after component-wise multiplication of $ c_1 $ and $ c_2 $, which produces a degree-2 term, an evaluation keyderived from the secret keyis used to replace this quadratic component with a linear one, ensuring the output ciphertext remains in the same space as inputs while introducing controlled additional noise. This technique, essential in BGV and CKKS, leverages gadget decompositions to approximate the necessary linear transformations efficiently.
+Noise management is critical in FHE, as operations amplify the inherent error in lattice-based ciphertexts, potentially overwhelming the decryption process. In typical ring-LWE constructions, fresh ciphertexts have noise drawn from a discrete Gaussian with variance $ \sigma^2 $; additions accumulate noise linearly by summing variances, while multiplications amplify it quadratically, leading to an overall noise variance bounded approximately by $ \sigma^2 (1 + L) $, where $ L $ represents the multiplicative depth of the circuit. Exceeding the noise budget renders decryption incorrect, so schemes like BGV employ modulus switchingreducing the modulus $ q $ post-multiplication to scale down noisewhile CKKS uses rescaling to maintain approximation precision. Bootstrapping addresses this by treating decryption as a homomorphic circuit: given a ciphertext $ c $ encrypting $ m $ under $ \mathrm{pk} $, an encrypted secret key $ \mathrm{Enc}(\mathrm{pk}, \mathrm{sk}) $ is used to evaluate $ \mathrm{Dec}(\mathrm{sk}, c) $ homomorphically, yielding a fresh ciphertext for $ m $ with low noise, at the cost of evaluating a circuit of depth logarithmic in the bit-length of $ \mathrm{sk} $.
+Variants of FHE extend functionality for multi-party settings, such as multi-key FHE, which allows evaluation on ciphertexts encrypted under distinct keys without key aggregation. Lpez-Alt, Tromer, and Vaikuntanathan's 2012 construction achieves this by embedding multiple keys into a single lattice structure, enabling on-the-fly multiparty computation where each party's input remains encrypted under their own key during joint evaluation. These schemes, often built atop BGV or Gentry's framework, support applications like secure cloud aggregation but incur overhead from key-dependent noise growth. Across generations, FHE constructions have evolved from Gentry's bootstrapping-heavy ideal lattice approach to more efficient ring-LWE variants, prioritizing reduced noise and faster evaluations.
+
+Implementations
+
+Software Libraries and Tools
+
+Microsoft SEAL is an open-source C++ library for homomorphic encryption, initially released in 2015 by Microsoft Research, that implements the BFV, BGV, and CKKS schemes, enabling computations on encrypted integers and real numbers. It supports features such as relinearization, key switching, and approximate bootstrapping for CKKS, with ongoing optimizations for performance in privacy-preserving applications.
+HElib, developed by IBM and first released in 2012, is a C++ library built on the NTL mathematical library, primarily focused on the BGV scheme with bootstrapping support and also implementing CKKS for approximate computations. It emphasizes efficient ciphertext packing techniques, allowing single instruction multiple data (SIMD) operations on packed encrypted vectors to accelerate homomorphic evaluations.
+OpenFHE, launched in 2022 as an open-source C++ library, merges design elements from the PALISADE and HElib projects to provide extensible implementations of multiple schemes, including BGV, BFV, CKKS, FHEW, and TFHE (via CGGI). As of October 2025, version 1.4.2 includes enhanced support for CKKS bootstrapping. This multi-scheme support facilitates scheme switching and functional bootstrapping, making it suitable for diverse homomorphic applications.
+The TFHE library, developed by Inria, is an open-source C++ implementation of fast fully homomorphic encryption over the torus, specializing in efficient evaluation of arbitrary boolean circuits on encrypted bits through programmable bootstrapping.
+Python wrappers such as SEAL-Python and PySEAL extend accessibility by providing bindings to the SEAL library, allowing developers to perform homomorphic operations in Python scripts without direct C++ interaction. These tools simplify prototyping for machine learning and data analysis tasks.
+Key features across these libraries include performance optimizations for homomorphic operations; for instance, benchmarks on Microsoft SEAL demonstrate multiplication times around 0.04 milliseconds per operation under typical parameters, enabling sequences of thousands of multiplications in under a second on standard hardware. Additionally, integrations like TF-SEAL bridge SEAL with TensorFlow, supporting encrypted neural network inference and training workflows.
+Commercial offerings include Duality Technologies' platform, which leverages fully homomorphic encryption for secure data collaboration and analytics in enterprise environments, incorporating contributions to OpenFHE for advanced features like scheme switching. Enveil provides enterprise-grade solutions using homomorphic encryption to protect data in use, enabling privacy-preserving searches and computations across distributed systems.
+
+Hardware and Optimization Techniques
+
+Field-programmable gate arrays (FPGAs) have emerged as a key hardware platform for accelerating homomorphic encryption due to their flexibility in implementing parallel computations, particularly the number theoretic transform (NTT) essential for polynomial multiplications in schemes like BGV and CKKS. FPGA designs enable custom pipelines for NTT operations, reducing latency in bootstrapping and key switching. For example, the FAB accelerator, implemented on Xilinx FPGAs, supports bootstrappable fully homomorphic encryption (FHE) by optimizing lookup tables and arithmetic units, achieving up to 10 times faster bootstrapping compared to CPU implementations while consuming moderate power. Similarly, a 2025 FPGA-based accelerator for the TFHE scheme parameterizes gate bootstrapping to handle variable precision.
+Graphics processing units (GPUs), often programmed via CUDA, excel in massively parallel tasks suited to the CKKS scheme's approximate arithmetic on real-number data. GPU accelerations focus on vectorized NTT and rotation operations, yielding substantial speedups for encrypted machine learning workloads. A memory-centric GPU optimization for CKKS bootstrapping reports over 100 times faster performance than prior CPU-based methods, with single multiplications accelerated by 7 times, enabling practical evaluation of deep neural networks on encrypted data. A 2025 CUDA-accelerated framework for secure federated XGBoost achieves up to 30 times speedup in vertical scenarios using Paillier on high-end GPUs like NVIDIA A100, while CKKS is used for horizontal scenarios with minimal overhead.
+Application-specific integrated circuits (ASICs) provide the highest efficiency for dedicated FHE tasks, minimizing area and power overheads through tailored circuits for noise management and modular arithmetic. ASIC prototypes target bootstrapping bottlenecks, with designs reporting 100 to 1,000 times higher NTT throughput relative to FPGA or GPU counterparts. A 2025 exploration repurposes AI accelerator ASICs, such as Google's TPUv4, for FHE via specialized compilers like CROSS, achieving up to 161 times speedup over many-core CPUs. The Poseidon ASIC-like accelerator further optimizes bandwidth for complex FHE circuits, supporting up to 500,000 operations per second with 50% reduced resource utilization compared to general-purpose hardware.
+Algorithmic optimizations complement hardware by mitigating noise accumulation and enhancing parallelism. Homomorphic encryption switching (HES) protocols enable seamless transitions between schemessuch as from additive Paillier to multiplicative ElGamaltailored to operation types, reducing overall ciphertext sizes and computation in hybrid applications. Batching and single instruction multiple data (SIMD) techniques pack multiple plaintexts into one ciphertext, allowing parallel homomorphic operations that boost throughput by factors of 10 to 100 for vectorized workloads like encrypted database queries. In approximate schemes like CKKS, noise-reduction methods, including residue number system variants, limit approximation errors to under 2^{-40}, extending circuit depth without bootstrapping and improving energy efficiency by 20-30%.
+By 2025, integrations with confidential computing platforms, such as Intel SGX enclaves, hybridize FHE with trusted execution environments to offload partial decryptions securely, achieving end-to-end privacy in cloud settings with minimal performance overhead. Key metrics across these approaches include throughput (e.g., 10^4 to 10^6 operations per second) and energy efficiency (e.g., 0.1-10 joules per operation), with ASICs leading in both for production-scale deployments; for instance, the LP-HENN ReRAM-based design achieves up to 31.82 times speedup over CPU for HE-CNN inference at 1.93-2.35 watts.
+
+Applications
+
+Privacy-Preserving Data Processing
+
+Homomorphic encryption facilitates privacy-preserving data processing in cloud outsourcing scenarios by enabling encrypted search operations on databases without decryption. Partially homomorphic encryption (PHE) schemes, such as Paillier for additive operations, support efficient keyword searches and range queries on encrypted data, allowing users to outsource sensitive information to untrusted cloud providers while retrieving relevant results securely. This approach ensures that the cloud server performs computations solely on ciphertexts, preserving data confidentiality during storage and retrieval.
+Secure aggregation in federated learning represents another key application, where homomorphic encryption aggregates model updates from multiple participants without exposing individual contributions. By leveraging additive homomorphic properties, parties encrypt their local gradients, and the aggregator computes the sum on ciphertexts to derive a global model, mitigating risks of data leakage in distributed environments. This method supports collaborative data processing across decentralized nodes, such as in mobile or IoT settings, without requiring a trusted aggregator.
+In secure multi-party computation (MPC), homomorphic encryption serves as a building block for non-interactive protocols, enabling parties to jointly compute functions on private inputs without revealing them. Multi-key homomorphic encryption frameworks allow multiple users to encrypt data under distinct keys, supporting threshold decryption and distributed evaluation of circuits on shared ciphertexts. These protocols reduce interaction rounds compared to traditional MPC, making them suitable for scenarios like joint data analysis in untrusted networks.
+Practical examples include genomic data analysis, where fully homomorphic encryption (FHE) enables computation of statistics like minor allele frequencies and chi-squared tests on encrypted DNA sequences without decryption. Researchers can outsource encrypted genomic datasets to cloud servers for genome-wide association studies (GWAS), ensuring patient privacy while obtaining accurate results upon decryption. In financial modeling, homomorphic encryption supports operations on encrypted ledgers, such as risk assessment and auction mechanisms, allowing institutions to process transaction data or share aggregated insights without exposing raw values.
+A notable case study involves FHE for GDPR-compliant data sharing in financial collaborations, as demonstrated in 2024 initiatives where institutions used homomorphic encryption to perform joint analytics on encrypted datasets, adhering to EU privacy regulations without plaintext exposure. The primary benefits include end-to-end privacy, as data remains encrypted throughout processing, and the elimination of trusted third parties, enabling secure outsourcing to public clouds. This enhances compliance in regulated sectors while fostering data utility.
+
+Encrypted Machine Learning
+
+Homomorphic encryption enables machine learning inference on encrypted data, allowing models to process ciphertexts without decryption and thus preserving input privacy. In this paradigm, neural networks evaluate encrypted inputs to produce encrypted outputs, which the data owner decrypts locally. A seminal approach is CryptoNets, which adapts neural networks for homomorphic evaluation using polynomial approximations of activation functions like the sigmoid, achieving high throughput on encrypted data. The CKKS scheme, supporting approximate arithmetic on real numbers, is particularly suited for such computations due to its handling of floating-point operations essential for matrix multiplications in neural layers.
+Training machine learning models under homomorphic encryption involves performing gradient descent directly on ciphertexts, but non-polynomial activation functions pose significant challenges, often requiring low-degree polynomial approximations to maintain compatibility with the limited multiplicative depth of schemes. This approximation introduces minor accuracy degradation, typically less than 1% on benchmarks like MNIST, where encrypted training retains 96.4% accuracy compared to 99% in plaintext scenarios. Recent advancements mitigate these issues by optimizing approximations for deeper networks, enabling end-to-end training on encrypted datasets while bounding error accumulation.
+Frameworks like TensorFlow Encrypted integrate homomorphic encryption into TensorFlow workflows, leveraging libraries such as Microsoft SEAL to support encrypted tensor operations for both training and inference. By 2025, these tools have advanced applications in healthcare AI, such as encrypted diagnostic models that analyze patient data without exposure, using FHE to perform secure image classification on encrypted medical scans.
+Practical examples include privacy-preserving recommendation systems, where homomorphic encryption secures matrix factorization over user profiles to generate suggestions without revealing preferences. In federated learning, HE facilitates secure aggregation of model updates from distributed clients, summing encrypted gradients to update a global model while preventing leakage of individual contributions. Emerging trends in FHE for privacy-preserving deep learning include dedicated hardware acceleration via FPGA and ASIC for RNS-CKKS operators and deep integration with federated learning and MPC for multi-technique complementarity. These applications typically incur a 100x slowdown compared to unencrypted computations, highlighting the trade-off between privacy and efficiency in real-world deployments.
+
+Challenges and Limitations
+
+Performance and Efficiency Issues
+
+Homomorphic encryption (HE) schemes impose significant computational overhead due to the inherent complexity of performing operations on encrypted data while preserving security and correctness. In fully homomorphic encryption (FHE), a single multiplication operation typically requires on the order of 0.03 to 0.1 milliseconds on standard CPU hardware for secure parameter settings (as of 2025 benchmarks), compared to milliseconds for equivalent plaintext computations. This slowdown arises from the need to manage noise and perform modular arithmetic over large rings, often resulting in 10^3 to 10^6 times more computational effort than unencrypted processing. Ciphertexts in FHE are also substantially larger, frequently 100 times or more the size of plaintext equivalents, with representative sizes ranging from 25 KB for a single integer encryption to several megabytes for vectorized data under high-security parameters.
+Noise accumulation represents a core efficiency bottleneck in lattice-based HE, the dominant paradigm for FHE. Additions introduce linear noise growth, while multiplications cause exponential increases, rapidly limiting the number of operations before the noise exceeds the decryption threshold and renders results incorrect. This necessitates oversized parameterssuch as polynomial degrees exceeding 2^{14} and modulus sizes in the thousands of bitsto accommodate noise margins, which in turn amplify runtime and memory usage. Leveled HE variants mitigate this by bounding computation depth to avoid noise refresh, enabling faster execution for shallow circuits (e.g., up to 10-20 multiplications) at the cost of restricted expressiveness, whereas full FHE relies on bootstrapping for arbitrary depth, trading efficiency for generality.
+Scalability issues further hinder practical deployment, particularly in distributed environments. Parallelization opportunities exist for independent operations, such as batching additions or rotations in schemes like CKKS, but the sequential dependency on computation depth constrains overall speedup, often yielding only modest gains beyond 4-8 cores on multi-threaded CPUs. Communication overhead in multi-party or cloud settings is exacerbated by voluminous ciphertexts, where transmitting a single FHE-encoded vector can consume bandwidth equivalent to hundreds of plaintext equivalents, limiting throughput in networked applications.
+Recent advancements emphasize scheme-specific optimizations to alleviate these challenges. TFHE excels for boolean circuit evaluation with bootstrapping times under 1 millisecond on GPUs, making it suitable for gate-level computations despite higher per-operation costs. In contrast, CKKS offers superior performance for approximate numerical operations on vectors, with benchmarks showing it outperforming TFHE by factors of 5-10x in multiplications and polynomial evaluations on datasets of 65,536 elements. Evaluations in 2025 libraries like OpenFHE and Microsoft SEAL demonstrate up to 100x efficiency gains in bootstrapping through techniques like amortized processing and GPU acceleration, reducing refresh costs from seconds to milliseconds while maintaining security. Bootstrapping remains resource-intensive, typically involving on the order of 2^{16} operations per ciphertext refresh in optimized implementations.
+
+Security and Theoretical Foundations
+
+Homomorphic encryption schemes are typically analyzed under the standard indistinguishability under chosen-plaintext attack (IND-CPA) security notion, which ensures that an adversary cannot distinguish encryptions of two plaintexts without access to the secret key. This definition applies directly to the underlying encryption primitives in both partially and fully homomorphic schemes, treating them as standard public-key encryption systems during security proofs. For fully homomorphic encryption (FHE), achieving IND-CPA security must account for the noise growth inherent in homomorphic operations, where decryption errors are tolerated up to a certain threshold.
+Early FHE constructions, such as Gentry's original scheme, relied on bootstrapping to refresh ciphertexts and enable unlimited computations, but this process assumed circular securitynamely, the security of the scheme even when the adversary knows encryptions of the secret key itself. This assumption was controversial due to its non-standard nature and potential circularity in proofs. Second-generation schemes, like those based on the Brakerski-Gentry-Vaikuntanathan (BGV) framework, mitigated circular security concerns by using alternative noise-management techniques, such as modulus switching and key switching, grounded in more conventional hardness assumptions without invoking bootstrapping during the core security proof.
+The security of most modern homomorphic encryption schemes rests on the hardness of the Learning With Errors (LWE) problem or its variants, such as Ring-LWE, which posits that distinguishing random linear equations modulo a prime from those perturbed by small errors is computationally infeasible. LWE is believed to be quantum-resistant, as no efficient quantum algorithms are known to solve it, unlike classical problems like integer factorization, making lattice-based homomorphic encryption a prime candidate for post-quantum cryptography migration. This quantum resistance stems from the problem's worst-case connections to lattice problems like the shortest vector problem, which remain hard even for quantum adversaries.
+Beyond computational assumptions, homomorphic encryption is vulnerable to side-channel attacks that exploit implementation details, such as timing variations revealing noise levels in ciphertexts or power consumption patterns during operations. For instance, in schemes like CKKS, adversaries can recover secret keys by analyzing decryption outputs when noise-flooding countermeasures are insufficiently tuned.
+Theoretical limits on homomorphic encryption include impossibility results showing that certain forms of group homomorphic encryption cannot exist securely in the quantum setting for abelian groups under standard IND-CPA security, assuming the plaintext and ciphertext spaces form abelian groups. This underscores the necessity of lattice-based constructions for achieving strong homomorphic properties, as non-lattice approaches fail to provide quantum-secure additively or multiplicatively homomorphic encryption without additional assumptions. As a result, the post-quantum migration for homomorphic encryption emphasizes lattice problems like LWE, which inherently support the required algebraic structure for homomorphic operations.
+Known attacks on homomorphic encryption often target weak parameter choices, such as insufficiently large moduli or error distributions, enabling lattice reduction techniques to recover secret keys efficiently. For example, in early Paillier-based schemes or underpowered LWE instances, cyclotomic attacks or hybrid lattice sieving can break security for parameters below recommended levels, recovering plaintexts from as few as a handful of ciphertexts. Recent analyses, including 2024 work on approximate homomorphic schemes, demonstrate key recovery via passive attacks exploiting noise management flaws in real-world deployments.
+Open problems in the theoretical foundations of homomorphic encryption include establishing tighter security reductions from worst-case lattice problems to average-case LWE instances, which would strengthen confidence in the scheme's security without relying on potentially loose parameters. Another major challenge is constructing fully compact FHE schemes that support unbounded computations without bootstrapping, as current approaches either limit depth (leveled FHE) or incur significant overhead from refresh operations. Achieving such compactness under standard assumptions like LWE remains unresolved, with ongoing efforts exploring alternative noise-growth controls or novel algebraic structures.
+
+Standardization Efforts
+
+NIST Post-Quantum Cryptography Standardization
+
+The National Institute of Standards and Technology (NIST) launched its Post-Quantum Cryptography (PQC) Standardization Project in December 2016 to identify and standardize cryptographic algorithms resistant to attacks by quantum computers. This initiative progressed through multiple rounds of evaluation, with Round 4 candidates including lattice-based schemes such as Kyber, a key encapsulation mechanism (KEM) based on the Learning With Errors (LWE) problem. These lattice-based primitives provide a foundational basis for homomorphic encryption (HE) schemes, as LWE-hardness assumptions underpin many post-quantum secure fully homomorphic encryption (FHE) constructions, enabling computations on encrypted data without decryption.
+As of 2025, NIST has not yet established a direct standard for FHE, but its PQC efforts indirectly support HE development by prioritizing quantum-resistant primitives. In March 2025, NIST selected HQC as an additional lattice-based KEM for standardization, further supporting quantum-resistant primitives relevant to homomorphic encryption. In March 2025, NIST issued its first call for multi-party threshold schemes under NISTIR 8214C, explicitly including fully homomorphic encryption alongside post-quantum cryptography and secure multi-party computation to advance privacy-enhancing technologies. This call seeks submissions for threshold cryptosystems that could integrate homomorphic properties, fostering interoperability in distributed settings. To further this, NIST is hosting the Workshop on Multi-Party Threshold Schemes from November 1720, 2025, focusing on evaluating proposals for standardization.
+Key milestones include the selection and finalization of Kyber as ML-KEM in August 2024, marking NIST's first set of PQC standards alongside other algorithms like ML-DSA and SLH-DSA. The overarching goals of these efforts are to ensure cryptographic interoperability across systems and provide resistance to quantum threats, such as Shor's algorithm, which can efficiently break classical schemes like RSA and Paillier encryption.
+
+Industry and Open Standards
+
+The Homomorphic Encryption Standardization Consortium, established in 2017 as an open collaboration among industry, government, and academia, has driven efforts to develop community standards for homomorphic encryption, including white papers on parameters, APIs, and interoperability to facilitate broader adoption. This consortium hosts regular workshops, with the seventh meeting held on October 13, 2024, focusing on refining these standards to address practical deployment needs.
+Open standards initiatives emphasize portability and interoperability across schemes. The OpenFHE library, an open-source fully homomorphic encryption framework, supports multiple schemes such as BFV, BGV, CKKS, FHEW, and TFHE through extensible implementations and serialization mechanisms, enabling scheme portability by allowing encrypted data and keys to be shared across different cryptographic contexts without decryption. Additionally, the Internet Engineering Task Force (IETF) has advanced encrypted API protocols via drafts like "Homomorphic Cryptography Protocols for Measurement Information Collection," initially published in October 2024 and revised in April 2025, which define protocols for addition and multiplication on ciphertexts to support privacy-preserving network measurements.
+In the private sector, cloud providers have integrated homomorphic encryption to offer managed services. Amazon Web Services (AWS) launched support for fully homomorphic encryption in Amazon SageMaker endpoints in March 2023, allowing secure real-time inferencing on encrypted data without decryption, effectively providing homomorphic encryption as a service (HEaaS) for machine learning workloads.
+Recent developments include European Union-funded projects incorporating fully homomorphic encryption to enhance GDPR compliance. The RECITALS project, launched in January 2025 under the Horizon Europe program, implements homomorphic encryption alongside other privacy technologies for resilient secure digital identity systems, ensuring computations on encrypted personal data align with GDPR requirements for data protection by design. Similarly, the SECURED project advances homomorphic encryption for secure data sharing in collaborative environments, supporting GDPR's emphasis on privacy-enhancing technologies. In healthcare, homomorphic encryption is emerging as a HIPAA-compliant tool for processing protected health information; for instance, cloud providers leverage it under business associate agreements to analyze encrypted patient data without accessing plaintext, meeting HIPAA Security Rule standards for transmission and access controls.
+Despite these advances, challenges persist in achieving a unified API for homomorphic encryption, as diverse schemes and libraries lead to restrictive programming models and integration complexities that hinder developer adoption. Efforts toward common bootstrapping interfaces are underway, with libraries like OpenFHE providing standardized support for bootstrapping operations across schemes to refresh ciphertexts and enable unlimited computations, though manual management remains a barrier to efficiency.
+Industry examples include Microsoft's SEAL library, widely adopted for enterprise applications due to its ease of use in homomorphic computations on encrypted data, with ongoing enhancements for integration in secure cloud environments.
+
+References
+
+Core Concept: Homomorphic encryption - PMC - NIH
+
+ On Data Banks and Privacy Homomorphisms - of Luca Giuzzi
+
+Fully Homomorphic Encryption over the Integers
+
+What Is Homomorphic Encryption? - IEEE Digital Privacy
+
+ Fully Homomorphic Encryption Using Ideal Lattices
+
+Fully Homomorphic Encryption vs Confidential Computing | CSA
+
+ Homomorphic decryption in blockchains via compressed discrete ...
+
+ A Survey on Homomorphic Encryption Schemes - arXiv
+
+ Dense Probabilistic Encryption - Microsoft
+
+Public-Key Cryptosystems Based on Composite Degree Residuosity ...
+
+A public-key cryptosystem with worst-case/average-case equivalence
+
+Fully homomorphic encryption using ideal lattices
+
+https://eprint.iacr.org/2011/344
+
+(Leveled) fully homomorphic encryption without bootstrapping
+
+Homomorphic Encryption from Learning with Errors
+
+Homomorphic Encryption for Arithmetic of Approximate Numbers
+
+TFHE: Fast Fully Homomorphic Encryption over the Torus
+
+https://arxiv.org/pdf/2408.07304
+
+Encrypted Intelligence: A Comparative Analysis of Homomorphic ...
+
+ An Efficient CKKS-FHEW/TFHE Hybrid Encrypted Inference ...
+
+GPU Acceleration for FHEW/TFHE Bootstrapping
+
+Concrete v2.7: GPU Wheel, Extended Function Composition ... - Zama
+
+OpenFHE: Open-Source Fully Homomorphic Encryption Library
+
+Post-Quantum Cryptography | CSRC
+
+Post-Quantum Homomorphic Encryption: A Case for Code-Based ...
+
+Homomorphic Encryption Market Size & Insights Report, 2035
+
+ A FULLY HOMOMORPHIC ENCRYPTION SCHEME A ...
+
+Fully Homomorphic Encryption without Bootstrapping
+
+Bootstrapping in Fully Homomorphic Encryption (FHE)
+
+A High-Level Technical Overview of Fully Homomorphic Encryption
+
+Microsoft SEAL is an easy-to-use and powerful homomorphic ...
+
+Microsoft SEAL: Fast and Easy-to-Use Homomorphic Encryption ...
+
+homenc/HElib - GitHub
+
+Design and implementation of HElib: a homomorphic encryption ...
+
+OpenFHE.org OpenFHE Open-Source Fully Homomorphic ...
+
+TFHE Fast Fully Homomorphic Encryption over the Torus
+
+Huelse/SEAL-Python: Microsoft SEAL 4.X For Python - GitHub
+
+A Benchmark Study of SEAL, HElib, OpenFHE, and Lattigo
+
+tf-encrypted/tf-seal: Bridge between TensorFlow and the ... - GitHub
+
+Fully Homomorphic Encryption - Duality Technologies
+
+Enveil Is A Privacy Enhancing Technology Company | Enveil
+
+FAB: An FPGA-based Accelerator for Bootstrappable Fully ...
+
+ Over 100x Faster Bootstrapping in Fully Homomorphic Encryption
+
+Security for Data Privacy in Federated Learning with CUDA ...
+
+Poseidon: Practical Homomorphic Encryption Accelerator
+
+ HECO: Fully Homomorphic Encryption Compiler - USENIX
+
+https://www.nature.com/articles/s41598-025-22056-5
+
+LP-HENN: fully homomorphic encryption accelerator with high ...
+
+Leveraging Searchable Encryption through Homomorphic ... - MDPI
+
+A Secure Federated Learning framework using Homomorphic ...
+
+A General Framework of Homomorphic Encryption for Multiple ...
+
+Private genome analysis through homomorphic encryption - PMC
+
+https://economics.mit.edu/sites/default/files/2022-10/BISoutline_revisedJan2020_0.pdf
+
+ Privacy-Preserving Data Sharing across Financial Institutions
+
+What is Fully Homomorphic Encryption? - FHE Explained - Inpher
+
+ CryptoNets: Applying Neural Networks to Encrypted Data with High ...
+
+ Homomorphic Encryption for Arithmetic of Approximate Numbers
+
+ Fast and Accurately Training Deep Neural Networks on Encrypted ...
+
+A Framework for Encrypted Machine Learning in TensorFlow - GitHub
+
+A privacy preserving machine learning framework for medical image ...
+
+Efficient Privacy-Preserving Matrix Factorization for ...
+
+Secure Aggregation in Federated Learning using Multiparty ... - arXiv
+
+ SoK: New Insights into Fully Homomorphic Encryption Libraries via ...
+
+ Fully Composable Homomorphic Encryption DRAFT
+
+ On the Security of Homomorphic Encryption on Approximate Numbers
+
+ Fully Homomorphic Encryption without Bootstrapping
+
+ Lecture 21: (Lattice Based) Homomorphic Encryption
+
+ The Learning with Errors Problem
+
+Side Channel Analysis in Homomorphic Encryption - arXiv
+
+ Key Recovery Attacks on Approximate Homomorphic Encryption ...
+
+General Impossibility of Group Homomorphic Encryption in the ...
+
+Fully Homomorphic Encryption and Post-Quantum Cryptography
+
+Cycling attacks against homomorphic cryptosystems - SpringerLink
+
+Benchmarking Attacks on Learning with Errors - arXiv
+
+(Leveled) Fully Homomorphic Encryption without Bootstrapping
+
+NIST Post-Quantum Cryptography Standardization
+
+ NISTIR 8214C 2pd: NIST First Call for Multi-Party Threshold Schemes
+
+NIST Workshop on Multi-Party Threshold Schemes 2025 | CSRC
+
+NIST Releases First 3 Finalized Post-Quantum Encryption Standards
+
+Homomorphic Encryption Standardization An Open Industry ...
+
+Download the standard - Homomorphic Encryption Standardization
+
+Homomorphic Encryption Announcements - Google Groups
+
+ Homomorphic Encryption Serialization for Applications | OpenFHE
+
+Homomorphic Cryptography Protocols for Measurement Information ...
+
+draft-li-ppm-homomorphic-encryption-01 - IETF Datatracker
+
+Enable fully homomorphic encryption with Amazon SageMaker ...
+
+Top 7 Cloud Encryption Trends in Healthcare 2025 - Censinet
+
+Federated Security for Privacy Preservation of Healthcare Data in ...
+
+Enhancing Applications with Homomorphic Encryption
+
+ The Investigation of Fully Homomorphic Encryption - SciTePress
+
+Duality Advances Homomorphic Encryption Landscape with OpenFHE
+
+A Survey of Software and Hardware Acceleration Technologies for Fully Homomorphic Encryption
+
+Public-Key Cryptosystems Based on Composite Degree Residuosity Classes
+
+A Fully Homomorphic Encryption Scheme
+
+Faster Fully Homomorphic Encryption: Bootstrapping in less than 0.1 Seconds
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

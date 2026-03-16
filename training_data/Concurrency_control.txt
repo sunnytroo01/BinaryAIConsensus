@@ -1,0 +1,354 @@
+Concurrency control Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Concurrency control
+ Ara Eve Leo Sal 
+1x
+ Concurrency control is a fundamental mechanism in database management systems (DBMS) designed to manage the simultaneous execution of multiple transactions accessing shared data, ensuring the maintenance of database consistency and integrity by preventing anomalies such as lost updates, dirty reads, and inconsistent retrievals. It coordinates concurrent accesses in multiuser environments to guarantee that the effects of transaction interleavings are equivalent to some serial execution, thereby preserving the ACID propertiesparticularly atomicity, consistency, and isolationwhile maximizing system throughput.
+The primary objective of concurrency control is to achieve serializability, a correctness criterion where the outcome of concurrent transactions matches that of executing them one at a time in some order, often enforced through conflict serializability to avoid cycles in dependency graphs formed by conflicting operations. Isolation levels, such as read committed or serializable, further define the degree of concurrency permitted while controlling data visibility and phantom reads. These mechanisms are essential in distributed and centralized DBMS, where high concurrency supports applications like online banking and real-time systems, but they must balance performance with the risk of conflicts in read-write operations.
+Key techniques for concurrency control include lock-based protocols, timestamp-based protocols, and validation-based (optimistic) protocols. Lock-based approaches use shared locks for reads and exclusive locks for writes, with the two-phase locking (2PL) ruleacquiring all locks before releasing anyensuring serializability by dividing transaction execution into a growing phase and a shrinking phase. Timestamp-based methods assign unique timestamps to transactions and order operations accordingly, employing rules like Thomas' Write Rule to handle obsolete writes without rollback. Optimistic protocols, suitable for low-conflict workloads, allow transactions to proceed without locks and validate serializability only at commit time through phases of reading, execution, validation, and writing, aborting conflicting transactions as needed.
+Challenges in concurrency control encompass deadlock prevention and detection, where cyclic waits are resolved via schemes like wait-die or by rolling back victim transactions using wait-for graphs. Over decades of research, including influential works on serializability theory and practical implementations in commercial systems, concurrency control has evolved to support scalable, high-performance databases while adapting to modern distributed architectures.
+
+Core Concepts
+
+Definition and Scope of Concurrency Control
+
+Concurrency control refers to the mechanisms and protocols used to manage simultaneous operations on shared resources in multi-user computing systems, ensuring data consistency and system integrity by coordinating access and preventing conflicts. This involves synchronizing activities such as reads and writes to avoid interference, allowing multiple users or processes to operate efficiently as if they had exclusive access to the system.
+The scope of concurrency control spans multiple domains in computing. In database management systems (DBMS), it governs transaction execution to maintain data validity across concurrent queries and updates. In operating systems, it coordinates process and thread interactions with shared memory and hardware resources to prevent race conditions and ensure reliable multitasking. Distributed systems extend this to networked environments, where it synchronizes access to replicated data across multiple sites, addressing challenges like communication delays and partial failures. In programming environments, it provides foundational primitives, such as semaphores and mutual exclusion algorithms, enabling developers to build safe concurrent applications.
+Historically, concurrency control emerged in the 1970s from database research, with seminal work by Eswaran et al. formalizing serializability as the standard for correct concurrent schedules, alongside early protocols like two-phase locking to enforce it. This foundation addressed the limitations of single-processor systems, where concurrency relied on time-sharing to interleave operations. Over decades, it evolved to support multi-core processors, which introduced true parallelism and required scalable algorithms capable of handling hundreds of cores without performance degradation. By 2025, adaptations for cloud computing environments emphasize elastic, geo-distributed systems, integrating advanced protocols to balance consistency with high availability in massively scaled infrastructures.
+Central to concurrency control are the ACID properties, which define high-level goals for reliable transaction processing. Atomicity treats each transaction as an indivisible unit: all operations succeed together, or none take effect, preventing partial updates. Consistency ensures that transactions preserve database invariants, transforming valid states into new valid states while adhering to constraints like keys and referential integrity. Isolation guarantees that concurrent transactions do not interfere, yielding results equivalent to some serial execution order, thus maintaining the appearance of sequential processing. Durability commits changes permanently upon transaction completion, surviving failures through mechanisms like logging to enable recovery. These properties guide the design of concurrency mechanisms across all scopes, though trade-offs may arise in distributed or high-throughput settings.
+
+Problems Arising from Concurrent Access
+
+In concurrent systems, multiple transactions access shared data resources simultaneously, leading to interleavings of their operations that can produce unexpected and incorrect results. This simultaneous access often results in contention, where two or more transactions or processes attempt to access the same data resource in a conflicting manner, such as through concurrent locking for incompatible reads or writes. Without proper coordination, the order in which read and write operations from different transactions are executedknown as an interleavingcan cause race conditions where the outcome depends on timing rather than logic. For instance, naive parallelism assumes independent operations will maintain data integrity, but in practice, this fails because transactions may partially observe or override each other's changes, resulting in inconsistencies that propagate through the system.
+One classic anomaly is the lost update, where one transaction's modification to a data item is overwritten by another transaction that operates on an outdated copy of the same item. Consider a shared bank account with an initial balance of $100. Transaction T1 reads the balance ($100) and intends to add $50, while concurrently, T2 reads the same balance ($100) and intends to subtract $20. If T1 writes its update first ($150), but T2 then writes its update based on the original read ($80), T1's addition is lost, leaving the final balance at $80 instead of the expected $130. This occurs because neither transaction accounts for the other's changes during the interleaving.
+Another issue is the dirty read, in which a transaction reads data written by another transaction that has not yet committed, potentially basing decisions on transient, unconfirmed changes. Using the same account example, suppose T1 updates the balance to $150 but aborts before committing, rolling back to $100. If T2 reads the uncommitted $150 during this window and uses it to approve a withdrawal, T2 may proceed with invalid assumptions, leading to further errors when T1's rollback exposes the original value.
+The non-repeatable read anomaly arises when a transaction rereads data previously read within its execution, only to find different values due to another committed transaction's intervening update. For the account balance, T1 might read $100 at the start, perform some calculations, and later reread to verify, but if T2 commits a subtraction of $20 in between, T1 now sees $80, invalidating its internal state and computations.
+Finally, the phantom read occurs when a transaction executes a query multiple times, but the set of rows returned changes due to concurrent insertions or deletions by another transaction, even though the query criteria remain the same. Imagine T1 querying the total balance of all accounts exceeding $50 in a database of customer accounts (initially summing to $300 from three accounts). If T2 inserts a new account with $60 and commits, T1's subsequent identical query returns $360, including the "phantom" row, which disrupts aggregates or counts reliant on a stable result set.
+These anomalies collectively lead to data corruption, where shared resources end up in states that violate application invariants, such as non-negative account balances or accurate summaries. In multi-user scenarios, race conditions from such interleavings exacerbate inconsistencies, potentially cascading failures across the system and eroding trust in the data's reliability.
+In real-world applications like early banking systems of the 1980s, which increasingly relied on concurrent processing for ATMs and electronic transfers, these problems manifested as incorrect account balances and unintended overdrafts, highlighting the need for robust controls to prevent financial losses. Such issues underscore how anomalies can deviate from serializability, the key criterion ensuring concurrent executions mimic sequential ones.
+
+Key Correctness Criteria
+
+In concurrency control, serializability serves as a primary correctness criterion, ensuring that the outcome of concurrent transaction execution is equivalent to some serial execution where transactions run one at a time without interleaving. Formally, a schedule is serializable if its reads-from relation, write order, and final writes match those of a serial schedule, preserving the database's logical consistency as if transactions were isolated.
+Serializability encompasses two main types: conflict serializability and view serializability. Conflict serializability requires that the schedule avoids conflicting operations (reads and writes on the same data item by different transactions) in an order that would create cycles in the precedence graph, where nodes represent transactions and edges indicate forced ordering due to conflicts; the absence of cycles guarantees equivalence to a serial schedule. View serializability, a weaker but more permissive condition, focuses on the visibility of writes: a schedule is view serializable if it produces the same reads (each transaction reads from the same write), the same initial reads, and the same final writes as some serial schedule, allowing more concurrent executions at the cost of higher verification complexity.
+Recoverability addresses the durability aspect by ensuring that transaction outcomes can be restored after failures without propagating errors. A schedule is recoverable if, whenever transaction T2 reads a value written by T1, T1 commits before T2 commits, preventing T2 from basing decisions on uncommitted data that might later be aborted. For example, in a recoverable schedule, if T1 writes A=10 and aborts after T2 reads it to set B=20, T2 must also abort to avoid inconsistent states; a non-recoverable schedule might allow T2 to commit with B=20 based on T1's uncommitted write, leading to permanent errors. Strict schedules enhance recoverability by prohibiting reads or writes of uncommitted data entirely, while cascadeless schedules avoid dirty reads to prevent cascading aborts during recovery, where one transaction's failure triggers rollbacks of dependent ones. In a cascadeless example, enforcing commit-ordering for reads ensures no chain reactions, as seen when T2 only reads committed values from T1 post-T1's commit.
+Beyond databases, linearizability provides a real-time correctness criterion for concurrent objects, requiring that operations appear to take effect instantaneously at some point between invocation and response, extending serializability to respect real-time ordering for shared data structures like queues. Anomaly-free execution complements these by guaranteeing schedules free of specific inconsistencies, such as lost updates or non-repeatable reads, ensuring predictable behavior under concurrency.
+Performance metrics evaluate how well concurrency control mechanisms uphold these criteria under load: throughput measures transactions completed per unit time, reflecting efficiency in maintaining serializability without excessive blocking; latency captures the response time for individual transactions, critical for recoverable and linearizable systems where delays could amplify anomalies; and scalability assesses performance growth with increasing concurrency or cores, as poor scaling can compromise overall correctness in high-throughput environments.
+
+Fundamental Techniques
+
+Lock-Based Approaches
+
+Lock-based approaches represent a pessimistic concurrency control strategy that prevents conflicts by acquiring locks on shared resources before accessing them, thereby ensuring serializability through mutual exclusion. In this method, transactions explicitly request locks to guard data items, blocking conflicting operations until the locks are released. This technique is foundational in both database management systems (DBMS) and operating systems (OS), where it balances concurrency with consistency by serializing access to critical sections.
+Locks can be binary or multiple-mode. Binary locks provide simple mutual exclusion, allowing only one transaction to access a resource at a time, akin to a single on/off state. Multiple-mode locks, however, distinguish between read and write operations to permit greater concurrency. Shared locks (S locks) allow multiple transactions to read a data item simultaneously, while exclusive locks (X locks) grant sole access for writes, preventing any concurrent reads or writes. Compatibility between lock modes is governed by a matrix: S locks are compatible with other S locks but conflict with X locks; X locks conflict with both S and X locks. This design enables read operations to proceed in parallel while protecting writes.
+The two-phase locking (2PL) protocol enforces serializability by structuring lock acquisition and release into two distinct phases for each transaction. In the growing phase, a transaction acquires all necessary locks without releasing any; once the first lock is released, the shrinking phase begins, during which no new locks can be acquired, and existing locks are released progressively. Basic 2PL ensures conflict-serializability but may allow cascading aborts if reads depend on uncommitted writes. To mitigate recovery issues, strict 2PL extends this by holding all exclusive (write) locks until transaction commit or abort, preventing dirty reads and simplifying rollback. Rigorous 2PL further strengthens recoverability by retaining all locks (shared and exclusive) until commit or abort. These variants are widely adopted in production DBMS for their balance of concurrency and durability guarantees.
+Lock granularity refers to the level of detail at which resources are locked, influencing both concurrency and overhead. In databases, fine-grained locking at the page or record level maximizes parallelism by isolating conflicts to small units, while coarser table-level or database-level locking reduces management costs but serializes broader access. Multiple-granularity locking protocols exploit hierarchical data structures (e.g., database > table > page > record) using intention modes: Intention-Shared (IS) signals intent to read descendants, Intention-Exclusive (IX) signals intent to write descendants, Shared (S) for reads, Exclusive (X) for writes, and Shared-Intention-Exclusive (SIX) for mixed access. Before locking a node, ancestors must be locked in appropriate intention modes to propagate compatibility checks efficiently. The compatibility matrix for these modes is as follows:
+ModeISIXSSIXX
+ISYesYesYesYesNo
+IXYesYesNoNoNo
+SYesNoYesNoNo
+SIXYesNoNoNoNo
+XNoNoNoNoNo
+In operating systems, lock implementation varies by context: spinlocks employ busy-waiting, where a thread repeatedly polls the lock in a tight loop, suitable for short-held locks on multiprocessors to avoid context-switch overhead. Sleep locks (or mutexes) block the thread by suspending it until the lock is available, conserving CPU cycles for longer critical sections but incurring scheduler costs upon wakeup. Hybrid approaches may spin briefly before sleeping to optimize for varying hold times.
+An example of 2PL in pseudocode for a transaction T accessing data items A and B (read A, write B) under strict variant:
+Transaction T:
+ // Growing phase: Acquire locks
+ Acquire S-lock on A // If incompatible, wait
+ Read A
+ Acquire X-lock on B // If incompatible, wait
+ Compute using A and B
+ Write B // Update B
+
+ // No unlocks until end (strict 2PL)
+ Commit T
+ Release S-lock on A
+ Release X-lock on B // Shrinking phase
+If aborting, release all locks immediately. This ensures no new locks after the first release and holds writes until commit.
+
+Timestamp and Ordering-Based Methods
+
+Timestamp-based concurrency control methods assign unique timestamps to transactions upon initiation, using these values to enforce a total order on operations without relying on locks. This approach ensures conflict serializability by processing conflicting operations (reads and writes on the same data item) in timestamp order, aborting transactions that violate this order to prevent anomalies like dirty reads or lost updates. Seminal work formalized these algorithms for distributed systems, decomposing concurrency into read-write and write-write synchronization subproblems.
+In the basic timestamp ordering (TSO) protocol, each transaction $ T $ receives a unique timestamp $ TS(T) $, typically generated from a logical clock to guarantee system-wide uniqueness. For a read operation on data item $ X $ by $ T $, the protocol checks if $ TS(T) \geq W\text{-}TS(X) $, the timestamp of the last write to $ X $; if true, the read proceeds, and $ R\text{-}TS(X) $ (the latest read timestamp for $ X $) is updated to $ \max(R\text{-}TS(X), TS(T)) $; otherwise, $ T $ aborts and restarts with a new timestamp. For a write on $ X $, it verifies $ TS(T) \geq R\text{-}TS(X) $ and $ TS(T) \geq W\text{-}TS(X) $; if both hold, the write occurs, setting $ W\text{-}TS(X) = TS(T) $; else, $ T $ aborts. This ensures that operations execute as if in serial order of timestamps, guaranteeing serializability.
+Multiversion timestamp ordering (MVTO) extends basic TSO by maintaining multiple versions of each data item, each tagged with the timestamp of the transaction that created it, allowing readers to access a compatible prior version without aborting writers. In MVTO, a read by $ T $ on $ X $ selects the version with the largest creation timestamp $ \leq TS(T) $, avoiding aborts for late-arriving reads that would conflict in single-version schemes. Writes create a new version unless a younger transaction has already read a version that would be invalidated, in which case the write aborts; this reduces restart frequency, particularly in read-heavy workloads, while preserving view serializability.
+The Thomas' write rule optimizes timestamp ordering by ignoring obsolete writes rather than aborting the transaction, enhancing efficiency without sacrificing correctness. Specifically, in the write rule, if $ TS(T) < W\text{-}TS(X) $, the write is simply discarded as outdated, since a later transaction has already updated $ X $, but $ T $ continues; the other conditions (e.g., $ TS(T) < R\text{-}TS(X) $) still trigger aborts. This rule, applied during update propagation in multi-copy databases, ensures only the latest relevant updates are incorporated by comparing the update's timestamp against the data item's current timestamp and omitting earlier ones. It permits some view-serializable schedules not achievable under strict conflict serializability, reducing unnecessary rollbacks.
+In real-time systems, priority inheritance protocols adapt timestamp and ordering concepts to mitigate priority inversion during synchronization, where low-priority tasks block high-priority ones on shared resources. Under the basic priority inheritance protocol, a blocked high-priority task temporarily boosts the priority of the blocking low-priority task to its own level, allowing it to complete the critical section and release the resource promptly; upon release, priorities revert. This bounds blocking chains to a single level per resource, avoiding deadlocks from mutual priority inversions and ensuring predictable response times, though it does not eliminate all chained blocking. The protocol integrates with timestamp ordering by preserving operation precedence while honoring real-time priorities.
+
+Optimistic and Validation-Based Methods
+
+Optimistic concurrency control (OCC) is a non-locking technique that allows transactions to execute without acquiring locks, assuming conflicts are rare, and performs validation only at commit time to detect and resolve any inconsistencies. This approach contrasts with locking by prioritizing progress over prevention, making it suitable for environments where read operations dominate and contention is low.
+OCC divides transaction execution into three distinct phases: the read phase, where a transaction reads data items into private local variables without any synchronization or global updates; the validation phase, where the system checks for conflicts to ensure serializability; and the write phase, where validated updates are applied to the database if no conflicts are found. During the read phase, transactions proceed optimistically without restrictions, collecting read sets (items read) and write sets (items to be updated) locally. Validation occurs just before commit, assigning a transaction number (tn) based on the order of starting the validation.
+The validation phase employs two primary rules to guarantee serial equivalence: forward validation, which ensures that no transaction with a lower tn (earlier-committing) has a write set intersecting the current transaction's read set; and backward validation, which checks that no currently active transaction (higher tn) has a write set intersecting the current transaction's read or write sets. If either rule fails, the transaction is aborted and restarted from the read phase.
+In the seminal Kung-Robinson model, validation uses a certification mechanism where the validator compares the transaction's read set against the write sets of preceding transactions and active transactions' write sets against the current read and write sets. This can be implemented serially, using a critical section to process one validation at a time, or in parallel, queuing validations and checking them concurrently to improve throughput under high concurrency. For example, in B-tree index structures, conflict detection involves checking overlaps in small read and write sets (typically 4 items), making validation efficient.
+Multiversion OCC extends the basic model by maintaining multiple versions of data items, each tagged with a transaction timestamp, to provide readers with consistent snapshots without blocking writers. In snapshot isolation, a popular multiversion variant, each transaction reads from a snapshot of the database as of its start timestamp, ensuring repeatable reads without aborts from read-write conflicts. Writes create new versions, and commits succeed under a first-committer-wins rule for direct write-write conflicts on the same item: if another transaction has committed a conflicting write to an item in the write set since the start, the current transaction aborts. However, snapshot isolation permits anomalies like write skew, requiring additional mechanisms for full serializability. This avoids aborts for pure readers and reduces restarts in low-conflict scenarios compared to single-version OCC.
+OCC, including its multiversion forms, is particularly applicable in high-contention environments where aborts are infrequent, such as query-heavy workloads or large databases with sparse data access patterns. For instance, in a B-tree of order 199 with 10,000 leaf pages and depth 3, the probability of conflict during insertions is less than 0.0007, keeping validation overhead low relative to the read phase, which dominates execution time. Throughput benefits arise when the validation and write phases are short compared to reads, allowing higher concurrency without frequent restarts.
+
+Database Applications
+
+Transaction Models and ACID Properties
+
+In database systems, a transaction represents a logical unit of work that encapsulates a sequence of read and write operations on data, delimited by explicit begin and commit (or abort) boundaries to ensure reliable execution in the presence of failures. This model allows applications to group operations that must succeed or fail as a cohesive whole, maintaining data integrity during concurrent access. Flat transactions, the standard model, treat the entire unit as indivisible without internal structure, whereas nested transactions introduce a hierarchical composition where sub-transactions can be spawned within a parent transaction, enabling partial rollbacks and finer-grained control over recovery.
+The ACID propertiesAtomicity, Consistency, Isolation, and Durabilityform the cornerstone of reliable transaction processing in databases, ensuring that concurrent transactions do not compromise data validity. These properties were formalized in the early 1980s, building on foundational work by Jim Gray, who outlined the core concepts in his 1981 paper on transaction virtues and limitations. Atomicity guarantees that a transaction is treated as an indivisible unit: either all operations complete successfully (commit), or none take effect (abort), often implemented via rollback mechanisms that restore the database to its pre-transaction state, as seen in logging techniques during system crashes. Consistency ensures that each transaction transitions the database from one valid state to another, adhering to predefined integrity constraints such as foreign keys or balance rules in a banking system. Isolation provides the illusion that transactions execute sequentially, preventing interference from partial results of concurrent ones, which is critical for avoiding anomalies like lost updates in multi-user environments. Durability commits changes to non-volatile storage upon successful completion, ensuring persistence even after power failures, typically achieved through write-ahead logging to disk.
+In contrast to the strict ACID guarantees suited for relational databases, NoSQL systems often adopt BASE propertiesBasically Available, Soft state, and Eventual consistencyto prioritize scalability and availability in distributed environments. Basically Available ensures the system remains operational under partitions, Soft state allows temporary inconsistencies in data replicas, and Eventual consistency promises that updates propagate to all nodes over time, as exemplified in key-value stores like Dynamo where immediate ACID compliance would hinder performance at massive scale. This shift reflects trade-offs in modern data management, where BASE facilitates high-throughput applications at the expense of immediate consistency.
+
+Isolation Levels and Serializability
+
+In database systems, the ANSI SQL standard defines four transaction isolation levels to manage concurrent access while balancing consistency and performance: Read Uncommitted, Read Committed, Repeatable Read, and Serializable. These levels specify the degree to which changes made by one transaction are visible to others, based on preventing specific anomalies such as dirty reads (reading uncommitted data), non-repeatable reads (re-reading the same row yields different results), and phantoms (new rows appear in a range query).
+The following table summarizes the anomalies permitted at each level, including the standard ANSI SQL-92 phenomena (P1, P2, P3) and additional ones (P0, P4, A5A, A5B) from Berenson et al.:
+Isolation LevelDirty Reads (P1)Non-Repeatable Reads (P2)Phantoms (P3)Additional Anomalies Allowed
+Read UncommittedAllowedAllowedAllowedDirty writes (P0)
+Read CommittedPreventedAllowedAllowedLost updates (P4), read skew (A5A), write skew (A5B)
+Repeatable ReadPreventedPreventedAllowedWrite skew (A5B) in some implementations
+SerializablePreventedPreventedPreventedNone (full serializability)
+At the lowest level, Read Uncommitted permits all anomalies, including dirty reads where a transaction can observe changes from another uncommitted transaction, potentially leading to data inconsistencies if the writing transaction rolls back. Read Committed avoids dirty reads by ensuring reads only see committed data but still allows non-repeatable reads and phantoms, as well as write skew where two transactions read overlapping data and write non-conflicting updates that violate a joint constraint. Repeatable Read prevents dirty and non-repeatable reads but permits phantoms and write skew, such as when two transactions each check a condition on disjoint sets and both proceed to violate an integrity constraint. Serializable, the strictest level, prevents all these anomalies by guaranteeing that transaction outcomes are equivalent to some serial execution order.
+These levels map to degrees of correctness approximating serializability, the gold standard for isolation where concurrent transactions produce results as if executed sequentially. Lower levels like Read Committed and Repeatable Read allow non-serializable executions to improve concurrency, while Serializable enforces strict serializability. Many systems implement Repeatable Read using snapshot isolation, where transactions read a consistent snapshot of the database from their start time, preventing dirty reads, non-repeatable reads, and most phantoms but still permitting write skew anomalies that violate serializability. In contrast, strict serializability extends serializability by also respecting real-time ordering of transactions. Snapshot isolation, while not fully serializable, provides a practical approximation often sufficient for applications tolerant of write skew.
+The choice of isolation level involves trade-offs between performance (throughput and latency) and consistency guarantees. Higher levels reduce anomalies but increase overhead from locking or validation, potentially leading to more aborts and retries. In PostgreSQL, Repeatable Read uses snapshot isolation for consistent reads without locking reads, offering better concurrency than Read Committed but allowing write skew; Serializable employs Serializable Snapshot Isolation (SSI), which adds conflict detection to prevent all anomalies, though it incurs higher CPU costs and serialization failure rates in high-contention workloads compared to Repeatable Read. MySQL's InnoDB engine defaults to Repeatable Read with multi-version concurrency control (MVCC) for snapshot-like reads, minimizing locks for better performance over Serializable, which forces read locks on all queries and can significantly reduce throughput in read-heavy scenarios due to blocking. These implementations highlight how snapshot-based approaches in Repeatable Read enhance scalability at the cost of occasional non-serializable behaviors like write skew.
+
+Implementation Strategies in DBMS
+
+Database management systems (DBMS) implement concurrency control through specialized components like lock managers that enforce protocols such as two-phase locking (2PL) while integrating with storage structures for efficiency. Lock managers maintain a table of locks on data items, including pages and rows, to serialize access and prevent conflicts during concurrent transactions. In B-tree indexes, 2PL is integrated by acquiring locks on index nodes during searches and updates, with techniques like key-range locking to cover multiple records efficiently. To reduce contention in multicore environments, some systems employ latch-free B-trees, which use optimistic techniques and atomic primitives instead of traditional latches for traversing and modifying index structures, achieving higher throughput without blocking on shared memory access.
+Multi-version concurrency control (MVCC) is widely implemented in commercial DBMS to support non-blocking reads, particularly for read-only transactions. In PostgreSQL, MVCC creates version chains for each row, where updates append new versions with transaction identifiers (XIDs), allowing read-only transactions to traverse the chain backward to find the visible version based on the transaction's snapshot at start time. This avoids locks for readers, enabling snapshot isolation without interference from concurrent writes. Oracle implements a similar multi-version model using undo segments to store prior row images, which read-only transactions access via consistent read mechanisms that reconstruct the database state as of the transaction's begin time, ensuring read consistency across sessions.
+Hybrid models combine elements of locking and optimistic concurrency control (OCC) to balance throughput and latency for mixed workloads. These approaches use locking for write-heavy operations to prevent conflicts early, while employing OCC or timestamp ordering for reads to minimize overhead. Google's Spanner exemplifies this by integrating 2PL at the Paxos leader for read-write transactions with TrueTime timestamps to assign globally consistent commit times, ensuring external consistency without full locking for read-only transactions that use snapshot reads at any replica.
+Performance tuning in DBMS concurrency focuses on optimizing index locking granularity and buffer pool management to reduce overhead. Finer-grained index locking, such as intent locks on B-tree nodes, allows concurrent access to non-overlapping subtrees, while buffer pools employ eviction policies like clock or LRU to prioritize hot pages, minimizing I/O during lock acquisition. In cloud DBMS, recent advancements incorporate AI for dynamic tuning; for instance, learned models predict workload patterns to adjust lock timeouts or select protocols, as in NeurDB's AI-powered concurrency control that uses machine learning to optimize validation phases in OCC, improving throughput by up to 2x in high-contention scenarios.
+
+Operating System Applications
+
+Process and Thread Synchronization
+
+Process and thread synchronization in operating systems coordinates concurrent executions to prevent race conditions and ensure data consistency when multiple processes or threads access shared resources. These mechanisms operate primarily at the user level through libraries or at the kernel level via system calls, enabling safe parallelism in applications like multi-threaded programs. Key primitives facilitate mutual exclusion, signaling, and coordination, allowing developers to structure concurrent code without low-level hardware intervention.
+Semaphores, introduced by Edsger W. Dijkstra in 1965 as a solution for cooperating sequential processes, serve as fundamental synchronization tools by maintaining a counter to regulate resource access. A semaphore supports two atomic operations: the wait (P) operation, which decrements the counter and blocks if it is zero, and the signal (V) operation, which increments the counter and wakes a waiting process if any exist. Binary semaphores, restricted to values of 0 or 1, act as mutexes to enforce mutual exclusion for critical sections, while general semaphores with higher counts manage pools of resources, such as buffer slots in multi-producer scenarios.
+Monitors, formalized by C. A. R. Hoare in 1974, offer a structured approach to synchronization by grouping shared variables and procedures into a single module, where only one process can execute monitor procedures at a time, providing implicit mutual exclusion. Condition variables within monitors enable threads to suspend execution until a specific state is reached, using wait operations to release the monitor lock and signal operations to notify waiting threads, thus avoiding busy-waiting and simplifying complex coordination. This abstraction builds on semaphore concepts but reduces programming errors by localizing synchronization logic.
+Thread models distinguish between user-level and kernel-level implementations, impacting synchronization efficiency. User-level threads, managed entirely by a runtime library within a single process, allow fast context switches without kernel involvement but risk blocking the entire process on I/O operations, as the kernel sees only the parent process. In contrast, kernel-level threads are directly supported and scheduled by the operating system kernel, enabling true parallelism across cores and handling blocking calls per thread, though at the cost of higher overhead from system calls. The POSIX threads (pthreads) standard, defined in IEEE Std 1003.1c-1995, unifies these models with portable APIs for both user and kernel threads, including mutex operations like pthread_mutex_lock() to acquire exclusive access and pthread_mutex_unlock() to release it, ensuring atomic protection of shared data.
+Barriers and rendezvous mechanisms further support multi-threaded coordination by synchronizing groups of threads at specific computation phases. A barrier requires all participating threads to reach a designated point before any proceed, commonly used in parallel algorithms to align iterations; in pthreads, this is achieved via pthread_barrier_wait(), which blocks until the barrier's count of threads is met. Rendezvous, a related primitive, ensures threads meet pairwise or in small groups for handoff or synchronization, often implemented with semaphores initialized to zero to enforce waiting until counterparts arrive. These tools are essential for scalable computations, such as divide-and-conquer parallel processing.
+A classic illustration is the producer-consumer problem, originally posed by Dijkstra in 1965, where a producer thread generates data into a fixed-size buffer while a consumer thread retrieves it, risking overflow or underflow without coordination. Semaphores solve this with three variables: mutex (binary, for buffer access), full (counting buffer slots filled), and empty (counting available slots), initialized to 1, 0, and buffer size, respectively. The producer performs wait(empty), wait(mutex), adds data, signal(mutex), and signal(full); the consumer mirrors this with wait(full), wait(mutex), removes data, signal(mutex), and signal(empty), ensuring bounded buffer integrity atomically.
+// Producer
+wait(empty);
+wait(mutex);
+// add item to buffer
+signal(mutex);
+signal(full);
+
+// Consumer
+wait(full);
+wait(mutex);
+// remove item from buffer
+signal(mutex);
+signal(empty);
+
+Resource Allocation and Deadlock Prevention
+
+In operating systems, resource allocation involves assigning shared resources such as memory, I/O devices, or files to multiple concurrent processes or threads while ensuring system stability and progress. Improper allocation can lead to deadlocks, where processes indefinitely wait for resources held by each other, halting execution. To mitigate this, operating systems employ strategies for deadlock prevention, detection, and recovery, focusing on reusable resources that processes acquire and release dynamically.
+Deadlocks occur only if four necessary conditions, known as the Coffman conditions, hold simultaneously: mutual exclusion (resources cannot be shared and must be held exclusively), hold-and-wait (a process holding at least one resource waits for another), no preemption (resources cannot be forcibly taken from a process), and circular wait (a cycle exists in the resource allocation graph where processes wait for each other's resources). These conditions provide a foundational framework for analyzing and addressing deadlocks in resource management. Breaking any one condition enables prevention strategies.
+Prevention approaches aim to eliminate one or more Coffman conditions proactively. Resource ordering imposes a total linear ordering on all resource types, requiring processes to request resources in strictly increasing order of their assigned numbers; this breaks the circular wait condition by ensuring no cycles can form in the allocation graph. For instance, if resources are numbered 1 to n, a process holding resource 5 cannot request resource 3, preventing potential loops. Another key method is the Banker's algorithm, developed by Edsger W. Dijkstra in 1965, which avoids unsafe states by simulating resource allocations before granting them. The algorithm maintains vectors for available resources, allocated resources per process, and maximum needs per process; it checks for a "safe state" by iteratively allocating to processes that can complete with current availability, ensuring all can finish without deadlock. This dynamic avoidance is particularly useful in systems with multiple resource instances but incurs overhead from repeated safety checks.
+Detection strategies periodically or on-demand identify deadlocks after they occur, using models like the wait-for graph (WFG), introduced by Richard C. Holt in 1972. In a WFG, nodes represent processes, and directed edges indicate a process waiting for a resource held by another; a cycle in the graph signifies a deadlock. Operating systems construct and analyze these graphseither centrally or in a distributed mannerby tracking lock acquisitions and waits, invoking detection when timeouts or high contention occur. This approach is efficient for systems where prevention overhead is prohibitive, as detection can be triggered sparingly.
+Upon detecting a deadlock, recovery involves breaking cycles with minimal disruption, often through resource preemption, process termination, or rollback. Preemption forcibly releases resources from one or more processes in the cycle, allowing others to proceed; the preempted process is rolled back to a prior state or restarted. Selection criteria prioritize processes with minimal rollback cost or those holding fewer resources to limit system impact. While effective, preemption requires careful handling of non-preemptible resources like CPU registers to avoid data corruption. In practice, combining detection with preemption balances responsiveness and overhead in resource-constrained environments.
+A representative example is file system locking in the Linux kernel, where deadlocks are prevented through strict resource ordering and tools like lockdep for validation. Inodes and directory structures are locked using mutexes or semaphores, with developers required to acquire locks in a predefined hierarchy (e.g., parent directory before child) to avoid circular waits during operations like rename or unlink. The kernel's locking documentation emphasizes this ordering, and lockdep dynamically tracks dependencies at runtime, annotating potential cycles during development or boot to enforce prevention. This approach has proven robust in handling concurrent file accesses across thousands of processes in production workloads.
+
+Kernel-Level Concurrency Mechanisms
+
+Kernel-level concurrency mechanisms in operating systems manage synchronization at the core of the system, ensuring safe access to shared resources amid interrupts, scheduling, and memory operations. These techniques operate at a low level, often disabling preemption or interrupts to create atomic sections where concurrent access is impossible. In the Linux kernel, for instance, atomic sections are achieved by disabling and enabling interrupts using primitives like local_irq_disable() and local_irq_enable(), which prevent interrupt handlers from preempting the current code path and ensure uninterrupted execution for short durations.
+Interrupt handling introduces concurrency challenges, as handlers can preempt running code and access shared kernel data structures. To protect critical sections from such interruptions, kernels employ disable/enable interrupt pairs, creating atomic regions where no concurrent execution occurs on the same CPU. This approach is essential for maintaining consistency during hardware events, though it is limited to short operations to avoid excessive latency. For longer critical sections vulnerable to interrupts, spinlocks provide a complementary mechanism; these are busy-waiting locks suitable for short durations, where a thread repeatedly checks the lock until available, minimizing context-switch overhead in multiprocessor environments. In Linux, spin_lock_irq() combines spinlock acquisition with interrupt disabling on the local CPU, ensuring atomicity against both interrupts and other CPUs.
+Scheduler concurrency relies on lock-free or low-contention structures to handle task management without introducing bottlenecks. Read-Copy Update (RCU), a synchronization primitive in the Linux kernel since version 2.5, exemplifies this for read-mostly data structures like linked lists or trees. RCU allows multiple concurrent readers to access data without locks, using lightweight barriers (rcu_read_lock() and rcu_read_unlock()) that impose no synchronization overhead in non-preemptive kernels, while updaters create copies, publish changes atomically, and defer reclamation until all readers complete via synchronize_rcu(). This mechanism scales well on symmetric multiprocessing (SMP) systems by avoiding reader-writer locks, reducing cache-line contention and enabling high-throughput reads concurrent with infrequent updates.
+Virtual memory operations introduce concurrency issues in multi-threaded contexts, particularly with page faults that can occur simultaneously across threads accessing unmapped pages. In modern kernels like Linux, page fault handling uses per-virtual memory area (VMA) locks to allow concurrent faults on different VMAs without global contention on the mmap_lock, which previously serialized all memory operations and became a scalability bottleneck for multi-threaded processes with large address spaces. This design enables multiple threads to trigger and resolve page faults independently, with the kernel mapping faults to physical frames while maintaining isolation; for example, in multithreaded kernels, each thread can handle its own faults without blocking siblings, using lightweight locking to protect VMA metadata during concurrent reads.
+As of 2025, modern kernels incorporate extended Berkeley Packet Filter (eBPF) for safe, concurrent extensions without modifying core code. eBPF programs, verified and loaded dynamically into the kernel, enable user-defined concurrency primitives like lightweight testing of thread interleavings for bug detection, running safely alongside kernel threads with bounded execution to prevent races or deadlocks. This trend enhances kernel extensibility for observability and networking, allowing concurrent hooks into scheduler paths or interrupt contexts while maintaining isolation through the eBPF verifier.
+
+Distributed and Advanced Applications
+
+Challenges in Distributed Environments
+
+Distributed environments introduce significant challenges to concurrency control beyond those in centralized systems, primarily due to the inherent asynchrony of communication, unreliable networks, and the physical separation of nodes across geographies. In such settings, operations may experience unpredictable delays, and there is no shared global clock, complicating the ordering of events necessary for maintaining consistency. This asynchrony arises because messages between nodes can be delayed, lost, or reordered, making it impossible to assume a uniform notion of "simultaneous" execution across the system.
+A core issue is clock skew, where local clocks on different nodes drift apart due to variations in hardware oscillators and environmental factors, leading to inconsistent timestamps for transactions. This skew can cause incorrect ordering of events, such as a transaction appearing to commit before another that logically precedes it, undermining serializability. To address partition tolerancethe ability to continue operating despite network failures that isolate subsets of nodesthe CAP theorem posits that distributed systems cannot simultaneously guarantee consistency, availability, and partition tolerance in the presence of partitions. Formally proven for asynchronous networks, this theorem implies trade-offs: for instance, prioritizing consistency and availability (CA) may fail during partitions, while availability and partition tolerance (AP) often sacrifice strong consistency for eventual consistency.
+Consistency models in distributed systems further highlight these tensions, with strong models like linearizability requiring that operations appear to take effect instantaneously at some point between invocation and response, preserving a real-time order across all nodes. In contrast, sequential consistency ensures that the outcome of executions is equivalent to some sequential interleaving of operations, but without the real-time constraints of linearizability, allowing more flexibility at the cost of potential non-intuitive behaviors. Weaker models, such as eventual consistency, permit temporary inconsistencies that resolve over time if no new updates occur, enabling higher availability in partitioned networks but risking stale reads during convergence periods. These models directly impact global serializability, as achieving it across distributed nodes requires coordinating local schedules to avoid cycles in the global dependency graph, which becomes infeasible under asynchrony without additional mechanisms.
+Failure modes exacerbate these challenges, particularly network partitions that split the system into isolated components, preventing consensus on transaction outcomes and potentially leading to conflicting commits that violate global serializability. Byzantine faults, where nodes may behave arbitrarilysending conflicting messages or halting unpredictablycompound this by allowing malicious or erroneous behavior to propagate inconsistencies, as illustrated in the Byzantine Generals Problem, where agreement cannot be reached if more than one-third of nodes are faulty. In heterogeneous distributed databases, such autonomy in local concurrency control amplifies the difficulty of enforcing global serializability, often requiring relaxed models to avoid indefinite blocking during failures.
+Metrics in geo-replicated systems underscore the practical implications, with commit latency for serializable transactions bounded below by the round-trip time (RTT) between datacenters; for example, in a two-datacenter setup, the sum of commit latencies must be at least the RTT to ensure coordination, often resulting in latencies of 100-200 ms for cross-continental replication. This bound highlights why strong consistency in geo-replicated environments typically incurs 2-3x higher latency compared to local operations, driving the adoption of weaker models to meet performance demands.
+
+Protocols for Distributed Concurrency
+
+In distributed systems, concurrency control protocols ensure that transactions across multiple nodes maintain consistency and isolation despite network partitions, failures, and asynchrony. These protocols address atomicity and durability in distributed transactions by coordinating commits and synchronizing access to shared resources. Key approaches include atomic commit protocols like two-phase commit and consensus-based mechanisms for replicated state machines, which enable fault-tolerant agreement on transaction outcomes.
+The two-phase commit (2PC) protocol is a foundational atomic commit mechanism for distributed transactions, ensuring that all participating nodes either commit or abort collectively. In the prepare phase, the coordinator node queries each participant to vote on whether it can commit the transaction locally; participants respond affirmatively only if they have locked resources and prepared logs for potential rollback or commit. If all votes are yes, the coordinator enters the commit phase, instructing participants to finalize the commit and release locks; otherwise, it issues an abort directive. This protocol guarantees atomicity but can block if the coordinator fails during the commit phase, as participants must wait for recovery to determine the outcome. Non-blocking variants, such as those using a pre-commit state, mitigate this by allowing participants to proceed unilaterally in certain failure scenarios, though they require additional coordination to avoid inconsistencies.
+Consensus protocols provide a robust foundation for distributed concurrency by enabling agreement on a single value or sequence of operations among nodes, often applied to replicated state machines where transactions are logged and replayed consistently. Paxos, introduced by Leslie Lamport, achieves consensus in asynchronous environments tolerant to crash failures, using a proposer-acceptor-learner model to select a leader and replicate decisions safely. It ensures linearizability for state machine replication, making it suitable for coordinating distributed locks and transaction commits. Raft simplifies Paxos by decomposing consensus into leader election, log replication, and safety checks, improving understandability while maintaining equivalent fault tolerance; it has been widely adopted in systems like etcd for managing replicated logs in concurrent environments.
+Distributed locking protocols extend concurrency control by providing mutual exclusion across nodes, preventing conflicting accesses to shared data. Google's Chubby lock service implements distributed locks using a centralized master with Paxos-based replication for fault tolerance, allowing clients to acquire locks on files in a shared namespace for coordination tasks like leader election. Similarly, Apache ZooKeeper offers a hierarchical namespace for distributed coordination, where locks are implemented via ephemeral nodes and watches, ensuring atomic operations and failure detection in large-scale systems. Timestamp-augmented locks enhance these by incorporating global time bounds to order operations and resolve conflicts without full consensus rounds.
+Google's Spanner database exemplifies these protocols in practice, achieving external consistency for distributed transactions using a variant of 2PC combined with the TrueTime API. TrueTime provides uncertainty-bounded timestamps via synchronized atomic clocks and GPS, enabling Spanner to assign commit times that respect causality without relying solely on message delays. This allows Spanner to support serializable isolation across global replicas while tolerating failures through Paxos-managed replication groups.
+
+Concurrency in Real-Time and Embedded Systems
+
+In real-time and embedded systems, concurrency control must ensure not only mutual exclusion and data consistency but also strict timing predictability to meet deadlines, given the resource constraints and safety-critical nature of these environments. Unlike general-purpose systems, where throughput or average response time may suffice, real-time concurrency prioritizes worst-case execution times and bounded blocking to prevent priority inversions that could delay high-priority tasks. This is particularly vital in embedded devices with limited CPU, memory, and power, where unpredictable delays can lead to system failure.
+Real-time systems distinguish between hard and soft deadlines: hard real-time tasks require all deadlines to be met without exception, as missing one could result in catastrophic failure, such as in avionics or medical devices, while soft real-time tasks tolerate occasional misses with degraded but acceptable performance, as seen in multimedia streaming. To achieve schedulability, priority-based scheduling algorithms like rate monotonic scheduling (RMS) assign higher priorities to tasks with shorter periods, providing an optimal fixed-priority policy for periodic tasks under preemptive scheduling. RMS utilizes response-time analysis to verify if a task set meets deadlines, with a schedulability bound of approximately 69% CPU utilization for large numbers of tasks, ensuring predictable concurrency by minimizing interference from lower-priority tasks.
+Key techniques for concurrency control in these systems include the priority ceiling protocol (PCP) for mutexes, which bounds priority inversion by raising a task's priority to the highest priority of any task that may lock the resource upon acquisition, preventing chains of inversions and limiting blocking to a single critical section duration. Similarly, the stack resource policy (SRP) extends PCP for dynamic-priority schedulers like earliest deadline first (EDF), allowing safe stack sharing among tasks while preventing deadlocks and bounding inversion through preemptive priority inheritance at resource entry. These protocols ensure that high-priority tasks are not indefinitely delayed by lower-priority ones holding shared resources, such as semaphores or buffers in sensor fusion modules.
+In embedded systems, real-time operating systems (RTOS) like FreeRTOS implement lightweight concurrency primitives tailored to microcontrollers, including mutexes with priority inheritance to mitigate inversion without the overhead of full PCP, and binary semaphores for simple signaling, enabling efficient task synchronization in memory-constrained environments. Power-aware concurrency further optimizes these by integrating dynamic voltage and frequency scaling (DVFS) with scheduling, where tasks are grouped by power states to reduce energy consumption while preserving timing guarantees, as demonstrated in battery-powered IoT devices where idle locking and opportunistic scaling cut power by up to 30% under RMS without deadline violations.
+A prominent case study is automotive systems under the AUTOSAR standard, which supports concurrent processing of sensor data from cameras, LIDAR, and radar in electronic control units (ECUs) through its OS layer and priority-based mechanisms. AUTOSAR's OS layer uses priority-based tasks and events for real-time concurrency, ensuring deterministic handling of multi-sensor fusionsuch as obstacle detectionvia protected resources and interrupt-safe queues, preventing data races while meeting ASIL-D safety levels for advanced driver-assistance systems (ADAS).
+
+References
+
+ Concurrency Control in Database Systems
+
+ Lecture Notes - 15 Concurrency Control Theory
+
+ Chapter 18 : Concurrency Control - Database System Concepts
+
+ Concurrency Control in Distributed Database Systems
+
+Concurrency Control in Distributed Database Systems
+
+ A Survey of Concurrency Control Algorithms in the Operating Systems
+
+ Solution of a Problem in Concurrent Programming Control
+
+ The Notions of Consistency and Predicate Locks in a Database ...
+
+ An Evaluation of Concurrency Control with One Thousand Cores
+
+2PC*: a distributed transaction concurrency control protocol of multi ...
+
+ Jim Gray - The Transaction Concept: Virtues and Limitations
+
+The notions of consistency and predicate locks in a database system
+
+ A Critique of ANSI SQL Isolation Levels - Microsoft
+
+ The Serializability of Concurrent Database Updates
+
+ SERIALIZAWLITY THEORY - Microsoft
+
+ Linearizability: A Correctness Condition for Concurrent Objects
+
+ TWO PHASE LOCKING - Microsoft
+
+ Granularity of Locks in a Shared Data Base - cs.wisc.edu
+
+ threads-locks.pdf - cs.wisc.edu
+
+ TIMESTAMP-BASED ALGORITHMS FOR CONCURRENCY ...
+
+None
+
+ Majority Consensus for Multiple Copy Database Control
+
+ Priority inheritance protocols: an approach to real-time synchronization
+
+On optimistic methods for concurrency control - ACM Digital Library
+
+A critique of ANSI SQL isolation levels - ACM Digital Library
+
+Principles of transaction-oriented database recovery
+
+Everything you always wanted to know about SQL isolation levels ...
+
+Isolation levels and concurrency
+
+ adya-phd.pdf - Programming Methodology Group
+
+Documentation: 18: 13.2. Transaction Isolation - PostgreSQL
+
+ Making Snapshot Isolation Serializable
+
+MySQL :: MySQL 8.0 Reference Manual :: 17.7.2.1 Transaction Isolation Levels
+
+Chapter13.Concurrency Control
+
+Data Concurrency and Consistency - Oracle Help Center
+
+ An Empirical Evaluation of In-Memory Multi-Version Concurrency ...
+
+ Spanner: Google's Globally-Distributed Database
+
+ NeurDB: On the Design and Implementation of an AI-powered ...
+
+E.W.Dijkstra Archive: Cooperating sequential processes (EWD 123)
+
+Monitors: an operating system structuring concept
+
+System Deadlocks
+
+Avoiding deadlock in multitasking systems - ACM Digital Library
+
+https://www.cs.utexas.edu/users/EWD/ewd01xx/EWD108.PDF
+
+Lock types and their rules - The Linux Kernel documentation
+
+Unreliable Guide To Locking The Linux Kernel documentation
+
+Local locks in the kernel - LWN.net
+
+What is RCU? -- Read, Copy, Update - The Linux Kernel Archives
+
+What is RCU, Fundamentally? - LWN.net
+
+Concurrent page-fault handling with per-VMA locks - LWN.net
+
+Process Addresses - The Linux Kernel documentation
+
+ Beyond Multiprocessing: Multithreading the SUnOS Kernel - USENIX
+
+ Concurrency Testing in the Linux Kernel via eBPF - arXiv
+
+eBPF Ecosystem Progress in 20242025: A Technical Deep Dive
+
+ Time, Clocks, and the Ordering of Events in a Distributed System
+
+ Brewer's Conjecture and the Feasibility of
+
+ sequential consistency - Washington
+
+ The Byzantine Generals Problem - Leslie Lamport
+
+ Effects of Autonomy on Maintaining Global Serializability in ... - CORE
+
+ Scheduling Algorithms for Multiprogramming in a Hard- Real-Time ...
+
+Priority inheritance protocols: an approach to real-time synchronization
+
+ A stack-based resource allocation policy for realtime processes
+
+What is database contention, and why should you care?
+
+Identifying and Resolving Database Contention Issues
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

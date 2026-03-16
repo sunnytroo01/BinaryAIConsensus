@@ -1,0 +1,261 @@
+Journaling file system Grokipedia
+ 
+
+ Fact-checked by Grok 1 month ago 
+Journaling file system
+ Ara Eve Leo Sal 
+1x
+ A journaling file system is a type of file system that maintains a dedicated log, called a journal, to record metadata and sometimes data changes before they are committed to the primary file system structures, drawing from database transaction logging principles to ensure atomicity and consistency. This approach prevents inconsistencies during system crashes by allowing recovery through replaying the journal, which restores the file system to a known good state much faster than traditional methods that require exhaustive checks like fsck.
+The origins of journaling trace back to the early 1990s in enterprise environments, with IBM developing the Journaled File System (JFS) in 1990 for its AIX operating system to enhance reliability in high-availability servers. Silicon Graphics followed with XFS in 1994, optimized for high-performance computing on IRIX, which later ported to Linux in 2001. In the Linux ecosystem, the ext3 file system, introduced in 2001 as a journaling extension to the widely used ext2, became a standard for its compatibility and reduced recovery times, paving the way for successors like ext4 in 2008, ReiserFS in 2001 for efficient small-file handling. Microsoft's NTFS, deployed since Windows NT 3.1 in 1993, incorporates journaling through a transaction log ($LogFile) for metadata changes, enabling recovery to a consistent state after system failures, and supports features like file compression and encryption.
+Journaling systems vary in operation modes to trade off between performance, safety, and storage overhead: the writeback mode logs only metadata changes for speed but risks data inconsistency; ordered mode (common default, e.g., in ext3/ext4) writes data blocks before their metadata to prevent stale data exposure; and data mode journals both metadata and data for full protection against corruption, at the cost of higher overhead. Benefits include fault tolerance against power failures or improper shutdowns, elimination of lengthy consistency checks on boot, and support for large-scale storage, though they introduce minor write amplification from journaling. These systems underpin modern operating systems, enabling reliable data management in desktops, servers, and embedded devices.
+
+Fundamentals
+
+Definition
+
+A journaling file system is a type of file system that records pending updates to its structures in a dedicated log, known as a journal, before committing those changes to the main file system area on disk. This approach ensures that in the event of a system crash or power failure, the file system can quickly recover consistency by replaying the committed transactions from the journal, avoiding the need for extensive scanning of the entire disk.
+To understand journaling file systems, it is helpful to review basic file system components. A file system organizes data on storage devices into fixed-size units called blocks, which serve as the fundamental allocation units for storing file contents and metadata. Each file is represented by an inode, a data structure that holds metadata such as file size, permissions, timestamps, and pointers to the blocks containing the file's data. The superblock is a critical metadata structure that describes the overall file system layout, including the number of blocks, inodes, and the location of other key structures like the free space bitmap.
+The journal itself functions as an append-only log or a circular buffer, typically allocated as a contiguous or file-based region on disk, where transactionsgroups of atomic changesare written sequentially. Journaling systems distinguish between metadata journaling, which logs only changes to structures like inodes and directories (while applying data writes directly), and full data journaling, which also logs file data blocks to guarantee their integrity. In ordered metadata-only mode, data is written to its final location before the corresponding metadata transaction is committed, balancing performance and safety.
+Prominent examples of journaling file systems include:
+
+ext3: Developed by Stephen Tweedie and released in 1999 for the Linux kernel 2.2, as a journaling extension of the ext2 file system.
+
+ext4: Introduced in 2008 as an enhanced successor to ext3, led by Theodore Ts'o, with improvements in scalability and performance for larger volumes.
+
+JFS: Created by IBM in 1990 for the AIX operating system and ported to Linux in 2001, emphasizing high throughput for enterprise workloads.
+
+XFS: Originated by Silicon Graphics (SGI) in 1994 for the IRIX platform and ported to Linux in 2001, optimized for high-performance computing and large files.
+
+NTFS: Developed by Microsoft starting in 1993 for Windows NT 3.1, serving as the default file system for modern Windows with support for security and quotas.
+
+ReiserFS: Designed by Hans Reiser and Namesys, released in 2001 for Linux, focusing on efficient handling of small files through a B-tree structure (now deprecated and removed from the Linux kernel as of 2024).
+
+Rationale
+
+Non-journaling file systems, such as the original ext2 filesystem, face significant risks of metadata corruption during system crashes or power failures because file operations typically require multiple asynchronous disk writes that may only be partially completed. If a crash interrupts these operations, the filesystem can enter an inconsistent state where metadata structures like inodes, directories, or block allocation maps are left partially updated, potentially leading to data loss, orphaned files, or allocation errors. Recovery in such cases relies on tools like fsck, which must scan and repair the entire filesystem, often taking hours for large volumes due to the need to traverse all blocks and metadata.
+Journaling file systems mitigate these issues by maintaining a log of pending changes, ensuring that recovery involves replaying only the journal rather than a full scan, which reduces boot times from hours to seconds or even sub-seconds. This approach minimizes the risk of filesystem inconsistencies by guaranteeing atomicity for metadata updates and supports reliable execution of multi-step operations, such as file creation or deletion, even if interrupted.
+However, journaling introduces trade-offs, including write performance overhead from double-writing data to the journal and main filesystem, which can slow writes in synchronous workloads. Additionally, the journal requires a small dedicated portion of the disk, often less than 1% for large filesystems depending on configuration, to hold transaction logs without impacting the primary data area.
+These benefits make journaling particularly valuable in use cases prone to unexpected interruptions, such as enterprise servers handling high transaction volumes, databases requiring consistent state after failures, and mobile devices susceptible to sudden power loss during battery drain or removal.
+
+Historical Development
+
+Origins
+
+The conceptual roots of journaling file systems trace back to transaction logging techniques in database systems during the 1970s and 1980s. Write-ahead logging (WAL), a method for ensuring atomicity and durability by recording transaction changes to a sequential log before applying them to the main data structures, emerged as a key innovation in late-1970s database research, such as IBM's System R project. This approach addressed consistency issues in multi-user environments prone to failures. The ARIES (Algorithms for Recovery and Isolation Exploiting Semantics) recovery algorithm, developed by C. Mohan and colleagues at IBM and published in 1992, built on WAL principles with three-phase recovery (analysis, redo, undo) and explicitly extended its applicability to recoverable file systems beyond databases.
+Pioneering file system research in the late 1980s at UC Berkeley produced the Sprite Log-Structured File System (LFS), a prototype that served as an influential precursor to journaling by appending all file system modificationsincluding data and metadatasequentially to a disk log, rather than scattering updates randomly. Implemented by Mendel Rosenblum and John K. Ousterhout, Sprite LFS, detailed in their 1992 paper, achieved up to an order-of-magnitude improvement in write performance for small files on contemporary hardware by exploiting sequential disk access patterns, though it required complex cleaner processes to manage log space.
+The first production journaling file system appeared in 1990 with IBM's Journaled File System (JFS), integrated into AIX version 3.1 as a metadata-focused logging mechanism to enable rapid crash recovery without full file system scans. This development was motivated in part by the limitations of earlier Unix file systems, such as the Berkeley Fast File System (FFS) designed by Marshall Kirk McKusick, William Joy, Samuel Leffler, and Robert Fabry in 1983 for 4.2BSD, where post-crash consistency checks via fsck on VAX minicomputers could require hours for large volumes due to exhaustive verification of inodes and blocks.
+Hardware constraints of the era, including disk seek times exceeding 30 milliseconds and bandwidth limited to a few megabytes per second, posed significant early challenges for journaling, as full-data logging risked amplifying write amplification and reducing throughput. Consequently, initial designs like JFS prioritized metadata-only journaling to limit overhead, logging only structural changes (e.g., inode updates) while assuming data writes were durable, thereby achieving sub-second recovery times even on multi-gigabyte volumes.
+
+Key Milestones
+
+The development of journaling file systems gained momentum in the 1990s with the introduction of NTFS by Microsoft alongside Windows NT 3.1 in 1993, marking one of the first widespread implementations of journaling to enhance data integrity in enterprise environments. Shortly thereafter, Silicon Graphics released XFS in December 1994 for its IRIX operating system, emphasizing high-performance journaling for large-scale storage systems. These early systems laid the groundwork for journaling adoption beyond experimental prototypes.
+Entering the early 2000s, Linux saw significant breakthroughs with the release of ext3 in November 2001 as part of kernel version 2.4.15, building on ext2 with journaling capabilities developed since 1998 to provide crash recovery without full file system checks. Earlier in 2001, ReiserFS debuted with kernel version 2.4.1, introducing B-tree-based structures for efficient handling of small files and directories in journaling contexts. IBM open-sourced JFS in 1999, with Linux kernel integration following in 2001, bringing balanced tree optimizations from its AIX origins to open-source ecosystems. XFS was ported to Linux in 2001, enabling its high-throughput journaling features for broader use.
+The 2000s also featured widespread integration of these systems into the Linux kernel, solidifying journaling as a standard for reliability in distributions. By the late 2000s, ext4 emerged in 2008 with kernel 2.6.28, enhancing ext3's journaling through features like delayed allocation to reduce fragmentation and improve performance on larger volumes. Sun Microsystems released ZFS in 2005 under OpenSolaris, influencing journaling hybrids with its copy-on-write mechanisms integrated into a pooled storage model.
+In the 2010s, Btrfs entered the Linux kernel in 2009, combining journaling with copy-on-write for advanced snapshotting and data integrity, though it evolved toward hybrid approaches. Apple's APFS, introduced in 2016 with macOS High Sierra, optimized SSD performance through a metadata scheme that achieves journaling-like crash protection via copy-on-write, eliminating traditional logs for faster recovery.
+Recent developments as of 2025 have focused on refining journaling for modern hardware, including improvements to ext4's metadata operations and journaling in Linux kernel 6.x series. Notably, ReiserFS support was fully removed from the Linux kernel in version 6.13 (November 2024), marking the end of maintenance for this pioneering journaling file system due to lack of upstream development. Barriers such as Microsoft's patents on NTFS were addressed through licensing agreements, like the 2009 deal with Tuxera for the open-source NTFS-3G driver, enabling reliable cross-platform support without infringement risks.
+
+Core Mechanisms
+
+Journal Structures
+
+A journaling file system's journal is structured as an append-only log, where updates are written sequentially to ensure atomicity and ordered recovery. This log includes headers with transaction identifiers (TIDs) and sequence numbers to track the progress and ordering of operations, preventing replays of outdated entries during recovery. The log functions as a circular buffer, allowing continuous overwriting of space from committed transactions once they are no longer needed.
+Key components of the journal include descriptor blocks, which detail metadata changes such as inode modifications or directory entries; data blocks or tags, which either contain the updated content or reference block pointers for data writes; and commit blocks, which signal the successful completion of a transaction. These elements are grouped into transactions, with descriptors marking the start, followed by the payload, and commit blocks at the end. Journals vary between fixed-size formats, such as the contiguous 32 MB maximum in ReiserFS, and variable-size configurations that adapt to file system needs, as in ext3 where size is set during formatting.
+Space management in the journal relies on sizing it to buffer brief bursts of activity, with ext3 typically defaulting to around 32 MB for larger volumes to support recovery in approximately one second. Checkpointing reclaims space by verifying that committed updates have been applied to the main file system, advancing the log tail to free blocks for new transactions and preventing unbounded growth.
+Variations in journal implementation distinguish between fully on-disk storage for durability and in-memory buffering of dirty metadata before commit, reducing write amplification while relying on the log for crash consistency. The journal's location is integrated with the file system superblock, such as through a reserved inode in ext3, which maintains backward compatibility with non-journaled layouts like ext2.
+
+Logging Process
+
+In journaling file systems, the logging process follows a transaction-based model to ensure atomicity and consistency of file system updates. A transaction begins by marking the start of a sequence of operations, such as metadata modifications or data writes, which are then logged as pending changes in the journal before any permanent commitment to the main file system structures. The transaction commits atomically once the log entries are synchronized to stable storage, typically via a flush operation that guarantees the journal contents are durable on disk. This write-ahead logging approach allows multiple file system operations to be batched into a single transaction, improving efficiency by reducing the frequency of disk synchronizations while maintaining the illusion of atomic updates.
+The write phases in the logging process emphasize ordered durability to prevent inconsistencies. Changes are first written to the journal in a dedicated area, often using a circular buffer structure for sequential appends, before being applied to the main file system. Barriers or explicit flushes are then employed to enforce write ordering, ensuring that journal commits occur after preceding data writes but before dependent metadata updates, thereby preserving causal relationships across storage layers. After checkpointing, where committed transactions are replayed or discarded from the journal, the changes are propagated to their final locations in the file system, freeing journal space for new entries.
+Journaling file systems support configurable modes that balance consistency guarantees with performance, exemplified in implementations like ext3. In data=ordered mode, only metadata changes are logged in the journal, while file data is written directly to its final disk location before the corresponding metadata commit, relying on barriers to synchronize data writes and minimize corruption risks without full data journaling. The data=journal mode provides stronger guarantees by logging both file data and metadata in the journal prior to commitment, ensuring full atomicity but at the cost of writing data twiceonce to the journal and again to the main file system. In contrast, data=writeback mode journals only metadata asynchronously, allowing data writes without immediate ordering, which offers the highest performance but exposes the system to potential data exposure or old data visibility after crashes.
+These processes introduce overheads inherent to the journaling mechanism, particularly the double-write penalty in full data journaling modes, where each modified block must be copied to the journal before its permanent location, doubling I/O operations and increasing latency for write-intensive workloads. Batching multiple operations into compound transactions mitigates this by amortizing the fixed costs of journal commits across several changes, though transaction size is typically limited to a fraction of the journal capacity to bound recovery time.
+
+Recovery Procedures
+
+Upon system startup following a crash, journaling file systems first detect inconsistencies by examining the superblock for a clean shutdown flag; if absent, the journal is scanned for uncommitted transactions marked by incomplete commit records or mismatched sequence numbers. In ext4, for instance, the journal superblock provides the sequence number of the last committed transaction, allowing the recovery process to identify and skip any partial updates.
+The core recovery mechanism employs a forward replay algorithm, where the system sequentially applies all committed transactions from the journal to the main file system structures, ensuring metadata and, in data-journaling modes, file contents are restored to a consistent state. Incomplete transactionsthose lacking a valid commit blockare discarded, effectively rolling back any in-flight changes without altering already-committed data. This process relies on idempotency, achieved through redo logging that records the final outcomes of operations rather than procedural steps, preventing duplicate applications even if recovery replays overlapping transactions.
+Recovery is typically integrated into the mount process for the file system, with tools like e2fsck handling verification and repair for the ext family by replaying the journal and checking for broader inconsistencies. The time complexity is linear in the journal size, O(journal blocks), which remains efficient as journals are orders of magnitude smaller than the full disk volume, often completing in seconds even for large systems.
+Edge cases include power loss during a commit, where the absence of a commit record ensures the partial transaction is ignored, preserving prior consistency without data loss. Wrapped journals, which circularly overwrite old entries after reaching capacity (e.g., 2^32 blocks in ext4), are handled by starting the scan from the superblock's last sequence number, avoiding replay of checkpointed data. Additionally, checksum verification using algorithms like CRC32C on journal blocks detects corruption during replay, triggering abort or repair as needed.
+
+Implementation Techniques
+
+Physical Journaling
+
+Physical journaling involves logging entire disk blocks, typically in fixed sizes such as 4 KB, encompassing both metadata and data as raw physical units before they are written to their final locations in the file system. This approach, also known as full or data journaling, ensures that all changes are captured atomically in the journal, providing a complete snapshot for recovery. In systems like ext3, this is implemented in the data=journal mode, where every modified block is first appended to the journal with tags indicating its type and destination.
+The primary advantage of physical journaling is its guarantee of full atomicity for both data and metadata, preventing inconsistencies even in the event of a crash during data writes, which makes it particularly suitable for applications requiring strict consistency, such as databases. However, it incurs significant overhead due to the need to write each block twiceonce to the journal and once to the final positionpotentially doubling I/O operations and increasing space usage in the journal. This double-write penalty can lead to performance degradation, with benchmarks showing ext3 in data=journal mode achieving only 33-50% of the throughput of non-journaled ext2 under certain workloads.
+In implementation, the journal maintains tags for each block entry, including identifiers for the block's location and transaction boundaries marked by commit headers, allowing for idempotent replay during recovery. Upon system restart, the recovery process scans the journal sequentially, copying valid, uncommitted blocks back to their intended positions in the main file system while skipping already-applied ones based on sequence numbers. This block-level tagging and copying mechanism contrasts with higher-level logging by treating data opaquely as full units, without parsing file system semantics during journaling.
+Examples of physical journaling include the data=journal mode in ext3.
+
+Logical Journaling
+
+Logical journaling represents an approach in journaling file systems where metadata modifications are recorded as high-level, abstract operationssuch as "allocate block X to inode Y" or "update field Z in directory entry"rather than logging the complete contents of affected data blocks. This method focuses exclusively on metadata structures like inodes, directories, and allocation bitmaps, excluding user data blocks to minimize overhead. During recovery, the file system replays these logged operations using specialized code to reconstruct the consistent metadata state, ensuring atomicity without needing to store or replay full block images.
+The key benefit of logical journaling lies in its reduced storage and I/O requirements, as metadata typically accounts for a small portion of file system activityoften less than 1% of total data volumeenabling faster write performance and quicker recovery times for metadata-intensive workloads compared to approaches that log user data. However, this efficiency comes at the cost of lower fault tolerance for user data integrity; if a crash occurs after writing data but before committing the corresponding metadata operation, the data may become inaccessible or appear corrupted, as the journal does not protect against such mismatches.
+Implementation of logical journaling relies on structured operation logs comprising descriptors that encode the intent and parameters of metadata changes, such as create, delete, or rename actions, often including support for reverse operations to enable rollback or undo during partial transaction recovery. These logs are written to the journal in a compact format, with commit records marking transaction boundaries and revoke entries preventing replay of superseded operations. In ext3, the default ordered journaling mode employs descriptor blocks to succinctly capture multiple metadata updates, providing inherent compression and reducing journal traffic for operations like file allocations. XFS implements metadata journaling through a write-ahead log that records individual structural changes to metadata objects, such as inode modifications, allowing for scalable performance in high-volume environments without the overhead of data logging. These techniques yield substantial efficiency improvements, with logical approaches demonstrating lower journal write volumes than full block logging in comparable scenarios.
+
+Write Hazard Mitigation
+
+In journaling file systems, write hazards primarily arise from disk controllers and storage devices that reorder or buffer writes to optimize performance, potentially leading to inconsistent on-disk states such as metadata updates committing before corresponding data blocks are persisteda phenomenon known as "tearing." This can result in scenarios where file pointers reference unwritten or garbage data, causing corruption upon crash recovery. For instance, in metadata-only journaling, if a disk controller reorders operations, an inode modification might be journaled while the associated data block remains unflushed, leaving the file system in an invalid state.
+To mitigate these hazards, journaling systems employ write barriers, which are explicit commands that ensure all preceding writes complete to stable storage before subsequent operations proceed, preserving the intended order despite device-level reordering. In Linux implementations like ext3 and ext4, barriers are integrated via system calls such as fdatasync() or mount options like barrier=1, forcing the disk to flush its write-back cache at critical points, such as before journal commits. Additionally, ordered journaling modecommon in metadata journalingaddresses tearing by requiring data blocks to be synchronously written to their final locations on disk prior to journaling the associated metadata, thus guaranteeing that pointers never reference uncommitted data.
+Advanced techniques further enhance reliability, including journal-specific barriers that delimit transaction commits to prevent partial log writes and checksums embedded in journal entries to verify integrity and detect incomplete operations. In ext4, for example, metadata checksums allow the file system to identify and skip corrupted journal blocks during replay, reducing the risk of propagating errors. For solid-state drives (SSDs), where barriers can exacerbate write amplification by triggering unnecessary erases and garbage collection, mitigations involve optimizing barrier usagesuch as selective application in ordered modeor leveraging SSD firmware features for atomic multi-block writes to minimize wear while maintaining order.
+These mitigations impose performance trade-offs, as barriers introduce latency by draining disk caches, typically adding 1-10 milliseconds per synchronization operation depending on hardware, which can bottleneck high-throughput workloads like databases. In real-time or latency-sensitive systems, disabling barriers (e.g., via barrier=0 mount option) may be considered if the storage uses battery-backed caches or non-volatile memory, though this increases corruption risk from reordering. Overall, the balance favors enabled barriers in standard configurations to prioritize data integrity over raw speed.
+
+Alternatives
+
+Soft Updates
+
+Soft updates represent a non-journaling technique for maintaining file system consistency by tracking and enforcing dependencies among metadata updates, allowing writes to be delayed and reordered in memory without requiring a dedicated log structure. The core mechanism involves maintaining a dependency graph for operations such as block allocations, inode updates, and directory entries; for instance, an inode update that references a newly allocated block is not committed to disk until the allocation itself is persisted, preventing orphaned or dangling references during a crash. This dependency tracking occurs in the buffer cache, where updates are batched and flushed in an order that preserves atomicity, often using rollback mechanisms to revert partial writes if prerequisites fail.
+A primary advantage of soft updates is the elimination of journal overhead, enabling faster write performance by avoiding extra disk I/O for logging and permitting most metadata operations to proceed asynchronously, which can improve throughput in metadata-intensive workloads compared to synchronous alternatives. However, this approach is limited to metadata and does not protect user data, and in the event of a crash, the file system may still require a full fsck scan to resolve any residual inconsistencies, potentially taking several minutes on large volumes. In contrast, journaling systems achieve recovery in seconds through log replay, though at the cost of higher runtime write amplification.
+Soft updates were implemented in the Unix File System (UFS) variant known as the Berkeley Fast File System, with integration into FreeBSD's UFS2 during the late 1990s, building on earlier dependency-tracking concepts from the mid-1990s. The technique uses intent logging in memory for batches of related updates, such as directory modifications, to coordinate flushes efficiently without persistent storage. This implementation has been refined over time, including extensions like journaled soft updates in later FreeBSD versions, but the base form remains focused on dependency ordering for low-overhead consistency.
+
+Log-Structured File Systems
+
+Log-structured file systems (LFS) treat the entire file system as a single append-only log, where all modificationsincluding both data and metadataare written sequentially to the disk without in-place updates. This approach eliminates the fragmentation typical of traditional file systems by organizing storage into fixed-size segments, typically 512 KB to 1 MB, which are filled sequentially before advancing to the next. Inodes and directory structures are also logged, with a fixed master inode map pointing to the most recent versions, ensuring that reads can locate current data by following pointers backward through the log. Unlike journaling systems that maintain a separate log for transactional recovery, LFS integrates the log as the primary storage medium, simplifying the architecture but requiring mechanisms to reclaim space from obsolete data.
+The writing process in LFS buffers changes in memory and flushes them as complete segments to the log, achieving high throughput by minimizing seek operations. To handle space reclamation, LFS employs garbage collection through segment cleaning: the cleaner scans segments to identify live (valid) and dead (obsolete) data, then copies live data to new clean segments and erases the old ones, effectively defragmenting the log. Cleaning policies, such as greedy or cost-benefit algorithms, prioritize segments with high ratios of dead space to reduce overhead; in the original Sprite LFS implementation, this process runs in the background and separates files into generations similar to generational garbage collection in programming languages. For random writes, which could otherwise fragment the log, segment cleaners consolidate updates, though this introduces write amplification where the total disk writes exceed user data writes by factors of 2 to 10 times, depending on workload and utilization. Modern variants optimize this for flash storage by separating hot and cold data into multi-head logs and using adaptive logging to switch modes based on free space availability.
+LFS excels in environments with sequential write patterns, such as SSDs, where it leverages the device's native logging efficiency to achieve up to 65-75% of raw disk bandwidth utilization, compared to 5-10% in traditional Unix file systems like FFS. The absence of a separate journal reduces complexity and overhead, while crash recovery is rapid, involving a scan of only the recent log portion rather than the entire file system. However, the cleaning process can degrade performance under high utilization or random workloads, as it competes for I/O resources and amplifies writes, potentially shortening device lifespan on flash media. The seminal Sprite LFS prototype, developed in 1985 and detailed in 1991, demonstrated up to 10 times faster small-file write performance over FFS on disk-based systems. A prominent modern implementation is Linux's F2FS, introduced in 2012 and optimized for NAND flash, which outperforms EXT4 by up to 3.1 times in benchmarks like iozone on mobile devices by mitigating the "wandering tree" problem in metadata and aligning with flash translation layer operations.
+In contrast to journaling file systems' hybrid approachwhich logs metadata or data selectively before applying changes in-placeLFS's full-log structure provides inherent versioning and atomicity but demands proactive cleaning to manage random access patterns, making it particularly suited for write-heavy, append-dominant applications like databases or embedded systems. The concepts pioneered in LFS significantly influenced the development of journaling techniques by demonstrating the benefits of log-based storage for reliability and performance.
+
+Copy-on-Write File Systems
+
+Copy-on-write (COW) file systems represent an alternative approach to ensuring data consistency and crash recovery by avoiding in-place modifications entirely, instead creating new versions of modified blocks and updating filesystem pointers atomically. In this mechanism, when a write operation occurs, the filesystem allocates fresh space for the updated block, copies the modified data into it, and then adjusts the metadata pointerssuch as those in the block treeto reference the new block while leaving the original unchanged. This process propagates up the tree structure until the root pointer, often called the uberblock in systems like ZFS, is updated in a single atomic step, ensuring that the filesystem always presents a consistent view to the operating system either before or after the update, without partial states. Snapshots are a natural byproduct of COW, as they simply retain pointers to the unaltered original blocks, allowing instantaneous, space-efficient point-in-time copies that share data with the active filesystem until further divergence.
+The immutable nature of data blocks in COW systems facilitates easy backups and cloning, as unchanged paths in the block tree can be referenced directly without duplication, promoting data integrity through checksum verification on all blocks to detect corruption. However, this approach incurs higher space usage due to the temporary retention of both old and new block versions, which can lead to overhead before garbage collection reclaims space, and it introduces read amplification because metadata indirection may require traversing more pointers to access data. Additionally, while COW enhances fault tolerance by eliminating the need for post-crash replay, it can suffer from fragmentation over time, particularly in metadata-heavy operations, potentially degrading performance on spinning disks.
+Prominent implementations include ZFS, introduced by Sun Microsystems in 2005 as part of Solaris, which integrates COW with built-in volume management and RAID-like redundancy via RAID-Z to provide end-to-end data integrity and self-healing capabilities. Btrfs, developed by Chris Mason at Oracle starting in 2007 and merged into the Linux kernel, extends COW with B-tree structures for efficient indexing, supporting features like subvolumes, compression, and multi-device RAID levels for scalable storage pools. Unlike traditional journaling systems, COW achieves atomicity through block versioning and pointer indirection rather than logging changes, which eliminates journal overhead but enables superior deduplication by allowing shared references to identical immutable blocks across files.
+
+References
+
+OS Lecture #25 - NYU Computer Science
+
+ Anatomy of Linux journaling file systems - IBM
+
+Change Journals - Win32 apps - Microsoft Learn
+
+ Analysis and Evolution of Journaling File Systems - USENIX
+
+ JOURNALING FILE SYSTEMS
+
+Ext3 Filesystem - The Linux Kernel documentation
+
+ext4 General Information - The Linux Kernel documentation
+
+The SGI XFS Filesystem - The Linux Kernel documentation
+
+NTFS overview - Microsoft Learn
+
+ Journaling the Linux ext2fs Filesystem - Columbia CS
+
+IBM's Journaled Filesystem
+
+ Analysis and Evolution of Journaling File Systems - cs.wisc.edu
+
+Forensic Analysis of Android Phone Using Ext4 File System Journal ...
+
+ ARIES: A Transaction Recovery Method Supporting Fine-Granularity ...
+
+ The design and implementation of a log-structured file system
+
+ A Fast File System for UNIX* - Revised July 27, 1983 - Berkeley EECS
+
+Analysis and Evolution of Journaling File Systems - USENIX
+
+ XFS: the big storage file system for Linux - USENIX
+
+What is ext3? -- introduction by The Linux Information Project (LINFO)
+
+ReiserFS Reaches Its Final Chapter - Linuxiac
+
+IBM's Journaled Filesystem
+
+The Ext4 Filesystem - The Linux Information Project
+
+History - - OpenZFS
+
+Introduction BTRFS documentation - Read the Docs
+
+LWN.net Weekly Edition for June 22, 2023
+
+Microsoft signs confidential IP deal over NTFS - ZDNET
+
+ Crash Consistency: FSCK and Journaling - cs.wisc.edu
+
+ State of the Art: Where we are with the Ext3 filesystem
+
+3.6. Journal (jbd2) The Linux Kernel documentation
+
+https://man7.org/linux/man-pages/man8/e2fsck.8.html
+
+ Journaling - CS 161
+
+ Out-of-Place Journaling - USENIX
+
+ EXT3, Journaling Filesystem - cs.wisc.edu
+
+ Journaling - File Systems
+
+Improving ext4: bigalloc, inline data, and metadata checksums
+
+ Atomic Writes to Unleash Pivotal Fault-Tolerance in SSDs - USENIX
+
+Barriers and journaling filesystems - LWN.net
+
+Soft Updates: A Technique for Eliminating Most Synchronous Writes ...
+
+ Journaling versus Soft Updates: Asynchronous Meta-data Protection ...
+
+ Journaled Soft-updates - Marshall Kirk McKusick
+
+ F2FS: A New File System for Flash Storage - USENIX
+
+None
+
+ The Btrfs Filesystem
+
+ Copy On Write Based File Systems Performance Analysis And ...
+
+ SYSTEMS How to Not Copy Files - USENIX
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

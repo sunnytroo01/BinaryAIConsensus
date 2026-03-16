@@ -1,0 +1,241 @@
+OSTree Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+OSTree
+ Ara Eve Leo Sal 
+1x
+ OSTree is an upgrade system for Linux-based operating systems that performs atomic upgrades of complete filesystem trees, combining a git-like model for committing and downloading bootable filesystem trees with tools for managing deployments and updates. It operates as both a shared library (libostree) and a suite of command-line tools, enabling the replication of read-only OS trees via content-addressed object stores while supporting parallel installations and efficient deduplication through hardlinks. Developed to complement rather than replace traditional package managers, OSTree emphasizes immutability, version control, and reliability in OS deployment, making it suitable for bare-metal systems, virtual machines, and container-like environments.
+At its core, OSTree uses a repository structuretypically located at /ostree/repoto store filesystem objects in a content-addressed format, similar to Git repositories, which allows for branching, merging, and history tracking of entire OS images. Deployments are managed in directories like /ostree/deploy/$STATEROOT/$CHECKSUM, where each deployment represents a bootable, versioned tree that can be atomically switched during updates, ensuring that failed upgrades do not corrupt the system. The system maintains two primary writable directories, /etc for configuration and /var for runtime state, overlaid on an otherwise read-only root filesystem to balance immutability with necessary mutability. This design supports features like A/B partitioning for seamless rollbacks, byte-level diffs for low-bandwidth updates, and integration with bootloaders such as GRUB to point to the active deployment.
+As of 2025, OSTree has been adopted in various Linux distributions and projects to enable image-based OS management, including Fedora Silverblue and Fedora CoreOS, where it serves as the foundation for layering RPM packages atop base images via tools like rpm-ostree; emerging tools like bootc further extend its principles for container-native deployments. In enterprise contexts, such as Red Hat Enterprise Linux for Edge and CentOS Automotive SIG, it facilitates secure, tamper-proof deployments with read-only /usr partitions and automated health checks for rollback via extensions like Greenboot. By providing a unified approach to OS versioning that works across userspace filesystems and supports HTTP-based replication, OSTree addresses challenges in traditional package-based updates, promoting faster, more reliable system maintenance in embedded, cloud, and desktop scenarios.
+
+Overview
+
+Description
+
+OSTree (libostree) is a shared library and suite of command-line tools for managing bootable, immutable, and versioned filesystem trees in Linux-based operating systems. It integrates a Git-like model for committing and downloading entire filesystem trees with mechanisms for deployment and bootloader integration, enabling efficient handling of operating system images as atomic units.
+At its core, OSTree uses a content-addressed object store where files are checksummed and stored deduplicated, much like Git objects, to support versioning of full filesystem snapshots. This allows multiple trees to coexist on a single partition, with shared data across versions to minimize storage overhead, while enforcing immutability to ensure system integrity during updates or rollbacks. The system supports transactional operations, such as atomic upgrades via hardlink-based checkouts, and facilitates booting into specific tree versions through configurable bootloader entries.
+OSTree's design addresses key challenges in OS deployment by enabling seamless switching between versions, retention of previous states as fallbacks, and sharing of user data like home directories across trees. It is widely adopted for immutable OS distributions, embedded systems, and container runtimes, providing a foundation for reliable, incremental updates over networks like HTTP with GPG verification.
+
+Design Goals
+
+OSTree was designed as an upgrade system for Linux-based operating systems, emphasizing atomic upgrades of complete filesystem trees to ensure reliability and predictability in deployments. This approach complements traditional package managers by treating the entire operating system as a versioned, immutable unit, similar to how container images or cloud instance replication operates without complex orchestration. The core motivation is to enable seamless transitions between OS versions while minimizing downtime and failure risks, allowing systems to boot from consistent snapshots.
+A primary design principle is the adoption of a "git-like" model for managing operating system binaries, utilizing a content-addressed object store with branches to track different states of filesystem trees. This facilitates deduplication through hardlinks, enabling multiple parallel-installable, read-only trees to coexist efficiently on disk without redundant storage. OSTree operates entirely in userspace, making it compatible with any standard Linux filesystem such as ext4, BTRFS, or XFS, and supports delivery of these trees over HTTP for straightforward network-based updates.
+Key objectives include preserving user-specific configurations in directories like /etc and /var during upgrades, while providing mechanisms for bootloader integration and optional layering of applications in separate locations such as /var or /home. By focusing on immutability and atomicity, OSTree aims to reduce the complexity of OS maintenance, supporting hybrid models where traditional package managers can layer additions onto the base tree for flexibility in diverse environments.
+
+History
+
+Origins
+
+OSTree was initiated in October 2011 by Colin Walters, a software engineer who later became a principal engineer at Red Hat, as a tool for managing versioned, bootable filesystem trees. The project was first publicly introduced by Walters at the GNOME Users And Developers European Conference (GUADEC) in 2012, where it was presented as a system for building and deploying atomic operating system images inspired by Git's content-addressed object storage model.
+The origins of OSTree stem from challenges faced by developers working on core GNOME components, such as upower, NetworkManager, and gnome-shell, who needed efficient ways to test and iterate on operating system-level changes without disrupting their host environments. Walters designed it to enable chroot-based development with hard-linked, read-only filesystem trees, supporting rollback and atomic updates to address limitations in traditional package managers like RPM and dpkg, as well as virtualization tools. This approach targeted operating system developers and testers, including figures like Dan Williams and Eric Anholt, by providing a git-like versioning system for entire OS trees rather than individual files.
+Early motivations emphasized improving continuous integration for GNOME, allowing automated daily builds from upstream Git repositories into bootable images. By 2013, OSTree had been integrated into GNOME's continuous integration pipeline, running on dedicated 32-core hardware to produce and test immutable OS variants, marking its shift from a prototyping tool to a foundational system for reliable OS deployment.
+
+Development Milestones
+
+OSTree's development, initiated in 2011, gained public momentum in 2012 through the GNOME Continuous project aimed at enabling high-performance continuous delivery and testing for GNOME software. This effort addressed challenges in OS-level experimentation, such as safe upgrades and rollback without disrupting the host system, drawing inspiration from tools like NixOS and Chromium OS's autoupdater.
+The project's first public release, version 2013.6, arrived in August 2013, introducing core functionality for atomic upgrades of filesystem trees using a Git-like content-addressed model. Early versions focused on parallel installations and bootloader integration, with subsequent releases like v2014.1 in January 2014 enhancing repository management and documentation. By 2014, Endless OS became the first production operating system to adopt OSTree from its launch, leveraging it for immutable updates in its Debian-based distribution targeted at education and emerging markets.
+In 2015, the rpm-ostree extension was proposed as a Fedora Project change, bridging OSTree with RPM packaging to enable hybrid image-based and layered updates for container-focused systems like Project Atomic. This marked a significant milestone in mainstream Linux adoption, with rpm-ostree's v2017.7 release in July 2017 adding features like improved transaction handling and integration with tools such as libhif.
+OSTree's role expanded in application distribution with the 2016 renaming and release of Flatpak (previously xdg-app), which uses OSTree repositories for sandboxed app deployment across Linux desktops. In 2018, Fedora introduced Silverblue (now part of Fedora Linux Workstation variants) in Fedora 28, using OSTree for immutable desktop images with bi-weekly updates and rollback capabilities.
+Subsequent years saw broader ecosystem integration, including Yocto Project support for embedded systems and adoption in Red Hat Enterprise Linux for Edge images. In 2023, Colin Walters introduced bootc, a new project extending OSTree concepts for bootable container images, influencing future integrations in Fedora Atomic variants. Development continued with a shift to year-based versioning (e.g., v2018.1 onward), culminating in releases like v2025.6 in September 2025, which included enhancements for boot performance and verity checksum optimizations. As of 2025, OSTree underpins immutable distributions like Fedora CoreOS, Fedora IoT, and Torizon OS, emphasizing security through GPG signatures and delta updates.
+
+Architecture
+
+Content-Addressed Storage
+
+OSTree employs a content-addressed storage model, inspired by Git, where all data objects are uniquely identified and stored based on their SHA256 checksums rather than file paths or names. This approach enables efficient deduplication, as identical files across different versions or deployments share the same storage object via hardlinks, minimizing disk usage during upgrades or multiple installations. The repository structure is organized into an objects directory containing these deduplicated blobs, metadata, and trees, typically located at /ostree/repo/objects, with loose objects for recent additions and packfiles for optimized long-term storage.
+At the core of this model are several object types that represent the filesystem hierarchy. Commit objects serve as version markers, encapsulating metadata such as timestamps, subject lines, and references to parent commits, while pointing to the root dirtree and dirmeta objects that define the entire filesystem tree. These commits are addressed by the SHA256 hash of their serialized content and stored as .commit files.
+Dirtree objects represent directory structures as sorted arrays of filename-to-checksum mappings, distinguishing between regular files (content objects) and subdirectories (nested dirtrees), and are serialized as .dirtree files. Complementing them, dirmeta objects store directory-specific metadata, including permissions and ownership, in .dirmeta format, separating this from the structural tree to avoid redundancy in extended attributes. Content objects, the leaves of the tree, encapsulate individual files with their metadata (uid, gid, mode, symlink targets) and gzipped payload, addressed by the SHA256 of this combined data and stored as .file or .filez files without timestamps to ensure immutability. Additionally, in modes like bare-split-xattrs, extended attributes are handled via dedicated xattrs objects (file-xattrs) encoded as GVariants, further enabling precise content addressing.
+This content-addressed design facilitates atomic operations, as entire trees can be referenced immutably by a single commit checksum, allowing deployments to hardlink into the shared object store for space-efficient rollbacks and upgrades that only materialize changes proportional to modified files. For example, when committing a new filesystem tree via ostree commit, OSTree recursively hashes files and directories, writing only novel objects to the store.
+
+Deployment Model
+
+OSTree's deployment model centers on managing multiple, bootable, versioned filesystem trees stored in a content-addressed repository, enabling atomic updates and rollbacks for operating systems. Deployments are organized under a "stateroot" (also known as "osname"), which groups related installations sharing a common /var directory at /ostree/deploy/$stateroot/var. For instance, a stateroot like "fedora" or "rhel" allows multiple deployments within /ostree/deploy/$stateroot/deploy/$checksum, where each $checksum corresponds to a SHA256 hash of a specific commit from the OSTree repository at /ostree/repo. This structure ensures that the core OS content, primarily in /usr, is read-only and deduplicated via hardlinks across deployments, minimizing storage overhead during upgrades.
+The boot process integrates with the Boot Loader Specification, where OSTree generates configuration entries in /boot/loader/entries/ for each active deployment, such as ostree-$stateroot-$checksum.$serial.conf. These entries include kernel parameters like ostree=/ostree/deploy/$stateroot/deploy/$checksum to mount the selected deployment as the root filesystem (/sysroot) during initramfs execution. A writable overlay for /etc is applied at boot time by merging changes from /usr/etc (immutable) with user modifications in /etc, preserving configuration across updates. The bootloader maintains an ordered list of deployments, with the first entry as the default boot target, facilitating seamless rollback to prior versions if needed.
+Management of deployments emphasizes atomicity and safety. Upgrades are staged using commands like ostree admin upgrade --stage, creating a pending deployment that is finalized atomically via a systemd service (ostree-finalize-staged.service), ensuring the system either fully transitions to the new tree or reverts without partial states. This model supports parallel installations, allowing multiple OS versions to coexist, and differs from traditional package managers by treating the entire /usr as an immutable unit rather than updating individual files. Rollbacks are achieved by simply reordering the deployment list with ostree admin status or ostree admin deploy, promoting reliability in production environments.
+
+Features
+
+Atomicity and Rollback
+
+OSTree implements atomic updates by treating the entire operating system filesystem as an immutable, versioned tree, ensuring that upgrades either fully succeed or leave the system unchanged. When applying an update, OSTree downloads or computes a new filesystem tree, validates it using SHA256 checksums, and stages it as a separate deployment alongside the existing one. This process uses hard links for efficient storage, minimizing disk writes, and only activates the new deployment upon successful reboot via bootloader configuration, such as GRUB entries. If a failure occurs during the updatesuch as a power loss or crashthe system boots from the prior deployment, guaranteeing consistency without partial states.
+The atomicity model leverages OSTree's content-addressed object store, where each file and directory is deduplicated and referenced by its hash, enabling safe transitions between deployments. For instance, in rpm-ostree-based systems like Fedora Silverblue, the rpm-ostree (/page/Upgrade) command fetches updates from a remote repository, performs a three-way merge for user-modified files in /etc, and prepares a new bootloader entry without altering the running system. This deployment strategy supports A/B partitioning patterns, where alternate directories (e.g., /ostree/boot.0 and /ostree/boot.1) facilitate swapping, ensuring the booted version remains accessible even after garbage collection of unused trees.
+Rollback in OSTree is facilitated by retaining multiple deployments, allowing reversion to a previous version with minimal effort. The rpm-ostree rollback command deploys the immediately prior version as the default boot target, while users can select older ones temporarily via the GRUB menu or permanently by specifying a commit hash (e.g., rpm-ostree deploy <checksum>). This preserves user data in /home and layered packages like Flatpaks, as the base OS tree is immutable. By default, systems retain at least one rollback option, with options to pin specific deployments (e.g., ostree admin pin 0) to prevent automatic cleanup. Rollbacks are particularly valuable in production environments, enabling quick recovery from faulty updates without reinstallation.
+These features provide significant reliability benefits, reducing downtime in embedded and server deployments by avoiding the risks of traditional package managers that can leave systems in inconsistent states. For example, in IoT scenarios, atomicity ensures devices remain operational post-update failure, while rollback supports rapid iteration in development workflows. OSTree's design draws from Git's branching model but optimizes for bootable trees, achieving efficient space usage through shared objects across versions.
+
+Security and Replication
+
+OSTree incorporates several security mechanisms centered on immutability and cryptographic verification to protect against tampering and unauthorized modifications. The system's content-addressed object store uses SHA256 checksums for all files and metadata, ensuring that any alteration to content would result in a mismatched hash, thereby preventing undetected corruption or injection of malicious data. Deployments are designed as read-only filesystem trees, with the /usr directory mounted read-only via Linux bind mounts, which isolates the core operating system from runtime changes and enhances resistance to exploits targeting mutable filesystems. Additionally, OSTree supports GPG signatures on commits and references, allowing administrators to verify the authenticity of updates from trusted sources before deployment.
+Verification processes in OSTree are integrated into key operations to maintain trust. When pulling content from a remote repository, the ostree tool automatically checks GPG signatures against a configured keyring, rejecting unsigned or invalidly signed metadata to block deployment of unverified trees. This per-remote GPG verification, combined with options for custom keyrings or key paths, enables fine-grained control over trusted publishers, such as operating system vendors. For deployments, the atomic nature of updateswhere changes are staged in a separate bootable root before activationallows rollback to a known-good state if verification fails post-pull, further mitigating risks from compromised updates.
+Replication in OSTree facilitates secure distribution of filesystem trees through an incremental, HTTP-based model that leverages its security primitives. Clients can add remotes via ostree remote-add and pull updates using ostree pull, downloading only new objects identified by their checksums, which reduces bandwidth and exposure to transfer errors. This process mandates GPG verification of pulled metadata and supports "pinned TLS" for HTTPS connections, where specific certificates are enforced to prevent man-in-the-middle attacks during replication. As of 2024, OSTree serves as the underlying storage for bootc, enabling these features in container-native workflows by unpacking OCI images into the object store. In practice, this enables efficient mirroring of repositories across distributed systems, as seen in rpm-ostree integrations where vendors like Fedora provide signed base images for client replication, ensuring end-to-end integrity from build server to endpoint.
+
+Usage
+
+Command-Line Tools
+
+OSTree provides a suite of command-line tools for managing repositories, commits, deployments, and related operations, primarily through the ostree executable with various subcommands. These tools enable users to initialize repositories, create and manipulate versioned filesystem trees, pull and push content from remotes, and handle system deployments atomically. The repository location defaults to the current directory, the OSTREE_REPO environment variable, or /sysroot/ostree/repo in deployed systems.
+The ostree admin subcommand focuses on system-level administration, particularly for managing deployments in a booted OSTree-based operating system. Key operations include ostree admin init-fs, which initializes the root filesystem structure for deployment; ostree admin status, which lists current deployments and their checksums; and ostree admin deploy, which sets up a specific commit for the next boot by creating a deployment subdirectory under /ostree/deploy. Other notable commands are ostree admin upgrade for downloading and deploying the latest version from a remote, ostree admin switch for changing the tracked branch without altering the remote, and ostree admin undeploy for removing a deployment to free up space. These ensure atomic updates and rollback capabilities during system management.
+For repository and filesystem operations, core subcommands handle content addressing and versioning akin to Git. The ostree init command initializes a bare repository with the necessary object directories for storing checksum-addressed files. ostree commit creates a new versioned tree from an existing directory or previous commit, generating a unique SHA256 checksum for the root object. Users can inspect trees with ostree ls to list directory contents, ostree diff to compare changes between commits, and ostree log to view revision history. Data transfer is managed via ostree pull for downloading from HTTP or HTTPS remotes, supporting partial fetches and delta compression, and tools such as ostree-push for uploading commits to remote repositories over SSH. Maintenance tasks include ostree prune to garbage-collect unreachable objects and ostree fsck for verifying repository integrity.
+Additional utilities support integration and debugging. For instance, ostree remote manages remote repository configurations, including adding mirrors with ostree remote add, while ostree refs lists all branches and tags in the repository. The ostree checkout command extracts a commit to a writable directory for modification, and ostree summary generates metadata files for efficient remote pulls. In deployed environments, tools like ostree admin cleanup remove untagged deployments and prune objects to reclaim disk space. These commands collectively facilitate OSTree's model of immutable, content-addressed storage while allowing flexible workflow customization.
+
+Integration with Build Systems
+
+OSTree integrates with various build systems by serving as a content-addressed storage layer that ingests filesystem trees or tarballs generated during the build process, enabling atomic, versioned deployments of operating systems and applications. Build systems produce artifacts such as directory structures or archives, which OSTree then commits into repositories using commands like ostree commit --tree=dir=/path/to/build/output for directories or ostree commit --tree=tar=build.tar for tarballs. This workflow supports efficient storage through hardlinks and unions, reducing duplication and allowing incremental updates via binary deltas.
+In RPM-based distributions, rpm-ostree exemplifies this integration by layering RPM packages onto an immutable base OSTree commit, composing a new filesystem tree that is then committed to the repository. The process involves building RPMs externally and using OSTree to manage the resulting deployment, with support for GPG signing and bootloader configuration. This enables online updates without disrupting the running system, as seen in Fedora variants like Silverblue.
+For container and application packaging, Flatpak leverages OSTree as its core storage mechanism, treating applications as branches in OSTree repositories. During builds, Flatpak runtime environments and app bundles are committed directly into OSTree, utilizing hardlinks for efficient on-disk representation and content-addressed objects to deduplicate files across installations. This allows seamless updates and rollbacks, with repositories manipulable via the ostree command-line tool.
+Embedded Linux build systems like the Yocto Project integrate OSTree through layers such as meta-updater, which facilitates the creation of OSTree-compatible images from Yocto-generated sysroots. The workflow deploys the built filesystem as an OSTree commit, supporting atomic updates for devices, and includes tools for generating bootable images from the repository. This is particularly useful for IoT and automotive applications requiring reliable over-the-air updates.
+General-purpose build tools like BuildStream use OSTree's C API to compose and commit filesystem trees, enabling agnostic integration across different build pipelines. Artifacts are imported into OSTree repositories for sharing via hardlinks, supporting immutable deployments without built-in dependency management. Similarly, NixOS incorporates OSTree-like features for managing multiple bootable roots with checksum-based paths and deduplication.
+In enterprise environments, Red Hat's osbuild-composer tool builds OSTree images for RHEL for Edge by defining blueprints and composing commits from container or tar sources, which are then pulled into local repositories. This supports centralized mirroring and efficient distribution to edge devices, emphasizing scalability for large-scale deployments.
+Oracle Linux integrates OSTree for building immutable images, supporting efficient and secure updates in cloud environments as of October 2025.
+
+Deployments
+
+In Operating Systems
+
+OSTree has been adopted in several Linux-based operating systems to enable atomic, immutable updates and versioned deployments of the entire filesystem tree, reducing the risk of partial updates and facilitating rollbacks. This approach treats the operating system as a series of immutable images, similar to container or Git commits, allowing for efficient storage through deduplication and delta-based transfers. In these deployments, OSTree manages the core system while user modifications are handled via layered packages, containers, or separate writable partitions like /var.
+One prominent example is Fedora Silverblue, an immutable variant of the Fedora distribution, where OSTree serves as the foundational technology for composing, deploying, and updating the base system. Users interact with it through rpm-ostree, which layers RPM packages atop the immutable core, ensuring atomic transactions and easy reversion to previous versions via bootloader entries. This model enhances reliability for desktop environments by isolating the base OS from application changes, often complemented by tools like Toolbox for containerized development workflows.
+Fedora CoreOS, designed for containerized and cloud-native workloads, similarly leverages OSTree to manage multiple bootable trees, sharing storage across versions for efficiency. It supports extensions via rpm-ostree layering, enabling customization without altering the immutable base, and is optimized for automated provisioning in server and edge scenarios. The system maintains at least two deployments by default, allowing seamless rollbacks if an update fails.
+In enterprise contexts, Red Hat Enterprise Linux (RHEL) for Edge images utilize OSTree to create and manage bootable filesystem trees as commits in a Git-like repository. As of RHEL 9, Image Builder tools generate OSTree-based container or tar images, which rpm-ostree deploys on edge devices with atomic upgrades and static deltas for bandwidth-efficient updates. Starting with RHEL 10 (2025), bootc replaces rpm-ostree for new images, enabling OCI-based deployments while retaining OSTree's atomicity, rollbacks, and delta efficiency; it supports centralized management through mirrors and container registries for secure, scalable over-the-air updates in disconnected environments.
+Oracle Linux employs OSTree for immutable OS images, particularly in cloud and container host scenarios, where it indexes full filesystem trees for atomic updates that either complete fully or revert to a prior state. This is integrated into Oracle Container Host for Kubernetes (OCK), an OSTree-based distribution tailored for Kubernetes workloads, providing versioned, secure base systems with efficient delta downloads.
+Endless OS, a Debian-derived distribution aimed at education and emerging markets, uses OSTree to maintain a read-only root filesystem, delivering non-destructive atomic updates that preserve user data. Combined with Flatpak for applications, it ensures the base OS remains immutable, with OSTree handling versioning and deployment to support offline and low-bandwidth scenarios.
+For embedded systems, Torizon OS integrates OSTree as its core update mechanism, managing bootable trees alongside a Docker runtime for containerized applications. Updates are delivered via OSTree commits using tools like Aktualizr, enabling over-the-air (OTA) deployments with deduplication and rollback capabilities optimized for industrial IoT devices.
+
+In Other Projects
+
+OSTree, through its libostree library, has been integrated into several open-source projects beyond traditional operating system distributions, enabling efficient management of immutable, versioned artifacts such as applications, build pipelines, and embedded firmware updates.
+One prominent example is Flatpak, a universal package management system for desktop applications. Flatpak leverages libostree to store and distribute application bundles and runtimes in a content-addressable repository, allowing for isolated, atomic deployments that share common files across installations to minimize storage usage. This integration enables Flatpak to treat applications as OSTree commits, supporting features like remote repositories and delta updates for efficient downloads.
+In continuous integration and testing workflows, GNOME Continuous employs OSTree as the foundation for a high-performance build system. It uses OSTree to create and distribute snapshots of GNOME modules on every commit, facilitating incremental rebuilds and regression testing by versioning entire filesystem trees of build artifacts. This approach originated the development of OSTree itself, providing developers with precise, git-like tracking of changes across hundreds of repositories.
+For embedded and IoT applications, the webOS Open Source Edition (webOS OSE) incorporates libostree for Firmware-Over-the-Air (FOTA) updates. Starting from version 2.0.0, webOS OSE builds root filesystems into OSTree repositories during image creation, enabling devices to pull and deploy specific revisions atomically without full reflashing. This supports multiple sysroots for seamless version switching, using hardlinks to store only incremental changes and integrating with bootloaders like U-Boot for reliable updates on platforms such as Raspberry Pi.
+Additionally, projects like TorizonCore Builder utilize OSTree abstractions to simplify customization of embedded Linux images for industrial applications. This tool allows developers to layer modifications onto OSTree-based base systems, generating deployable artifacts while preserving atomicity and rollback capabilities.
+
+References
+
+OSTree Overview | ostreedev/ostree
+
+libostree | ostreedev/ostree
+
+Immutable system images with OSTree - CentOS Documentation
+
+Technical Information - Fedora Docs
+
+Projects/OSTree/Overview - GNOME Wiki
+
+The ostree Open Source Project on Open Hub
+
+OSTree for Fedora - LWN.net
+
+My impressions from GUADEC - Martin Pitt
+
+Historical OSTree README
+
+Tech - Kosmokaryote
+
+https://wiki.gnome.org/Projects/GnomeContinuous
+
+ostree v2013.6 released - Colin Walters
+
+ostree v2014.1 - GNOME
+
+The Endless - Vision
+
+Changes/RpmOstree - Fedora Project Wiki
+
+Flatpak a history Alexander Larsson - GNOME Blogs
+
+What is Silverblue? - Fedora Magazine
+
+System Update - Yocto Project
+
+OSTree | Toradex Developer Center
+
+Anatomy of an OSTree repository
+
+Deployments | ostreedev/ostree
+
+https://uapi-group.org/specifications/specs/boot_loader_specification/
+
+Atomic Upgrades | ostreedev/ostree
+
+Updates, Upgrades & Rollbacks - Fedora Docs
+
+Chapter 11. Creating and managing OSTree image updates | 8
+
+Updates and Rollbacks - Fedora Docs
+
+ostree.repo-config
+
+A true hybrid image/package system | rpm-ostree - CoreOS
+
+ostree {COMMAND} 
+
+Writing a buildsystem and managing repositories - OSTree Project
+
+https://github.com/projectatomic/rpm-ostree/
+
+Under the Hood - Flatpak documentation
+
+uptane/meta-updater - GitHub
+
+Related Projects | ostreedev/ostree
+
+Chapter 16. Creating and managing OSTree image updates | 9
+
+Configuring Storage - Fedora Docs
+
+Immutable Images for Oracle Linux with OSTree
+
+Technical introduction - Support & Training | Endless Access
+
+OSTree | Toradex Developer Center
+
+Firmware-Over-the-Air Setup | webOS Open Source Edition
+
+https://developer.toradex.com/torizon/os-customization/torizoncore-builder-tool-customizing-torizoncore-images/
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

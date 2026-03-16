@@ -1,0 +1,260 @@
+Salted Challenge Response Authentication Mechanism Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Salted Challenge Response Authentication Mechanism
+ Ara Eve Leo Sal 
+1x
+ The Salted Challenge Response Authentication Mechanism (SCRAM) is a family of password-based challenge-response authentication protocols that enable secure user authentication to servers without transmitting plaintext passwords, even over transport-layer security such as TLS, by using salted and iterated hashing of credentials during an interactive exchange.
+Standardized by the Internet Engineering Task Force (IETF) in July 2010 through RFC 5802, SCRAM defines mechanisms for the Simple Authentication and Security Layer (SASL) and Generic Security Service Application Program Interface (GSS-API), addressing vulnerabilities in earlier methods like plaintext password transmission or weaker challenge-response schemes. It supports mutual authentication, where the client verifies the server's legitimacy, and transports authorization identities separately from authentication identities. SCRAM relies on external security layers like TLS for confidentiality and integrity, without negotiating its own security layer.
+Key security features include per-user salting of password-derived keys to thwart offline dictionary and rainbow table attacks if the credential database is compromised, combined with a configurable iteration count (minimum 4096 for SHA-1 variants) to slow down brute-force attempts. The protocol prevents servers from impersonating clients to other servers, except in authorized proxy scenarios, and optionally incorporates channel binding to bind authentication to the underlying secure channel, mitigating man-in-the-middle risks. SCRAM-SHA-1, using the SHA-1 hash function, is the mandatory-to-implement mechanism, with a PLUS variant (SCRAM-SHA-1-PLUS) for channel binding.
+Subsequent standards have extended SCRAM's applicability and strength; RFC 7677 (November 2015) introduces SCRAM-SHA-256 and SCRAM-SHA-256-PLUS, employing the more secure SHA-256 hash for better resistance to collision attacks. For HTTP authentication, RFC 7804 (March 2016) adapts SCRAM using standard HTTP headers like Authorization and WWW-Authenticate, adding a reauthentication mode while preserving the core exchange from the SASL version. Additionally, RFC 5803 (July 2010) specifies an LDAP schema for storing SCRAM secrets, facilitating integration with directory services. These mechanisms are used in protocols such as IMAP, SMTP, XMPP, and HTTP-based systems to enhance authentication security.
+
+Background
+
+Historical Development
+
+The Salted Challenge Response Authentication Mechanism (SCRAM) originated as an individual Internet-Draft submitted to the IETF by Chris Newman, Abhijit Menon-Sen, Alexey Melnikov, and Nicols Williams in September 1997, aimed at enhancing the Simple Authentication and Security Layer (SASL) framework with a secure, password-based challenge-response method. This initial proposal addressed limitations in existing SASL mechanisms by incorporating salted password storage and resistance to eavesdropping attacks when used over TLS. The draft underwent revisions through 2009, incorporating feedback on protocol details such as client-first message formats and extension options, following a development gap after 1998.
+In May 2009, the draft was adopted by the IETF SASL Working Group, becoming draft-ietf-sasl-scram-00 and initiating a series of iterative updates to refine the specification. Key developments during this period included resolving interoperability challenges related to UTF-8 encoding in usernames, passwords, and authorization identities, ensuring consistent handling across diverse implementations. By February 2010, with revision 11, the document addressed final concerns on proof computation and verification steps, leading to IESG approval in October 2009.
+The core SCRAM specification was published as RFC 5802 in July 2010, formally defining the SCRAM-SHA-1 and SCRAM-SHA-1-PLUS mechanisms for SASL and GSS-API environments. SCRAM evolved as a successor to the DIGEST-MD5 mechanism, offering improved security without requiring server-side password exposure. Subsequent standardization efforts included RFC 7677 in November 2015, which registered the SHA-256-based variants to leverage stronger hash functions. In January 2016, RFC 7804 extended SCRAM to HTTP authentication, enabling integration with web protocols previously reliant on Digest access authentication. Further updates came with RFC 9266 in July 2022, which defined channel bindings compatible with TLS 1.3 for the PLUS variants, enhancing protection against man-in-the-middle attacks in modern transport layers.
+
+Motivations
+
+The Salted Challenge Response Authentication Mechanism (SCRAM) was developed to address key vulnerabilities in password-based authentication over untrusted networks, where traditional methods risked exposing credentials to eavesdropping or replay attacks. By employing a challenge-response protocol, SCRAM ensures that authentication exchanges do not transmit plaintext passwords, instead deriving proofs from a shared secret that varies per session through the use of server-generated challenges. This approach prevents replay attacks, as captured responses cannot be reused without knowledge of the underlying password, and mitigates passive eavesdropping on insecure channels by avoiding direct credential transmission.
+A core motivation for SCRAM is the need for robust password storage that withstands offline attacks, achieved through salted and iterated hashing of passwords on the server side. Unlike unsalted mechanisms, SCRAM incorporates a unique per-user salt to prevent rainbow table precomputation attacks, while multiple iterations (e.g., at least 4096 for SHA-1 variants) increase the computational cost of brute-force or dictionary attacks against stolen credential databases. This design draws from established best practices in password hashing, ensuring that even if an attacker obtains stored credentials, deriving the original password remains infeasible without excessive resources.
+SCRAM also incorporates support for channel binding to enhance protection against active attacks, such as man-in-the-middle (MITM) interceptions or protocol downgrades. By optionally binding the authentication exchange to an underlying secure channel (e.g., TLS), SCRAM verifies that the client and server are communicating over the same protected connection, thwarting attempts to strip away encryption or impersonate endpoints. This feature addresses limitations in prior mechanisms that lacked such integration, providing stronger guarantees in environments where transport-layer security might be compromised or bypassed.
+Compared to earlier challenge-response methods like CRAM-MD5, which lacked salting and mutual authentication, SCRAM introduces salted storage and bidirectional proof verification to prevent both client impersonation and server-side vulnerabilities. Similarly, it improves upon DIGEST-MD5 by simplifying implementationavoiding the latter's excessive options, interoperability issues, and weak primitives like MD5 and DESwhile adding essential features such as channel binding and resistance to chosen-plaintext attacks. These enhancements make SCRAM a more secure and deployable alternative, as recognized in the deprecation of DIGEST-MD5 due to its complexity and cryptographic weaknesses.
+To facilitate widespread adoption, SCRAM was designed for seamless integration with the Simple Authentication and Security Layer (SASL) framework and the Generic Security Service API (GSS-API), enabling its use across protocols like IMAP and SMTP without requiring custom implementations. Additionally, mandatory UTF-8 encoding for usernames and passwords supports international character sets, promoting global usability while maintaining implementation simplicity over more convoluted predecessors. SCRAM was standardized in RFC 5802 to provide a modern, password-based authentication family meeting these goals.
+
+Protocol Mechanics
+
+Password Derivation and Storage
+
+In the Salted Challenge Response Authentication Mechanism (SCRAM), passwords are processed on the server side using a key derivation function to generate secure, salted representations that are stored in the authentication database, ensuring resistance to offline attacks without storing plaintext passwords. This process begins with password normalization followed by application of the Password-Based Key Derivation Function 2 (PBKDF2) to produce a salted password, from which additional keys are derived for verification purposes.
+The password is first normalized using the SASLprep profile, which applies Unicode Normalization Form KC (NFKC) to ensure consistent representation across different systems and prevent equivalence-based attacks. The normalized password is then used as input to PBKDF2, which employs HMAC (Hash-based Message Authentication Code) as its pseudorandom function (PRF) to derive the SaltedPassword. Specifically, the derivation is computed as:
+SaltedPassword:=Hi(Normalize(password),salt,i)
+\text{SaltedPassword} := \text{Hi}(\text{Normalize}(\text{password}), \text{salt}, i)
+SaltedPassword:=Hi(Normalize(password),salt,i)
+where Hi\text{Hi}Hi denotes the PBKDF2 iteration function, salt\text{salt}salt is a randomly generated 16-octet value unique to each user, and iii is the iteration count. The salt prevents precomputation of rainbow tables, while the iterations slow down brute-force attempts, with a minimum of 4096 recommended to balance computational security against dictionary attacks with acceptable server performance.
+From the SaltedPassword, the server derives two additional keys: the ClientKey and the ServerKey. The ClientKey is computed as ClientKey:=HMAC(SaltedPassword,"ClientKey")\text{ClientKey} := \text{HMAC}(\text{SaltedPassword}, \text{"Client Key"})ClientKey:=HMAC(SaltedPassword,"ClientKey"), and the StoredKey as StoredKey:=H(ClientKey)\text{StoredKey} := \text{H}(\text{ClientKey})StoredKey:=H(ClientKey), where H\text{H}H is the underlying hash function (e.g., SHA-256 for SCRAM-SHA-256). The ServerKey is derived separately as ServerKey:=HMAC(SaltedPassword,"ServerKey")\text{ServerKey} := \text{HMAC}(\text{SaltedPassword}, \text{"Server Key"})ServerKey:=HMAC(SaltedPassword,"ServerKey"). These keys enable proof verification without exposing the salted password; the StoredKey is used for client proof checks, while the ServerKey verifies the server's signature.
+The server stores the salt, iteration count iii, StoredKey, and ServerKey for each user in the authentication database, typically in a concatenated, base64-encoded format such as username:salt:StoredKey:ServerKey:i\text{username}:\text{salt}:\text{StoredKey}:\text{ServerKey}:iusername:salt:StoredKey:ServerKey:i to facilitate retrieval during authentication. This storage approach ensures that even if the database is compromised, an attacker cannot easily recover the original password due to the one-way derivations and high iteration count. The iteration count can be increased over time to maintain security as computational power advances, by updating the stored credentials during a process that involves the plaintext password, such as a password change.
+
+Message Exchange Sequence
+
+The Salted Challenge Response Authentication Mechanism (SCRAM) employs a four-message exchange between the client and server to authenticate the user without transmitting the password in plaintext. This sequence ensures mutual authentication and resistance to eavesdropping and replay attacks. The process begins with the client initiating the exchange and concludes with the server verifying the client's proof or reporting an error.
+The first message, ClientFirst, is sent by the client and contains the authentication identity (username) and an optional authorization identity (authzid), along with a client-generated nonce. Its format is n,,n=<username>,r=<client-nonce>, where the username is prepared using SASLprep normalization, and the client-nonce is a random string of at least 16 octets, also base64-encoded. If an authzid is specified, it replaces the empty trace in the GS2 header (e.g., n,a=<authzid>,n=<username>,r=<client-nonce>); otherwise, the authorization identity defaults to the authentication identity. This message allows the server to identify the user and begin deriving the necessary keys from the stored salted password.
+Upon receiving ClientFirst, the server responds with ServerFirst, which includes the concatenated nonce, salt, and iteration count. The format is r=<combined-nonce>,s=<salt>,i=<iterations>, where the combined-nonce is formed by prepending a server-nonce (at least 16 octets, random) to the client-nonce, the salt is the base64-encoded value stored with the user's credentials, and iterations is an integer (typically 4096 or higher) indicating the number of hashing rounds. The combined-nonce, formed as <server-nonce><client-nonce>, prevents replay attacks by ensuring uniqueness across sessions.
+The client then sends ClientFinal, incorporating the channel binding data and its computed proof based on the shared secrets derived from the password. The format is c=<channel-binding-data>,r=<combined-nonce>,p=<client-proof>, where channel-binding-data is base64-encoded (often empty if not used), the combined-nonce is echoed for verification, and client-proof is the base64-encoded result of the proof computation using the salted password. This message demonstrates the client's knowledge of the password without revealing it.
+Finally, the server issues ServerFinal to confirm or reject the authentication. If successful, it contains v=<server-proof>, where server-proof is the base64-encoded signature computed from the shared keys to prove the server's possession of the same credentials. In case of failure, it includes e=<error>, specifying an error message (e.g., "invalid-proof"). This completes the mutual authentication, with the server-proof allowing the client to verify the server's integrity.
+
+Proof Computation and Verification
+
+In the Salted Challenge Response Authentication Mechanism (SCRAM), proof computation and verification enable mutual authentication by demonstrating knowledge of the shared password without transmitting it directly over the network. The client and server derive cryptographic keys from a salted and iterated password hash, then use these keys to generate proofs that bind to the authentication message exchange. This process relies on keyed hash functions to ensure integrity and prevent replay or tampering attacks.
+Key derivation begins with the SaltedPassword, computed as $ \text{SaltedPassword} = \text{Hi}(\text{Normalize}(\text{password}), \text{salt}, i) $, where Hi denotes the PBKDF2 key derivation function using HMAC with the underlying hash (e.g., SHA-256), Normalize prepares the password string per RFC 4013, salt is a server-stored random value, and $ i $ is the iteration count for resistance to brute-force attacks. From SaltedPassword, the client derives the ClientKey as $ \text{ClientKey} = \text{HMAC}(\text{SaltedPassword}, \text{"Client Key"}) $ and the StoredKey as $ \text{StoredKey} = H(\text{ClientKey}) $, where $ H $ is the hash function. The server similarly derives (but does not store) the ServerKey as $ \text{ServerKey} = \text{HMAC}(\text{SaltedPassword}, \text{"Server Key"}) $. These derivations allow both parties to independently compute the necessary keys during the exchange.
+The AuthMessage, which binds the protocol messages to prevent modification, is formed as the concatenation $ \text{AuthMessage} = \text{client-first-message-bare} + "," + \text{server-first-message} + "," + \text{client-final-message-without-proof} $. The client computes the ClientSignature as
+ClientSignature=HMAC(StoredKey,AuthMessage)
+\text{ClientSignature} = \text{HMAC}(\text{StoredKey}, \text{AuthMessage})
+ClientSignature=HMAC(StoredKey,AuthMessage)
+and generates the ClientProof as
+ClientProof=ClientKeyClientSignature,
+\text{ClientProof} = \text{ClientKey} \oplus \text{ClientSignature},
+ClientProof=ClientKeyClientSignature,
+where $ \oplus $ denotes bitwise XOR. The ClientProof is included in the client's final message, allowing the server to verify the client's knowledge of the password without exposing the ClientKey.
+Server verification proceeds by recomputing the ClientSignature using its stored StoredKey and the AuthMessage, then recovering the ClientKey via $ \text{recovered ClientKey} = \text{ClientProof} \oplus \text{ClientSignature} $. The server checks if $ H(\text{recovered ClientKey}) = \text{StoredKey} $; a match confirms the client's proof. To provide its own proof, the server computes the ServerProof (also called ServerSignature) as
+ServerProof=HMAC(ServerKey,AuthMessage)
+\text{ServerProof} = \text{HMAC}(\text{ServerKey}, \text{AuthMessage})
+ServerProof=HMAC(ServerKey,AuthMessage)
+and transmits it in the final server message. The client verifies this by deriving the ServerKey from the password and recomputing the HMAC over AuthMessage, comparing the result to the received ServerProof. The inclusion of AuthMessage in both proofs ensures that altering any prior message invalidates the computations, thwarting man-in-the-middle tampering.
+
+Channel Binding
+
+Channel binding in the Salted Challenge Response Authentication Mechanism (SCRAM) is an optional feature provided through the "-PLUS" variant of SCRAM mechanisms, such as SCRAM-SHA-256-PLUS, which ties the authentication process to an external secure channel like TLS or GSS-API to prevent man-in-the-middle (MITM) attacks. This variant is negotiated when the server advertises support for both the base mechanism (e.g., SCRAM-SHA-256) and its -PLUS counterpart, allowing clients to opt into channel binding if a secure transport is available.
+The client computes channel binding data (cbdata) by concatenating three elements: the GS2 header, the channel-binding-type, and the channel-binding-data. The GS2 header is formatted as "n,a=authzid,p=channel-binding-type", where "n" indicates no authorization identity if empty, "a=authzid" specifies an optional authorization identity, and "p=" identifies the binding type (e.g., "p=tls-unique" for pre-TLS 1.3 or "p=tls-exporter" for TLS 1.3). For TLS, the channel-binding-type is typically "tls-unique" using the TLS exporter value as channel-binding-data in earlier versions, or "tls-server-end-point" which derives from a hash of the server's TLS certificate to provide a unique, stable binding to the server's endpoint. This cbdata is then base64-encoded and included in the ClientFinal message as the "c=" attribute, which influences the AuthMessage used in proof computation and verification.
+By incorporating channel binding, SCRAM ensures that authentication proofs become invalid if the underlying channel is altered, such as during a downgrade to plaintext or a MITM attempt where an attacker proxies the connection without matching the binding data. The server validates the "c=" field against its own computation of the binding; any mismatch, including detection of a channel downgrade via the client's "y" flag in the initial message when -PLUS is supported, causes the authentication to fail.
+RFC 9266 updates SCRAM's channel binding for compatibility with TLS 1.3 by mandating the use of the "tls-exporter" type as the default, which replaces the vulnerable "tls-unique" and derives from exported keying material to ensure uniqueness across TLS 1.3 connections, while retaining "tls-server-end-point" for endpoint-specific bindings. If the server detects a binding mismatch or an unsupported type, it responds in the ServerFinal message with an error such as "channel-bindings-dont-match" or "unsupported-channel-binding-type", aborting the authentication process.
+
+Variants and Extensions
+
+Supported Hash Functions
+
+The Salted Challenge Response Authentication Mechanism (SCRAM) supports a family of hash functions standardized by the Internet Engineering Task Force (IETF) to balance security, performance, and compatibility in password-based authentication. The core protocol, defined in RFC 5802, mandates the use of SHA-1 as the hash function H for SCRAM-SHA-1 to ensure legacy compatibility with existing deployments, though it is deprecated due to known collision vulnerabilities that undermine its long-term security. In this mechanism, the hash function H is applied to derive the StoredKey as H(ServerKey) and to compute client and server proofs during the authentication exchange.
+For enhanced security, RFC 7677 recommends SHA-256 as the primary hash function in SCRAM-SHA-256, producing a 256-bit output that provides stronger resistance to brute-force attacks and other cryptographic weaknesses compared to SHA-1. This variant maintains the same protocol structure but leverages SHA-256's improved preimage resistance and overall robustness, making it the preferred choice for new implementations. SCRAM mechanisms are named according to the convention SCRAM-HASH or SCRAM-HASH-PLUS, where HASH denotes the textual name of the hash function (e.g., SHA-256), and the -PLUS suffix indicates channel binding for added protection against man-in-the-middle attacks.
+The Internet Assigned Numbers Authority (IANA) maintains a registry of SCRAM family mechanisms, currently including SCRAM-SHA-1, SCRAM-SHA-1-PLUS, SCRAM-SHA-256, and SCRAM-SHA-256-PLUS, each with a minimum PBKDF2 iteration count of 4096 to resist offline dictionary attacks. Additional hash functions can be registered through this process; for example, draft-melnikov-scram-sha-512 (version 05, December 2024) proposes SCRAM-SHA-512 and SCRAM-SHA-512-PLUS using the 512-bit SHA-512 hash for even greater security margins against brute-force efforts. Trade-offs among these options include SHA-1's computational efficiency, which suits resource-constrained environments but at the cost of reduced security, whereas SHA-256 and SHA-512 offer superior protection at a moderate increase in processing overhead.
+
+Modern Extensions
+
+Since the publication of RFC 5802, which defined the core SCRAM protocol, several extensions have been proposed to address evolving security requirements and integration needs. One notable advancement is the introduction of SCRAM-SHA-512 and SCRAM-SHA-512-PLUS mechanisms, detailed in an IETF draft from December 2024, which provide 512-bit security levels by leveraging SHA-512 as the underlying hash function, enhancing resistance to brute-force attacks in high-security environments. These variants maintain compatibility with the original SCRAM framework while supporting optional channel binding via the "-PLUS" suffix for improved protection against man-in-the-middle attacks.
+Another significant extension is the SCRAM-2FA draft from December 2024, which integrates two-factor authentication into SCRAM by incorporating additional challenges for a second factor, such as a time-based one-time password or hardware token response, without altering the base message exchange. This allows SCRAM to support multi-factor scenarios seamlessly, enabling protocols like XMPP or LDAP to enforce stronger authentication policies.
+SCRAM has been integrated with modern transport protocols through SASL, including support for HTTP/2 and WebSocket connections as outlined in related specifications from 2018 onward, facilitating authenticated sessions in web-based applications. For instance, SCRAM can be used as a SASL mechanism within HTTP authentication schemes, extending to WebSocket subprotocols for real-time secure communications.
+Best practices for SCRAM implementations have been updated in the 2021 draft on password storage, recommending a minimum of 310,000 iterations for PBKDF2 with HMAC-SHA-256 to counter advances in computational power and mitigate offline dictionary attacks. This guidance emphasizes adaptive parameters to balance security and performance.
+The same draft recommends memory-hard key derivation functions like Argon2 for general password hashing and storage, offering better resistance to GPU-accelerated cracking; however, SCRAM continues to use PBKDF2 with recommended high iteration counts.
+Additionally, RFC 9266 from 2022 specifies TLS 1.3-specific channel bindings using the "tls-exporter" type, resolving compatibility issues for SCRAM-*-PLUS variants in TLS 1.3 sessions, including protections against 0-RTT resumption vulnerabilities.
+
+Security Analysis
+
+Key Strengths
+
+SCRAM enables mutual authentication between client and server without transmitting plaintext passwords, thereby minimizing exposure risks during the authentication exchange. The protocol derives a salted, iterated password verifier stored on the server, which the client uses to compute proofs in response to server challenges, ensuring neither party reveals the original password. This approach supports client naming while allowing the server to verify the client's knowledge of the password securely.
+The mechanism resists replay attacks through the use of unique client and server nonces combined in proofs, preventing intercepted messages from being reused effectively. Salting each stored verifier with a unique random value thwarts preimage and offline dictionary attacks by forcing attackers to compute hashes individually for each user, even if a database is compromised. Additionally, the recommended minimum of 4096 iterations on the password-to-key derivation function increases the computational cost of brute-force attempts, enhancing protection against offline attacks without relying on weak hashing assumptions.
+Compared to DIGEST-MD5, SCRAM offers a simpler implementation by avoiding complex nonce handling and quality-of-protection negotiations, reducing the potential for errors in protocol adherence. It mandates UTF-8 encoding for usernames and passwords, facilitating better internationalization and interoperability across diverse linguistic environments, unlike earlier mechanisms that lacked explicit character encoding requirements.
+SCRAM provides flexibility for channel bindings, allowing integration with external security layers such as TLS or GSS-API to prevent man-in-the-middle attacks by tying the authentication to the secure channel's properties. As a modern SASL mechanism, it maintains backward compatibility with existing SASL frameworks while supporting extensible hash functions beyond SHA-1, such as SHA-256, to align with evolving cryptographic standards.
+The tunable iteration count, defaulting to 4096, balances security with performance, making SCRAM suitable for real-time protocols like XMPP where low-latency authentication is essential; clients can further optimize by caching derived keys across sessions.
+
+Vulnerabilities and Mitigations
+
+One notable vulnerability in certain SCRAM implementations involves timing attacks, where differences in computation time can leak information about secret values like client proofs and server signatures. For instance, in the Java SCRAM library prior to version 3.2, the use of Arrays.equals for comparisons enabled attackers to exploit timing discrepancies, as identified in CVE-2025-59432. To mitigate this, developers should employ constant-time comparison functions, such as MessageDigest.isEqual, to ensure uniform execution time regardless of input similarity.
+Another implementation-specific issue arises from non-compliance with SCRAM protocol standards, particularly in improper handling of nonces. In Apache Kafka versions before 3.8.0, the server failed to verify the client's nonce in the final authentication message against the one it provided earlier, violating RFC 5802 and enabling replay attacks when encryption is absent, as detailed in CVE-2024-56128. This was addressed in subsequent updates by adding nonce verification in the final exchange step. Mitigation involves promptly applying library patches and validating all protocol steps during audits.
+The use of SHA-1 in SCRAM-SHA-1 exposes systems to collision attacks, where adversaries can generate inputs producing the same hash output, potentially compromising authentication integrity as demonstrated in practical attacks like SHAttered. NIST has deprecated SHA-1 for all cryptographic protections, mandating a phase-out by December 31, 2030. To counter this, deployments should transition to SCRAM-SHA-256 or stronger variants, which resist such collisions due to their longer output and robust design.
+Without the -PLUS variant, SCRAM is susceptible to downgrade attacks, where an attacker forces the use of a weaker channel binding type or none at all, undermining protection against man-in-the-middle interceptions. Enforcing mandatory channel binding via SCRAM-PLUS ensures the authentication ties to the secure channel, preventing such downgrades.
+Low iteration counts in PBKDF2, the key derivation function underlying SCRAM, heighten risks of offline dictionary and brute-force attacks, as fewer iterations reduce the computational cost for crackers. The OWASP Password Storage Cheat Sheet recommends at least 600,000 iterations for PBKDF2-HMAC-SHA-256 (as of 2024) to sufficiently slow down such attacks on modern hardware.
+Broader mitigation strategies include maintaining regular updates to SCRAM libraries to address emerging flaws, conducting code audits for constant-time operations in sensitive comparisons, and for new systems, preferring memory-hard functions like Argon2 over PBKDF2 to better resist parallelized attacks. While SCRAM's per-user salting provides inherent protection against precomputed table attacks, these measures collectively enhance resilience.
+
+Implementations
+
+Protocol Integrations
+
+SCRAM is primarily integrated into network protocols through the Simple Authentication and Security Layer (SASL) framework defined in RFC 4422, which provides a method for adding authentication support to connection-based protocols. This enables SCRAM's use in email-related protocols, including IMAP for secure retrieval of messages (RFC 3501), POP3 for downloading emails (RFC 1939, with SASL profile in RFC 5034), and SMTP for mail transfer (RFC 5321, with SASL support in RFC 4954). In these integrations, SCRAM serves as a pluggable SASL mechanism, allowing servers to authenticate clients without transmitting plaintext passwords, thereby enhancing security in email ecosystems.
+In the Extensible Messaging and Presence Protocol (XMPP) for instant messaging, SCRAM is supported as a SASL authentication mechanism, with RFC 6120 specifying the use of SCRAM-SHA-1 and SCRAM-SHA-1-PLUS variants to ensure confidentiality and integrity during stream initialization. This integration allows XMPP clients and servers to perform password-based authentication resilient to eavesdropping and replay attacks.
+For web authentication, SCRAM is adapted into an HTTP-specific scheme in RFC 7804, which defines a family of challenge-response mechanisms compatible with HTTP's authentication framework, replacing weaker options like HTTP Digest and providing protection against offline dictionary attacks.
+SCRAM is also employed in directory services via LDAP, where RFC 5803 defines a schema for storing SCRAM authentication secrets as LDAP attributes, enabling SASL/SCRAM binds for secure access to directory information without exposing credentials.
+In database systems, SCRAM is mandatory as the default authentication mechanism in the MongoDB wire protocol, where it verifies user credentials during client-server handshakes and supports variants like SCRAM-SHA-256 for stronger hashing. This ensures secure access to MongoDB deployments while maintaining compatibility with SASL standards.
+
+Software Libraries
+
+The Cyrus SASL library, written in C, provides SCRAM support starting with version 2.1.26 released in 2011 for SCRAM-SHA-1, with SCRAM-SHA-256 added in version 2.1.27. This library is widely used for integrating SASL mechanisms, including SCRAM variants, into applications like email servers and IMAP clients.
+In Java, SASL providers supporting SCRAM are available through frameworks like Apache Kafka clients, which implement SCRAM-SHA-256 and SCRAM-SHA-512 for secure authentication. A notable vulnerability, CVE-2024-56128, affected SCRAM implementations in Apache Kafka versions 0.10.2.0 through 3.7.1 and 3.8.0 by allowing replay attacks without encryption, fixed in versions 3.7.2, 3.8.1, and 3.9.0.
+Python offers dedicated libraries for SCRAM, such as the scramp package, which implements SCRAM-SHA-1, SCRAM-SHA-256, and their -PLUS variants for general use. For asynchronous applications, the aiosasl library provides protocol-agnostic SASL support, including SCRAM mechanisms integrated with asyncio for modern async environments like WebSocket or Kafka clients. Additionally, kafka-python includes built-in SCRAM support for SASL authentication in messaging scenarios.
+PostgreSQL server has supported SCRAM-SHA-256 authentication since version 10.0 released in 2017, with it becoming the default password authentication method starting in version 14.0. This integration enhances database security by replacing older MD5-based methods with salted challenge-response.
+MongoDB has utilized SCRAM as its default authentication mechanism since version 3.0 in 2015, with SCRAM-SHA-256 becoming the default in version 4.0 from 2018, particularly for cluster internal authentication.
+For Node.js, the @mongodb-js/saslprep library handles string preparation and normalization required for SCRAM-SHA-256 authentication, integrated directly into the official MongoDB Node.js driver since version 4.17.0.
+In Go, the xdg-go/scram library implements SCRAM client and server support per RFC 5802 and RFC 7677, including SCRAM-SHA-512 as a recent addition aligning with draft extensions for stronger hashing in 2024 updates.
+
+References
+
+RFC 5802: Salted Challenge Response Authentication Mechanism ...
+
+RFC 7677: SCRAM-SHA-256 and SCRAM-SHA-256-PLUS Simple Authentication and Security Layer (SASL) Mechanisms
+
+Salted Challenge Response (SCRAM) SASL Mechanism
+
+https://datatracker.ietf.org/doc/draft-ietf-sasl-scram/
+
+https://datatracker.ietf.org/doc/html/rfc5802#section-6
+
+RFC 5802 - Salted Challenge Response Authentication Mechanism ...
+
+RFC 7677 - SCRAM-SHA-256 and SCRAM-SHA-256-PLUS Simple ...
+
+RFC 7804 - Salted Challenge Response HTTP Authentication ...
+
+RFC 9266 - Channel Bindings for TLS 1.3 - IETF Datatracker
+
+ SCRAM paper
+
+RFC 6331 - Moving DIGEST-MD5 to Historic - IETF Datatracker
+
+https://datatracker.ietf.org/doc/html/rfc5802#section-3
+
+https://datatracker.ietf.org/doc/html/rfc4013
+
+https://datatracker.ietf.org/doc/html/rfc5802#section-5.1
+
+https://www.rfc-editor.org/rfc/rfc5802.html#section-5.1
+
+https://datatracker.ietf.org/doc/html/rfc5802#section-7
+
+RFC 9266: Channel Bindings for TLS 1.3
+
+NIST Transitioning Away from SHA-1 for All Applications | CSRC
+
+Simple Authentication and Security Layer (SASL) Mechanisms
+
+SCRAM-SHA-512 and SCRAM-SHA-512-PLUS Simple ... - IETF
+
+SCRAM-SHA-512 and SCRAM-SHA-512-PLUS Simple ... - IETF
+
+draft-ietf-kitten-scram-2fa-05
+
+RFC 8441: Bootstrapping WebSockets with HTTP/2
+
+Best practices for password hashing and storage - IETF Datatracker
+
+CVE-2025-59432 Detail - NVD
+
+CVE-2024-56128 Detail - NVD
+
+Research Results on SHA-1 Collisions | CSRC
+
+https://datatracker.ietf.org/doc/html/rfc5802#section-10.4
+
+https://datatracker.ietf.org/doc/html/rfc5802#section-6.8
+
+RFC 6120 - Extensible Messaging and Presence Protocol (XMPP)
+
+SCRAM - Database Manual - MongoDB Docs
+
+Cyrus SASL 2.1.x Release Notes
+
+Authentication Mechanisms Cyrus SASL 2.1.28 documentation
+
+Apache Kafka Security Vulnerabilities
+
+scramp - PyPI
+
+horazont/aiosasl: Pure-python, protocol-agnostic SASL ... - GitHub
+
+KafkaConsumer kafka-python 2.3.0.dev documentation
+
+Documentation: 18: 20.5. Password Authentication - PostgreSQL
+
+From MD5 to scram-sha-256 in PostgreSQL
+
+xdg-go/scram: Go implementation of RFC-5802 Salted ... - GitHub
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

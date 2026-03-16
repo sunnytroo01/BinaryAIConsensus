@@ -1,0 +1,249 @@
+Route flapping Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Route flapping
+ Ara Eve Leo Sal 
+1x
+ Route flapping is a phenomenon in computer networking where a route's availability alternates repeatedly between being advertised and withdrawn, leading to excessive updates in routing protocols such as the Border Gateway Protocol (BGP). This instability, often termed "route flap," has been observed since the early 1990s and typically arises from underlying issues like network failures, marginal circuits, congestion, or intermittent link problems that cause brief losses of connectivity.
+The primary impacts of route flapping include increased processing load on routers, which can lead to session failures, sustained routing oscillations, and delayed convergence across the network, ultimately compromising scalability and performance in large-scale environments like the Internet. To mitigate these effects, BGP route flap damping was introduced as a mechanism to penalize unstable routes by suppressing their advertisement based on a history of flaps, using techniques such as exponential decay penalties and configurable thresholds for suppression and reuse. This approach, detailed in RFC 2439, applies primarily to external BGP (EBGP) routes to prevent loops and is recommended for implementation near the source of instability, with parameters tuned to balance stability and convergence time. Subsequent refinements, such as those in RFC 7196, address potential misuse of damping, like targeted attacks, by advocating safer parameter sets and monitoring practices; however, as of 2025, damping remains controversial, with many operators disabling it or using conservative configurations due to risks of delaying convergence for stable routes, alongside ongoing protocol extensions.
+
+Definition and Characteristics
+
+Definition
+
+Route flapping refers to the rapid and repeated addition and withdrawal of routes in a router's routing information base (RIB) or forwarding information base (FIB), resulting in network instability. This phenomenon occurs when a route's availability alternates frequently, causing routers to process excessive updates and potentially propagate instability across the network. In essence, it disrupts the stable mapping of network destinations to next-hop paths that routers maintain for efficient packet forwarding.
+In dynamic routing protocols such as BGP, OSPF, and RIP, route flapping manifests through the repeated advertisement and withdrawal of routes. Routers exchange routing updates to inform peers of reachable destinations; when a route flaps, these updates trigger reconvergence, where the RIB is updated to reflect the changing topology, and the FIB is reprogrammed accordingly for forwarding decisions. For instance, in BGP, this involves frequent UPDATE messages that announce or revoke prefix reachability, while in OSPF and RIP, it leads to iterative link-state or distance-vector recalculations. This dynamic process, while essential for adapting to legitimate network changes, becomes problematic when it occurs excessively.
+Unlike normal route changes, which involve stable convergence after a single topology alterationsuch as a link failure resolved onceroute flapping is characterized by an excessive frequency of such events, often multiple times within minutes. Normal operations allow protocols to settle into a consistent state, whereas flapping creates ongoing oscillations that strain router resources without achieving stability.
+The term "route flapping" originated in the early 1990s amid observations of unstable Internet prefixes in early routing protocols, prompting the development of mitigation techniques like flap damping. This issue was particularly noted in the growing Internet backbone, where frequent updates overwhelmed router processing capabilities.
+
+Key Characteristics
+
+Route flapping manifests as rapid oscillations in route advertisements and withdrawals, typically occurring every few seconds to minutes, depending on the underlying instability. These patterns can be periodic, often synchronized with internal gateway protocol (IGP) timers such as OSPF's hello intervals (around 10 seconds by default), or sporadic, involving brief unavailability lasting seconds before restoration. In many cases, flapping persists until the root issue stabilizes but may self-resolve if transient, such as during short link interruptions, though prolonged episodes can continue for hours without intervention.
+The propagation of flapping varies by protocol and network scope. In BGP, local flapping within an autonomous system (AS) via internal BGP (iBGP) remains contained to intra-AS routers, while external BGP (eBGP) can disseminate instability across multiple ASes, potentially leading to global effects if not mitigated, as updates propagate hop-by-hop through the Internet. Conversely, in OSPF, flapping typically spreads within a single area or across the backbone (Area 0) to other areas, limited by the protocol's hierarchical design that floods link-state advertisements (LSAs) domain-wide but isolates changes to affected segments.
+Identification relies on monitoring metrics such as the count of route withdrawals and re-advertisements exceeding thresholds in a defined window, often 3-5 events within minutes signaling instability. For instance, BGP implementations track a "flap count" where each withdrawal increments a penalty, and surpassing a cutoff (e.g., equivalent to 3 flaps) indicates flapping.
+Distinct types include prefix flapping, where an IP prefix is repeatedly withdrawn (unreachable) and re-advertised (reachable), directly impacting reachability announcements, versus path flapping in BGP, involving frequent changes to the AS path attributes without prefix withdrawal, often due to path exploration during convergence.
+
+Causes
+
+Configuration Errors
+
+Configuration errors represent a significant human-induced cause of route flapping, where mistakes in network setup lead to unstable route advertisements and withdrawals in routing protocols such as BGP. These errors often stem from improper policy definitions that inadvertently create oscillating route preferences or invalid path selections. For instance, incorrect route redistribution policies between protocols like OSPF and BGP can result in routes being repeatedly injected and withdrawn due to mismatched administrative distances or metric calculations. Similarly, mismatched BGP timers, such as keepalive and hold timers configured differently across peers, can trigger session resets and subsequent route instability. Loop-inducing static routes, where a static entry points back into a dynamic routing domain without proper safeguards, further exacerbate this by causing recursive routing failures that propagate flapping.
+Specific examples illustrate how these misconfigurations manifest in practice. Advertising the same IP prefix via multiple protocols without adequate filters can lead to alternating route preferences, as routers select paths based on fluctuating metrics or policies, resulting in rapid advertisements and withdrawals. In BGP environments, improper configuration of route reflectorssuch as failing to designate non-client neighbors correctlycan cause routes to be reflected back to originators, inducing loops and flapping as the protocol attempts to resolve invalid paths. These issues are particularly prevalent in multi-homed networks where policy inconsistencies amplify the problem across autonomous systems.
+A notable real-world case occurred on April 25, 1997, when a misconfigured router in AS 7007 (operated by MAI Network Services) flooded the Internet with invalid route advertisements, originating bogus paths for nearly the entire global routing table and causing widespread route flapping that disrupted connectivity for hours. This incident highlighted the vulnerability of early Internet routing to configuration oversights, affecting major backbones and underscoring the need for robust filtering mechanisms. More recently, on July 14, 2025, a configuration error in Cloudflare's BGP setup led to unintended route withdrawals for the 1.1.1.1 DNS resolver, causing a global outage lasting 62 minutes and demonstrating how modern misconfigurations can still propagate instability.
+To prevent such configuration-induced flapping, network operators should implement access lists and prefix lists to filter invalid or unintended route advertisements at the protocol boundaries. Access lists can block specific IP ranges or patterns, while prefix lists provide more granular control over route lengths and origins, ensuring only legitimate prefixes are propagated. These tools, when applied in route maps, help enforce consistent policies and mitigate the risks of redistribution errors or reflector misconfigurations.
+
+Hardware and Link Failures
+
+Hardware and link failures represent a primary physical cause of route flapping, where intermittent or persistent issues at the physical layer (Layer 1) disrupt connectivity, prompting routers to repeatedly advertise and withdraw routes at higher layers (Layer 3). Common types include faulty cables that intermittently block signal transmission due to bending or damage, unstable power supplies leading to router reboots or interface instability, and overloaded interfaces where high traffic volumes cause buffer overflows and packet drops. Additionally, router hardware bugs, such as those manifesting as memory leaks, can force periodic route table dumps, exacerbating flapping as the router struggles to maintain stable forwarding tables.
+These physical issues propagate upward through the network stack, triggering mechanisms that directly induce route flapping. For instance, Layer 1 signal degradation or loss can result in repeated failures of Bidirectional Forwarding Detection (BFD) sessions, which are designed to quickly detect link faults but may flap if the underlying physical problem is intermittent, causing rapid neighbor state changes and route withdrawals. Similarly, hello packet losses in protocols like OSPF or BGP due to transient link flaps lead to adjacency resets and reconvergence attempts, amplifying instability across the routing domain. In fiber optic links, degradation from attenuation or contamination at connectors can cause sporadic signal loss, prompting routers to alternate between detecting the link as up and down.
+Real-world examples illustrate the scale of such failures. In the 2008 Mediterranean submarine cable disruptions, cuts to the SEA-ME-WE-4 and FLAG Europe-Asia cables near Alexandria, Egypt, led to over 10,000 BGP update messages from affected networks like OmanTel over 90 hours, with routes flapping constantly due to forced rerouting on congested backups and a 40% drop in prefix visibility in regions like Egypt and Sudan. Fiber optic cable degradation, such as from environmental stress or poor splices, has also been documented to cause intermittent signal loss, resulting in repeated route withdrawals as optical power falls below detection thresholds.
+Diagnosing hardware origins of route flapping relies on monitoring interface counters to pinpoint physical anomalies. Elevated Cyclic Redundancy Check (CRC) errors, for example, signal corrupted frames from Layer 1 issues like faulty cabling or electromagnetic interference, often correlating with link flaps that trigger routing instability. Tools that track these counters, alongside optical time-domain reflectometry (OTDR) for fiber links, enable localization of intermittent faults by comparing real-time attenuation traces against baselines, distinguishing hardware problems from configuration errors through differential analysis.
+
+Protocol Interactions
+
+Route flapping can arise from inherent protocol mechanisms that propagate instability within or between routing protocols. In the Border Gateway Protocol (BGP), path vector attributes like AS_PATH are designed to prevent loops, but recursive routing dependencies on an Interior Gateway Protocol (IGP) can lead to flapping when the IGP route for the BGP next-hop becomes unavailable or changes, causing BGP to repeatedly withdraw and readvertise routes until resolution. Similarly, in internal BGP (iBGP) full-mesh setups, oscillations occur due to inconsistent route selection influenced by attributes such as Multi-Exit Discriminator (MED), where hidden routes and timing dependencies create cycles of preference shifts among peers, resulting in persistent or transient instability without external failures.
+Interactions between protocols exacerbate flapping through feedback loops. For instance, without proper route dampening or filtering, redistribution between an IGP like Open Shortest Path First (OSPF) and BGP can create loops where OSPF-learned routes are injected into BGP and readvertised back, amplifying minor changes into repeated updates across domains. In OSPF, area border routers (ABRs) may encounter inconsistencies during topology changes if link-state advertisements (LSAs) flood asynchronously or timers mismatch, prompting repeated shortest path first (SPF) calculations and route withdrawals as the link-state database (LSDB) reconverges. The Routing Information Protocol (RIP), as a distance-vector protocol, suffers from slow convergence due to periodic updates and the count-to-infinity problem, where small topology alterations propagate gradually, causing prolonged oscillations as routers incrementally adjust metrics until stability.
+Protocol-specific behaviors further contribute to flapping under certain conditions. BGP's route refresh capability, defined in RFC 2918, allows peers to request re-advertisement of routes without session reset, but under high load from frequent requestssuch as during policy changesit can overload processing, leading to delayed responses, incomplete updates, and repeated withdrawals as speakers struggle to recompute and send Adj-RIB-Out contents.
+
+Effects
+
+Routing Instability
+
+Route flapping induces significant instability in routing processes by generating a high volume of update messages that frequently modify the Routing Information Base (RIB) and Forwarding Information Base (FIB) on affected routers. Each flapdefined as the withdrawal and subsequent re-advertisement of a routetriggers processing of these updates, which can overwhelm router CPU resources as the number of affected prefixes scales. For instance, in empirical tests from the early 2000s with BGP tables exceeding 140,000 routes, flapping led to stepwise growth in the BGP database and RIB lag, with command response delays reaching up to 10 seconds due to CPU saturation. With current global BGP tables exceeding 1 million prefixes as of 2025, such resource saturation would be even more severe.
+The propagation of a single flap exacerbates instability across the network, as BGP routers propagate withdrawal and update messages to peering sessions, potentially altering AS paths and triggering reconvergence in downstream autonomous systems. In attack scenarios simulating flaps, a single withdrawal from a compromised router can cascade, forcing peers to evaluate alternate paths and generate numerous additional updates in chained topologiesleading to intermittent peering session disruptions and path length changes that affect global reachability. This cascading effect is particularly pronounced at AS borders, where undampened flaps can flood adjacent networks with spurious advertisements, amplifying the initial instability.
+Instability is often quantified using flap counts, where metrics like the number of flaps per prefix (e.g., more than 3 flaps in quick succession) indicate severe disruption; in BGP route flap damping, each flap incurs a penalty of 1000 to the route's Figure of Merit (FoM), with suppression occurring above a threshold of 3000, effectively blackholing traffic to the prefix until the penalty decays sufficiently. Such temporary blackholing arises when suppressed routes are withdrawn from the RIB, leaving no viable path and dropping packets for durations tied to decay half-lives, typically 15 minutes when unreachable. These metrics highlight how even moderate flapping ratessuch as several events per hourcan render prefixes unusable, isolating network segments until stability returns.
+Over the long term, repeated flapping erodes trust in routing protocol metrics through mechanisms like damping, where cumulative FoM penalties from multiple flaps (e.g., exceeding reuse thresholds after decay) prolong suppression and force reliance on less preferred paths, indirectly influencing attributes such as LOCAL_PREF in path selection as alternate stable routes gain precedence. This sustained instability can lead to oscillatory behavior in the RIB, with routes oscillating between suppressed and active states, further delaying overall network convergence and requiring manual intervention in extreme cases like router freezes or session resets.
+
+Performance Impacts
+
+Route flapping induces significant traffic disruptions during routing reconvergence, including packet loss as in-flight packets encounter invalid paths or temporary loops, with studies showing up to 250 packets dropped in sparse networks using protocols like RIP before stabilization. Delays can extend to 30 seconds or more due to sub-optimal routing and periodic update mechanisms, while temporary blackholing occurs when withdrawn routes direct traffic to null destinations until alternate paths converge. These effects degrade application performance, such as increased latency in TCP sessions from path changes.
+In large-scale networks, route flapping propagates instability across the global Internet, exacerbating convergence times and causing widespread slowdowns as BGP updates flood autonomous systems, with trace data indicating thousands of potential flap events daily that delay routing by minutes to hours. For instance, a single flap in interconnected topologies can trigger secondary updates, amplifying effects in cliques of 5 or more nodes and reducing overall network throughput during propagation.
+Economically, route flapping contributes to costly downtime in enterprise networks by overwhelming routers with updates, leading to service interruptions and operational losses. Excessive updates from flapping can also strain inter-provider peering relationships.
+From a security perspective, route flapping can mask DDoS attacks by simulating natural instability, complicating detection of malicious traffic floods, while the resulting chaos enables route poisoning where attackers inject false advertisements during reconvergence periods. Such incidents blur the line between benign flaps and intentional disruptions, heightening vulnerability in BGP-dependent infrastructures.
+
+Detection and Monitoring
+
+Indicators and Symptoms
+
+Route flapping manifests through distinct patterns in network logs and observable behavioral anomalies that signal underlying instability in routing tables. In BGP environments, common log indicators include repeated syslog entries for route withdrawals and prefix additions, often appearing as frequent UPDATE messages advertising the same prefixes as unreachable and then reachable again. These patterns are exacerbated by BGP notification logs documenting session resets, such as %BGP-5-ADJCHANGE messages indicating neighbor state transitions from Established to Idle due to hold-timer expirations or errors. In OSPF networks, similar log symptoms involve recurrent Link State Advertisement (LSA) originations delayed by the MinLSInterval timer (typically 5 seconds) and the rejection of MaxAge LSAs due to the MinLSArrival interval (1 second), reflecting rapid route disappearances and reappearances in the link-state database.
+Behavioral signs of route flapping extend beyond logs to tangible network operations. Routers experiencing flapping often exhibit sudden spikes in CPU utilization, as the control plane processes excessive routing updates, leading to elevated loads on tasks like BGP or OSPF processes that can reach 80-100% during peak churn. Additionally, end-to-end diagnostics reveal unexplained fluctuations in path selection, where traceroute outputs show inconsistent hop sequences or intermittent packet loss along the same destination, stemming from transient routing loops or suboptimal path selections during reconvergence.
+Threshold-based indicators provide quantitative clues for identifying flapping before widespread impact. In BGP, route churn exceeding a figure of merit thresholdtypically tracked via multiple withdrawals (e.g., 3 or more in a short period)triggers damping mechanisms, with symptoms like 5 or more state transitions within a 5-15 minute window signaling instability. For link-state protocols like OSPF, increased hello timeouts occur when flapping causes neighbors to miss hellos beyond the dead interval (default 40 seconds), resulting in adjacency resets and route recalculations more frequently than baseline convergence times.
+Early warning signs often precede full flapping events, particularly in OSPF topologies. Pre-flap anomalies such as partial mesh inconsistencies arise when routing disparities lead to incomplete neighbor adjacencies or transient blackholes, where routes become temporarily inaccessible due to flap cycles shorter than LSA timers (e.g., under 5 seconds), disrupting synchronized link-state views across the area. These indicators, when correlated with performance symptoms like elevated latency, underscore the need for prompt investigation to avert broader routing instability.
+
+Tools and Techniques
+
+Several specialized tools facilitate the detection of route flapping by monitoring BGP prefix stability and global routing data. BGPmon provides prefix monitoring capabilities to assess network routing health and identify instability, such as repeated route withdrawals and advertisements. Similarly, the Route Views project collects real-time BGP data from multiple global vantage points, enabling analysis of route flapping patterns through historical and live feeds of routing tables. SNMP-based tools can monitor BGP statistics via vendor-specific MIB extensions to track route instability, though the standard BGP4-MIB does not include flap counters. Tools like ManageEngine OpManager provide flap monitoring capabilities.
+Practical techniques for real-time detection include BGP looking glasses, which allow operators to query remote BGP tables for prefix-specific information, revealing flap or damping status during troubleshooting. Passive monitoring with NetFlow offers another approach by analyzing flow records to infer forwarding table updates and detect delayed route changes and transient loops that can result from instability, including flapping episodes, as demonstrated in studies of ISP networks.
+Advanced methods leverage machine learning for anomaly detection in routing behavior. Cisco Catalyst Center (formerly DNA Center), introduced in 2017 with AI enhancements by 2018, employs ML algorithms to identify deviations in network performance metrics, including routing anomalies that may signal flapping. More recent tools like BGPStream and RIPEstat enable real-time and historical analysis of BGP updates to detect flapping events globally.
+Standards like the Internet Routing Registry (IRR) support validation of advertised routes against registered policies, helping to detect invalid announcements that contribute to flapping by cross-referencing BGP updates with authoritative prefix origins.
+
+Mitigation Strategies
+
+Preventive Measures
+
+Preventive measures for route flapping focus on proactive network design and configuration to minimize the propagation of unstable routes, particularly in BGP and IGP environments. By implementing robust filtering and stability mechanisms at the outset, operators can contain potential flaps within localized segments, reducing global impact. These strategies emphasize validation, aggregation, and tuned parameters to ensure reliable route advertisement without reactive interventions.
+Design best practices begin with route filtering at network borders to block invalid or overly specific prefixes that could trigger instability. Inbound and outbound filters should reject unallocated or special-purpose IP addresses, as well as prefixes exceeding reasonable lengths, using automated tools aligned with Internet Routing Registry (IRR) or Resource Public Key Infrastructure (RPKI) data for validation. Additionally, employing a stable Interior Gateway Protocol (IGP) for iBGP next-hop resolution prevents recursive lookup failures that lead to route withdrawals; BGP next-hop address tracking monitors IGP changes event-driven, updating the Routing Information Base (RIB) rapidly to avoid blackholing or loops during IGP convergence. To further stabilize, avoid over-redistribution between BGP and IGP by limiting injected routes to summaries or defaults, preventing full Internet Routing Table propagation into the IGP, which could amplify flaps across the domain.
+Configuration hardening involves setting appropriate timers and enabling restart capabilities. For OSPF, configure the dead interval to at least four times the hello interval (e.g., hello of 10 seconds with dead of 40 seconds) to tolerate transient link issues without declaring neighbors down prematurely, ensuring consistency across interfaces. Enabling graceful restart in BGP, as defined in RFC 4724, allows peers to retain forwarding information during session restarts, preserving routes marked as stale for short configurable periods (default 180 seconds) to mask control-plane disruptions without withdrawing paths. For longer retention, long-lived graceful restart per RFC 9494 enables preserving stale routes for extended times (e.g., up to 12 hours) while treating them as lower priority.
+Network architecture plays a critical role through hierarchical designs that incorporate route summarization to isolate flaps. In layered topologies, aggregate routes at area boundaries or distribution layers (e.g., summarizing 172.16.72.0/21 for multiple /24 subnets), so individual link failures downstream do not propagate summary changes upstream, insulating core routers from peripheral instability. Peering policies should integrate RPKI validation to authenticate BGP announcements, rejecting invalid origins that could mimic or exacerbate flaps from route leaks, thereby enhancing overall authenticity in eBGP sessions.
+Policy examples include AS-path prepending to influence path selection without risking loops, where an AS repeatedly appends its own identifier (e.g., three times) to exported paths, making them less preferred for inbound traffic while maintaining loop detection via the full AS_PATH attribute. This technique stabilizes preferences in multi-homed setups by deterring asymmetric routing that might otherwise cause repeated reconvergences.
+
+Suppression Mechanisms
+
+Suppression mechanisms in routing protocols aim to reactively mitigate the propagation of flapping routes once instability is detected, thereby stabilizing the network without halting all updates. In BGP, Route Flap Damping (RFD) is a primary technique, originally specified in RFC 2439, which tracks the history of route announcements and withdrawals for each prefix to assign a penalty score. The RFC defines a normalized penalty mechanism where each route withdrawal adds a penalty of 1 (with no penalty for announcements), decaying exponentially with an unreachable half-life of 15 minutes and reachable half-life of 5 minutes. If the penalty exceeds the suppression (cutoff) threshold of 1.25, the route is suppressed; it is reused when the penalty falls below 0.5 after a reuse interval. Maximum suppression time is configurable, with a sample of 15 minutes. Implementations often scale these values; for example, Cisco IOS uses a withdrawal penalty of 1000 (announcement 500 or 0), suppress threshold of 2000, reuse threshold of 750, half-life of 15 minutes, reuse interval of 60 minutes, and maximum suppression time of 60 minutes.
+This penalty-based algorithm with exponential backoff effectively dampens flapping prefixes by isolating unstable routes while allowing stable ones to propagate normally. However, RFC 7196 revised the approach to make RFD more usable, addressing flaws in the original design such as disproportionate suppression of multi-homed sites during transient failures; it recommends higher thresholds (minimum suppress at 6000 in scaled implementations) to reduce collateral damage to non-flapping routes, with no change to maximum suppression time (default 60 minutes).
+Due to risks of prolonged unreachability, BGP Community Profile (BCP) 194 and RIPE-580 recommend either disabling RFD or using conservative parameters like suppress threshold of 6000, half-life 15 minutes, and max suppress 60 minutes. As of 2025, an IETF draft proposes BGP Route Flap Damping State Exchange Capability to improve coordination.
+In other protocols, similar reactive limits help halt flapping propagation. OSPF employs Link-State Database (LSDB) Overload Protection to cap the number of non-self-generated LSAs, discarding excess advertisements during high churn to prevent database overflow and stabilize link-state flooding. For RIP, split horizon prevents advertising a route back over the interface from which it was learned, which curbs loop-induced flapping by blocking redundant updates that could amplify instability across the network.
+Despite these benefits, suppression mechanisms like BGP RFD have limitations in modern networks, where faster convergence and diverse peering make over-suppression common, delaying recovery from legitimate failures and harming well-connected prefixes. Studies from the 2020s, including real-world measurements, recommend lighter damping configurationssuch as disabling RFD entirely or using high thresholds (e.g., suppress at 6000) with short half-livesto minimize unnecessary suppression while targeting pathological flaps.
+
+References
+
+RFC 2439 - BGP Route Flap Damping - IETF Datatracker
+
+IP Routing: BGP Configuration Guide, Cisco IOS Release 15M&T
+
+Using Routing Policies to Damp BGP Route Flapping | Junos OS
+
+RFC 2791 - Scalable Routing Design Principles - IETF Datatracker
+
+RFC 7196 - Making Route Flap Damping Usable - IETF Datatracker
+
+IP Routing: Protocol-Independent Configuration Guide, Cisco IOS ...
+
+Cross-Platform Release Notes for Cisco IOS Release 12.2SB
+
+RFC 2439: BGP Route Flap Damping
+
+Troubleshoot Flapping BGP Routes (Recursive Routing Failure)
+
+Comparing BGP and OSPF: Stability Issues Including Flapping
+
+IP Routing: BGP Configuration Guide - Cisco
+
+BGP Path Hunting/Exploration - Packet Pushers
+
+Understanding BGP Flapping: Causes and Consequences - Noction
+
+Analysis of Continuous Route Flapping Due to Incorrect BGP Policy ...
+
+4 Real BGP Troubleshooting Scenarios - ThousandEyes
+
+ Beware of BGP Attacks - College of Computing
+
+ Protecting BGP by Cautiously Selecting Routes - cs.Princeton
+
+ Implementing Access Lists and Prefix Lists - Cisco
+
+Understanding Prefix Lists for Use in Routing Policy Match Conditions
+
+ troubleshoot-network-route-flapping-errors-viavi-onmsi-flash-fiber ...
+
+Understand Cyclic Redundancy Check Errors on Nexus Switches
+
+Troubleshoot Bidirectional Forwarding Detection in Cisco IOS XE
+
+ Mediterranean Fiber Cable Cut (January-February 2008) Analysis of ...
+
+ Route Oscillations in I-BGP with Route Reflection
+
+Routing Loop Generated When Routes Are Imported Between BGP ...
+
+Review OSPF Frequently Asked Questions - Cisco
+
+9.3: Distance-Vector Slow-Convergence Problem
+
+RFC 2918: Route Refresh Capability for BGP-4
+
+ Route Flap Damping Exacerbates Internet Routing Convergence
+
+ An Empirical Study of Router Response to Large BGP Routing Table ...
+
+Mastering Fast BGP Convergence: Techniques - INE
+
+BGP Route Dampening: obsolete or still used in the industry?
+
+BGP Route Dampening - NetworkLessons.com
+
+BGP Dampening Working on Junos - Juniper Support Portal
+
+ A Study of Packet Delivery Performance during Routing Convergence
+
+Route Flapping: A complete guide to understand router flaps
+
+A Survey of Advanced Border Gateway Protocol Attack Detection ...
+
+Disable Flapping BGP Neighbors - ipSpace.net blog
+
+ Route Flapping Effects on OSPF - Internet Research Lab.
+
+Case Study: OSPF Flapping Causes a High CPU Usage
+
+What is Network Flapping? Causes, Fixes, and Explanations
+
+How to troubleshoot routing protocols session flaps part 1
+
+BGPmon | BGPmon
+
+https://www.routeviews.org/
+
+Routing Protocol Monitoring - OpManager - ManageEngine
+
+ Troubleshooting BGP - nanog
+
+ FlowRoute: Inferring Forwarding Table Updates Using Passive Flow ...
+
+Cisco Catalyst Center 2.3.7 Data Sheet
+
+RFC 7454: BGP Operations and Security
+
+OSPF Link-State Database Overload Protection - IP Routing - Cisco
+
+Route Flap Damping in the Wild?! - RIPE Labs
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

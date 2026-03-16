@@ -1,0 +1,233 @@
+Process group Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Process group
+ Ara Eve Leo Sal 
+1x
+ In POSIX-conformant operating systems, a process group is a collection of one or more processes that share a common process group identifier (PGID), enabling related processes to be signaled collectively. Each process belongs to exactly one process group, identified by a positive integer PGID, and a newly created process inherits the PGID of its parent by default. The process group leader is the process whose PID equals the PGID. The leader may exit before other members, leaving the group leaderless.
+Process groups play a central role in job control and inter-process communication, particularly for handling signals such as SIGINT (interrupt) or SIGHUP (hangup), which can be directed to an entire group rather than individual processes. In Unix-like shells, they organize commands like pipelines (e.g., ls | wc), where all processes in the pipeline form a single group to allow unified suspension, resumption, or termination via terminal input sequences like Ctrl-C. Functions like setpgid() and getpgrp() are used to manage process group membership.
+Process groups are further organized into sessions, which are collections of one or more process groups established for job control and tied to a controlling terminal. Within a session, only one process group can be the foreground process group, granting its members privileged access to the terminal for input and output, while background groups are restricted and may receive signals like SIGTTIN or SIGTTOU upon attempting terminal access. This structure supports features like job suspension (Ctrl-Z) and resumption (fg or bg commands), enhancing multitasking in interactive environments.
+
+Definition and Basics
+
+Definition
+
+A process group is a collection of one or more related processes in an operating system that share the same process group identifier (PGID), a unique positive integer assigned to the group during its lifetime. This identifier enables the system to treat the processes as a cohesive unit, distinct from their individual process identifiers (PIDs). Each process belongs to exactly one process group, and newly created processes inherit the PGID of their parent unless explicitly reassigned.
+The primary purpose of a process group is to facilitate collective management of related processes, particularly by allowing signals and other operations to be directed to all members simultaneously. This supports coordinated control, such as suspending or terminating an entire group in response to user input, without needing to address each process individually. Unlike managing single processes, which operate independently, process groups enable job-like behaviortreating multiple cooperating tasks as a single entitywithout requiring direct inter-process communication mechanisms like pipes or shared memory.
+Process groups form part of a broader hierarchy, where multiple groups can belong to a single session, a higher-level container for related activities. A representative example is a shell command like cc -c foo.c, which spawns multiple processes (preprocessor, compiler, assembler) that join the same process group, allowing them to be controlled together, such as by interrupting the entire compilation with Ctrl+C.
+
+Key Attributes
+
+A process group is identified by a unique positive integer known as the process group ID (PGID), which remains associated with the group throughout its lifetime and is not reused by the system until the group ceases to exist. By convention, the PGID is typically set to the process ID (PID) of the process group leader, defined as the process whose PID equals the group's PGID.
+Processes become members of a process group either upon creation, by inheriting the PGID of their parent process during a fork operation, or through explicit reassignment to another existing group within the same session. This inheritance ensures that child processes start in the same group as their creator, and the PGID is preserved even after an execve call replaces the process image.
+Process groups exhibit mutability in their composition: they can be created when a process sets its own PGID to match its PID, allowing it to become the leader of a new group, or processes can join an existing group via reassignment functions, provided the target group belongs to the same session. A group dissolves implicitly when its last member process terminates.
+The scope of a process group is confined to a single session, meaning all member processes must belong to the same session and cannot be reassigned across session boundaries, which enforces isolation for job control and resource management. This limitation ensures that PGIDs are used effectively for targeted operations, such as delivering signals to all processes within the group.
+
+Hierarchy and Relationships
+
+Relation to Processes and Sessions
+
+In Unix-like systems adhering to the POSIX standard, each process belongs to exactly one process group, forming a fundamental layer in the process hierarchy that enables coordinated management of related processes. A process group is defined as a collection of processes sharing the same process group ID (PGID), which serves as a unique identifier within the system. Upon creation via the fork() system call, a child process inherits the PGID of its parent, ensuring it initially joins the parent's process group.
+Sessions provide a higher-level abstraction in this hierarchy, encompassing one or more process groups that share a common session ID (SID). A session is established for job control purposes and typically includes a controlling terminal accessible only to processes within it, preventing process groups from crossing session boundaries. All members of a given process group are inherently part of the same session, creating a two-level structure where individual processes are nested within groups, and groups are nested within sessions. New processes inherit their session membership from the creating process, maintaining this organizational integrity.
+This hierarchical arrangement supports job control by allowing multiple process groups within a single session to operate as distinct foreground or background jobs. The foreground process group gains exclusive input/output access to the session's controlling terminal, while background groups are restricted to prevent interference, facilitating features like job suspension and resumption.
+In practice, this structure is evident in interactive shell environments, where each pipeline of commands (e.g., (/page/Ls) | (/page/Grep) pattern) or subshell execution forms a separate process group within the shell's session, enabling independent job management without affecting the entire session.
+
+Process Group Leader and ID
+
+In POSIX-compliant systems, the process group leader is defined as the process whose process ID (PID) equals the process group ID (PGID), typically the initial process that creates the group. This leader process serves as the identifier for the group and coordinates its lifecycle, including the addition of member processes through mechanisms like inheritance or explicit assignment. The leader's role is integral to job control operations, such as signaling and foreground/background management, though it holds no elevated privileges over other group members.
+The PGID is assigned as the PID of the process group leader at the time of group creation, establishing a unique positive integer that identifies the group throughout its existence. Subsequent processes join the group either by inheriting the PGID from their parent during creation or through explicit reassignment, ensuring all members share the same identifier within the session. This assignment convention maintains consistency, as the PGID remains tied to the original leader's PID even as the group evolves.
+Upon termination of the process group leader, the group does not dissolve and continues to exist until its last member process exits or leaves via reassignment. No automatic selection of a new leader occurs; the PGID persists as the original value, and the group retains its identity without a living process holding that specific PID. The process group lifetime, which spans from creation to the departure of all members, underscores this persistence.
+PGIDs must be unique system-wide to prevent conflicts in job control and signaling, but they become available for reuse once the associated process group's lifetime ends. This system-wide scoping ensures that multiple process groups can coexist, including within a single session, without identifier overlap during active periods.
+
+Implementation
+
+In POSIX and Unix-like Systems
+
+In POSIX-compliant systems, a process group is defined as a collection of one or more processes that share the same process group ID (PGID), which serves as a unique identifier for the group within the session. The POSIX.1 standard (IEEE Std 1003.1) mandates support for process groups, including the ability to query the PGID of a process via functions like getpgid(), create or join groups using setpgid(), and broadcast signals to all members of a group, such as through kill() with a negative PGID argument. This mechanism enables coordinated control of related processes, particularly for job control and signaling, without altering the fundamental process model.
+In Unix-like operating systems such as Linux, BSD variants, and Solaris, process groups are implemented at the kernel level to enforce session-based organization and isolation. In the Linux kernel, process groups are managed through the struct pid data structure, which encapsulates identifiers for tasks, groups, and sessions, allowing the kernel to track membership and propagate signals efficiently across group members. FreeBSD, a BSD derivative, inherits process group semantics from early Unix, where each process structure includes a PGID field inherited from the parent, enabling terminal access control and signal distribution to grouped processes for job management. Similarly, in Oracle Solaris, the kernel maintains process group linkages within session structures to support event notification chains, particularly for signals and terminal interactions, ensuring that grouped processes operate cohesively under a shared controlling terminal.
+Key constraints in POSIX and Unix-like implementations prevent cross-session intermingling: a process can only join or create a process group within its own session, as setpgid() restricts the target PGID to values valid in the current session, and processes from different sessions cannot share a PGID. Additionally, each session associates with at most one controlling terminal, limiting terminal input/output to a single foreground process group while background groups face restrictions on interactive access to avoid interference.
+Modern extensions in Linux integrate process groups with namespaces, particularly the PID namespace, which isolates PGIDs and process visibility within containerized environments like Docker, allowing independent group management per namespace without altering core POSIX mechanics such as signal broadcasting or session isolation. This enhances scalability in virtualized setups while preserving the original group semantics for job control.
+
+Equivalents in Non-POSIX Systems
+
+In Windows operating systems, job objects serve as an analogous mechanism to process groups, enabling the management of multiple processes as a single unit for enforcing resource limits, such as working set size and process priority, and for coordinated termination. Job objects are created using the CreateJobObject function and processes are assigned to them via AssignProcessToJobObject, allowing control over attributes like security descriptors and limits that affect all associated processes. Unlike Unix process groups, which primarily facilitate signal broadcasting to all members, Windows job objects lack native support for direct signal distribution and instead emphasize resource containment and termination policies, such as killing all processes upon job closure.
+In real-time operating systems (RTOS) outside strict POSIX compliance, equivalents vary. QNX, while POSIX-like due to its microkernel architecture, supports process groups as part of its process management, where the procnto manager handles attributes including process IDs and groups for creation, destruction, and control. It also provides application groups to aggregate processes for unified control and isolation. In contrast, VxWorks primarily operates with tasks as the basic execution units rather than traditional processes, lacking native process groups; instead, it relies on custom mechanisms like VxPOD for grouping and isolating subsystems through allocation of memory, time windows, and system objects.
+Non-POSIX systems generally prioritize resource control and security isolation over signal handling in their grouping constructs; for instance, Windows job objects establish security boundaries and limit resource usage across processes without the broadcast semantics central to Unix process groups. Cross-platform libraries such as Cygwin emulate Unix process groups on Windows by providing a POSIX-compatible API layer through its DLL, enabling fork, exec, and group management behaviors on top of the Windows kernel.
+
+Uses and Applications
+
+Signal Delivery
+
+In Unix-like operating systems conforming to POSIX, process groups facilitate the delivery of signals to multiple related processes simultaneously, enabling coordinated control such as interruption or termination of job pipelines. The kill() function sends a signal to an entire process group by specifying a negative process group ID (PGID) as the pid argument, where the absolute value of pid identifies the target group; for example, kill(-PGID, sig) broadcasts the signal to all member processes for which the sender has permission. This mechanism is particularly useful for signals like SIGINT, which is generated by the terminal driver upon receiving the INTR character (typically Ctrl+C) and delivered to all processes in the foreground process group associated with the controlling terminal, provided the ISIG flag is set in the terminal attributes.
+A key use case arises in terminal interactions, where the foreground process group ensures that user-initiated interrupts affect an entire command or job, such as a shell pipeline, rather than isolated processes. This targeted broadcasting prevents scenarios where child processes might otherwise evade signals intended for the group, maintaining orderly job execution. Additionally, in the context of orphaned process groupsthose whose session leader has terminatedthe kernel automatically sends a SIGHUP signal to all members upon certain events, like terminal closure, compelling cleanup and preventing detached processes from persisting without access to the controlling terminal.
+Exceptions apply to certain signals that can be directed to process groups via the same kill(-PGID, sig) syntax, notably SIGKILL, which unconditionally terminates all group members, and SIGSTOP, which suspends them; unlike most signals, these cannot be caught, blocked, or ignored by the recipients. Delivery order within the group is implementation-defined and not guaranteed by POSIX, though signals are sent to each eligible process individually after permission checks.
+Security restrictions ensure controlled access: a process may only signal a foreign process group if it possesses superuser privileges or if its effective or real user ID matches the real or saved set-user-ID of each target process in the group. No such user ID verification occurs for SIGCONT within the same session, allowing resumption of stopped processes without additional checks.
+
+Job Control and Management
+
+In Unix-like operating systems, job control refers to the mechanisms that enable a shell to manage multiple concurrent jobs, where each job consists of one or more related processes grouped into a process group. This allows users to execute commands in the foreground, suspending or terminating them as needed, while running other commands in the background without interrupting the primary interaction. The shell assigns a unique process group to each job, facilitating collective operations such as signal delivery to all member processes.
+A key aspect of job control is the distinction between foreground and background jobs within a session tied to a controlling terminal. The foreground process group receives exclusive access to the terminal for input and output, while background groups are restricted to prevent interference; attempts by background processes to read from the terminal trigger the SIGTTIN signal, typically stopping the process, and writes may trigger SIGTTOU if the terminal is in TOSTOP mode. This enforcement is handled by the terminal driver, ensuring that only the foreground job can interact directly with the user. Shell utilities like fg (foreground) and bg (background) manipulate these assignments by changing the foreground process group via system calls such as tcsetpgrp(), which sets the terminal's foreground group ID to that of the target process group.
+Job management also involves monitoring and controlling job states, including running, stopped, or completed. The shell tracks these via the jobs utility, which reports the status of all active jobs in the current session, displaying process group leaders and their conditions (e.g., "Running" or "Stopped"). Signals like SIGINT (from Ctrl+C) or SIGTSTP (from Ctrl+Z) are directed to the entire foreground process group, allowing unified suspension or termination. Orphaned process groupsthose whose session leader has terminatedreceive special handling, such as ignoring certain job control signals to prevent indefinite stops. This framework, defined in POSIX.1, supports interactive shells in multitasking environments by integrating process groups with terminal I/O and signal protocols.
+
+System Calls and APIs
+
+Creating and Managing Groups
+
+In POSIX-compliant systems, process groups are created and managed primarily through the setpgid() and setsid() system calls, which allow processes to join existing groups, form new ones, or establish sessions with dedicated process groups. The setpgid() function assigns a process to a specified process group ID (PGID) within the same session, enabling either the joining of an existing group or the creation of a new one if the PGID matches the process ID (PID) of the target process. This call is typically invoked by shell implementations, such as those for job control, before executing a new program via exec() to ensure the child process inherits the desired group membership. However, setpgid() fails if the target process is a child of the caller that has already executed an exec() function, preventing group changes after the process image is replaced.
+The setsid() function creates a new session and simultaneously establishes a new process group within that session, with the calling process becoming the leader of both. It succeeds only if the caller is not already a process group leader, ensuring no overlap with existing groups, and detaches the process from any controlling terminal. This mechanism is essential for daemon processes or background jobs that require isolation from the parent's session. Additional process groups can then be formed within the new session using setpgid().
+For retrieving the PGID of the calling process during management operations, the POSIX getpgrp() function provides a simple interface equivalent to getpgid(0), returning the current process group's ID without arguments. This call always succeeds and aids in verifying group assignments before further modifications.
+Process groups are implicitly managed by the kernel and dissolve automatically when the last member process terminates, as there is no explicit system call to delete a group. Once empty, the PGID becomes available for reuse, maintaining system efficiency without manual intervention.
+
+Querying Group Information
+
+Process group information can be queried using specific system calls in POSIX-compliant systems, allowing applications and administrators to retrieve details about process affiliations without altering the group structure. These functions provide essential data for understanding process hierarchies, particularly in multi-process environments where coordination is key.
+The getpgid() function retrieves the process group ID (PGID) of a specified process identified by its process ID (pid); if pid is zero, it returns the PGID of the calling process itself. This function is useful for determining group membership across related processes, returning -1 on error with errno set to indicate the failure reason, such as if the process does not exist.
+For terminal-related queries, the tcgetpgrp() function obtains the PGID of the foreground process group associated with a controlling terminal specified by file descriptor fd. It returns this PGID value directly or -1 on error, enabling processeseven those in background groupsto check the current foreground status without permission restrictions beyond file access.
+Related to process groups, the getsid() function retrieves the session ID of the process specified by pid, which is the PGID of the session leader process containing the target; if pid is zero, it returns the session ID of the calling process. This provides context on broader session containment, as detailed in the relation to processes and sessions.
+In debugging and system monitoring, these query functions underpin tools like the ps command, which displays PGID alongside other process details when invoked with options such as -o pid,pgid or the BSD-style j format, facilitating the visualization of process group hierarchies for troubleshooting and resource management.
+
+History and Evolution
+
+Origins in Early Unix
+
+Process groups were first introduced in the Fourth Edition of Unix, released in November 1973 by Bell Labs, primarily as a mechanism for basic grouping of processes associated with a controlling terminal. In this early implementation, every process belonged to a process group tied directly to its terminal (tty), facilitating the delivery of signals such as SIGINT (from interrupt) and SIGQUIT (from quit) to all processes in the group when generated at the terminal. This design addressed the need for coordinated signal handling in a multi-process environment, where processes from the same command invocation could be managed collectively without individual addressing.
+The concept was significantly expanded in Version 7 Unix, released in 1979, where process groups gained an independent identity with their own numeric ID (via the p_pgrp field), separate from the terminal association. The setpgrp() system call to explicitly set a process's group ID was introduced later in AT&T System III Unix in 1981. Developed by Ken Thompson and Dennis Ritchie at Bell Labs, process groups in Version 7 featured "closed" semantics, meaning processes could not easily leave their group once assigned, which simplified management but limited flexibility. The initial purpose centered on managing related processes spawned from shell commands, particularly to prevent signal loss in pipelinessequences of commands connected by pipes where output from one process feeds into the nextensuring that terminal-generated signals reached all pipeline participants reliably.
+Prior to enhancements in Berkeley Software Distribution (BSD) variants, process groups in these early Unix versions were limited to serving as a simple collection of processes without advanced job control features, such as suspending or resuming groups. This basic functionality sufficed for the era's primarily sequential and pipeline-based workflows at Bell Labs.
+
+Key Developments
+
+In the 1980s, Berkeley Software Distribution (BSD) introduced significant extensions to process group functionality, particularly through the development of job control mechanisms. The 4.2BSD release in 1983 marked a key milestone by integrating job control features originally prototyped in 4.1BSD, allowing processes to be organized into groups for foreground and background execution under shells like csh. This enabled users to suspend, resume, and manage related processes as cohesive units, with the process group ID (PGID) serving as the identifier for job-level operations, such as signal delivery to all members. These enhancements built on earlier Unix concepts but provided a more robust framework for interactive computing environments.
+The standardization of process groups came with the IEEE POSIX.1-1988 specification, which formalized key elements including the PGID, the setsid() function for creating new sessions and process groups, and precise signal semantics for group-wide delivery. POSIX.1 defined process groups as collections of one or more processes that could receive signals collectively, with the group leader typically identified by the PGID matching its process ID, ensuring portability across Unix-like systems. This standard influenced subsequent Unix variants, including AT&T System V Release 4 (SVR4) in 1988, which adopted POSIX-compliant process group APIs to enhance interoperability while incorporating BSD-inspired job control.
+Linux inherited the traditional process group model directly from Unix and BSD traditions, maintaining compatibility with POSIX semantics for signal handling and job management since its early kernels. In the 2000s, Linux extended process organization through the introduction of control groups (cgroups), developed primarily by Paul Menage and Rohit Seth at Google, with initial work beginning in 2006 and merger into the mainline kernel in version 2.6.24 (2007). Unlike traditional process groups focused on signaling, cgroups provide hierarchical resource controllimiting CPU, memory, and I/O for groups of processeswithout altering core signal semantics, thus serving complementary roles in modern system administration.
+In recent developments, process groups have been enhanced within containerization technologies, where PID namespaces isolate process identifiers and group structures to prevent cross-container interference. For instance, Docker leverages PID namespaces to confine process groups within containers, allowing each to maintain its own independent view of processes while adhering to host-level resource limits via cgroups. The core POSIX-defined process group mechanisms have remained largely unchanged since 1988, with evolutions primarily in integration with isolation primitives rather than fundamental alterations.
+
+References
+
+Definitions - The Open Group Publications Catalog
+
+credentials(7) - Linux manual page - man7.org
+
+4.8 Process Groups and Sessions - InformIT
+
+Concepts of Job Control (The GNU C Library)
+
+Definitions
+
+https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_298
+
+https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_296
+
+setpgid(2) - Linux manual page - man7.org
+
+setpgid
+
+https://pubs.opengroup.org/onlinepubs/009696799/basedefs/xbd_chap03.html#tag_03_290
+
+https://pubs.opengroup.org/onlinepubs/009696799/basedefs/xbd_chap03.html#tag_03_337
+
+getpgid
+
+2.4. Process Management - FreeBSD Documentation Archive
+
+Control Groups - The Linux Kernel documentation
+
+Job Objects - Win32 apps - Microsoft Learn
+
+Very Confused why ProcessStartInfo.CreateNewProcessGroup is ...
+
+Process management - QNX
+
+Application groups - QNX
+
+Software Containment in VxWorks: VxPOD A Separation ...
+
+ Cygwin User's Guide
+
+kill
+
+Orphaned Process Groups (The GNU C Library)
+
+11. General Terminal Interface
+
+jobs - The Open Group Publications Catalog
+
+setsid(2) - Linux manual page - man7.org
+
+tcgetpgrp
+
+getsid
+
+ps(1) - Linux manual page - man7.org
+
+Control groups, part 1: On the history of process grouping - LWN.net
+
+The history of sending signals to Unix process groups
+
+Evolution of the Unix Time-sharing System - Nokia
+
+setpgrp
+
+ Changes to the Kernel in 4.2BSD July 25, 1983
+
+ 4.2BSD and 4.3BSD as Examples of the UNIX System
+
+ IEEE standard portable operating system interface for computer ...
+
+setpgid
+
+Understanding the new control groups API - LWN.net
+
+cgroups(7) - Linux manual page - man7.org
+
+docker container run | Docker Docs
+
+Docker Engine security
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

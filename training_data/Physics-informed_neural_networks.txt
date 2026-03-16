@@ -1,0 +1,304 @@
+Physics-informed neural networks Grokipedia
+ 
+
+ Fact-checked by Grok 12 days ago 
+Physics-informed neural networks
+ Ara Eve Leo Sal 
+1x
+ Physics-informed neural networks (PINNs) are a class of deep neural networks designed to solve forward and inverse problems governed by physical laws, particularly nonlinear partial differential equations (PDEs), by embedding these laws directly into the network's training process. Building on earlier neural network methods for PDE solving, such as those proposed by Lagaris et al., the modern PINN framework was first introduced in 2017 by Maziar Raissi, Paris Perdikaris, and George E. Karniadakis, with formal publication in 2019. PINNs leverage automatic differentiation to compute PDE residuals and incorporate them into a composite loss function alongside data-fitting terms, enabling mesh-free approximations that respect underlying physics without requiring extensive labeled datasets. This approach bridges traditional numerical methods like finite element analysis with machine learning, offering a data-efficient framework for modeling complex physical systems.
+At their core, PINNs approximate the solution to a PDE as the output of a neural network, typically a fully connected architecture with hyperbolic tangent or similar activation functions, where the network parameters are optimized to minimize a loss that balances empirical data error and the violation of physical constraints evaluated at collocation points in the domain. For forward problems, PINNs predict solutions given known parameters and boundary conditions, while for inverse problems, they infer unknown parameters or even discover governing equations from sparse or noisy observations. Key advantages include their ability to handle high-dimensional problems, incorporate uncertainty quantification through Bayesian variants, and generalize beyond training data by enforcing conservation laws or symmetries, outperforming purely data-driven models in scenarios with limited measurements.
+Since their inception, PINNs have evolved through numerous variants to address limitations such as optimization challenges and stiffness in stiff PDEs, including conservative PINNs (cPINNs) that enforce integral constraints for better stability in transport phenomena, extended PINNs (XPINNs) using domain decomposition for scalability, and fractional PINNs (fPINNs) for non-local operators. These extensions have expanded applications across fields like fluid dynamics (e.g., simulating blood flow from MRI data), quantum mechanics (solving Schrdinger equations), climate modeling (parameterizing subgrid processes), materials science (predicting microstructure evolution), electromagnetism in conductive media (e.g., magnetohydrodynamic flows and electro-diffusion in brain tissues), and electrochemistry (lithium-ion battery state of charge estimation). Despite successes, ongoing challenges include balancing loss terms to avoid failure modes like spectral bias and improving theoretical guarantees for convergence in diverse settings. Overall, PINNs represent a cornerstone of physics-informed machine learning, fostering hybrid models that enhance scientific discovery and engineering design.
+
+Overview and Background
+
+Definition and Principles
+
+Physics-informed neural networks (PINNs) are a prominent example of differentiable physics, a broader framework in which the mathematical models of physical phenomena, such as fluids, solids, and light, are directly embedded into the architecture of artificial intelligence systems. This integration enables the computation of gradients with respect to physical processes, facilitating rapid solutions to engineering problems like aerodynamic design. PINNs specifically are neural networks trained to solve supervised learning tasks while respecting physical laws, such as those governed by nonlinear partial differential equations (PDEs) or ordinary differential equations (ODEs). They function as universal function approximators, representing solutions to physical systems by embedding the governing equations directly into the loss function during training via automatic differentiation, which enables the computation of derivatives without explicit discretization. For instance, PINNs can embed the Navier-Stokes equations, which describe fluid motion, directly into the neural network to solve complex fluid dynamics problems.
+The core principles of PINNs revolve around leveraging known physics to regularize the learning process, thereby addressing data scarcity in scientific applications where observations are often limited or expensive to obtain. By incorporating physical constraints as priors, PINNs constrain the solution space to physically plausible outcomes, reducing overfitting and improving generalization. In contrast to conventional numerical methods like finite element analysis, which rely on mesh generation and can be computationally intensive for complex geometries, PINNs employ a mesh-free paradigm, evaluating equations at arbitrarily chosen collocation points within the domain.
+The fundamental workflow of PINNs involves parameterizing the solutionsuch as the function u(x,t)u(x,t)u(x,t) for spatiotemporal problemswith a neural network and enforcing physical consistency through minimization of the residual arising from the governing equations. This residual is computed seamlessly using automatic differentiation and added to the training loss, often alongside data-fitting terms from boundary or initial conditions.
+PINNs provide distinct advantages, including their capacity to tackle high-dimensional problems that challenge traditional solvers due to exponential scaling in computational cost, while integrating noisy or incomplete data effectively through balanced loss components. They support unified treatment of forward modeling, where solutions are predicted given known parameters, and inverse modeling, where parameters are inferred from measurements, all within a differentiable framework. For example, PINNs approximate solutions to the one-dimensional Burgers' equation, a canonical nonlinear PDE describing shock formation in viscous fluids, by directly embedding the equation's structure to guide learning from sparse data points.
+
+Historical Development
+
+The origins of physics-informed neural networks (PINNs) trace back to 2017, when Maziar Raissi, Paris Perdikaris, and George Em. Karniadakis published an arXiv preprint introducing the core concept as a means to solve nonlinear partial differential equations (PDEs) by embedding physical laws directly into neural network training. This foundational work built on earlier ideas of data-driven PDE discovery but marked the explicit formulation of PINNs for both forward PDE solving and inverse parameter estimation. The approach leveraged the success of deep learning in scientific computing, particularly the rise of automatic differentiation in frameworks like PyTorch and TensorFlow, which enabled efficient computation of PDE residuals without traditional discretization.
+The foundational 2017 arXiv preprint by the same authors, updated in 2018 and published in 2019, formalized PINNs as a deep learning framework for forward and inverse problems involving nonlinear PDEs, including demonstrations of applications to the Navier-Stokes equations for incompressible flow modeling. This seminal 2019 publication established PINNs' data-driven solution capabilities, emphasizing sparse data integration with physics constraints, and rapidly gained influence with over 10,000 citations by 2023. Early adoption focused on fluid dynamics, such as solving the Navier-Stokes and Burgers' equations, where PINNs outperformed traditional numerical methods in handling noisy or limited data scenarios.
+Subsequent developments in 2020 extended PINNs to uncertainty quantification, with Bayesian physics-informed neural networks (B-PINNs) incorporating Bayesian inference to assess prediction reliability in PDE solutions, addressing a key limitation in deterministic neural network outputs. From 2021 to 2023, the field saw rapid growth in variants, including conservative PINNs (cPINNs) introduced in 2020, which enforce flux continuity on discrete domains to improve stability for conservation laws. By 2022, PINNs expanded beyond fluid dynamics to multiphysics problems, such as coupled flow-mechanics systems and subsurface transport, enabling simulations of interacting phenomena like poroelasticity and multiphase flows. These advancements were fueled by the frameworks' flexibility in handling complex geometries and the growing availability of open-source implementations, solidifying PINNs as a standard tool in computational science. By 20242025, PINNs continued to evolve with advancements in network architectures and theoretical guarantees, as detailed in subsequent sections.
+
+Mathematical Foundations
+
+Network Architecture
+
+Physics-informed neural networks (PINNs) typically employ fully connected feedforward neural networks as their core architecture to approximate solutions to partial differential equations (PDEs). These networks take spatial and temporal coordinates, such as (x,t)(x, t)(x,t), as inputs and output the corresponding solution variables, for instance, u(x,t)u(x, t)u(x,t), representing the latent solution of the PDE. The architecture leverages the universal approximation theorem, enabling the network to represent complex functions defined over continuous domains without requiring a mesh.
+Activation functions play a crucial role in ensuring the smoothness required for accurate derivative computations via automatic differentiation, which is used to enforce physical constraints. Common choices include the hyperbolic tangent (tanh) function, favored for its bounded and differentiable properties that facilitate smooth approximations, or the swish activation (swish(z)=z(z)\text{swish}(z) = z \cdot \sigma(z)swish(z)=z(z), where \sigma is the sigmoid function), which has shown improved performance in capturing non-linear behaviors in certain PDEs.
+Typical hyperparameters for PINN architectures involve 5 to 10 hidden layers with 50 to 100 neurons per layer, selected based on the complexity of the PDE to balance expressiveness and computational efficiency. These configurations are often optimized using gradient-based methods like Adam, allowing the trainable parameters \theta to adjust the network to fit both data and physics. For example, in solving the Burgers' equation, a network with 8 hidden layers and 20 neurons each has been effectively used.
+The input-output mapping in PINNs involves sampling collocation points randomly within the computational domain to enforce the governing PDE, while boundary and initial conditions are incorporated as additional training data points. This unsupervised sampling strategy enables mesh-free enforcement of physics across the domain. Mathematically, the neural network provides an approximation u~(;x,t)\tilde{u}(\theta; x, t)u~(;x,t) to the true solution u(x,t)u(x, t)u(x,t), where \theta denotes the set of network weights and biases.
+For challenging problems involving stiff PDEs, adaptations such as multi-scale architectures have been developed to better resolve disparate length or time scales. These include hierarchical networks or Fourier feature embeddings that enhance the representational capacity for multi-scale phenomena, improving convergence on problems like high-Reynolds-number flows or reaction-diffusion systems.
+
+Loss Function Formulation
+
+The loss function in physics-informed neural networks (PINNs) is designed to enforce both data consistency and adherence to physical laws by combining multiple terms into a composite objective. The neural network approximates the solution to a partial differential equation (PDE) as (; x, t), where represents the network parameters, and x, t denote spatial and temporal coordinates. This approximation is trained by minimizing a loss that balances empirical data fitting with the residual of the governing physics.
+The composite loss is generally expressed as
+L()=Ldata()+Lphysics()+Lboundary(), \mathcal{L}(\theta) = \mathcal{L}_\text{data}(\theta) + \lambda \mathcal{L}_\text{physics}(\theta) + \mathcal{L}_\text{boundary}(\theta), L()=Ldata()+Lphysics()+Lboundary(),
+where Ldata\mathcal{L}_\text{data}Ldata quantifies the discrepancy between predicted and observed values, Lphysics\mathcal{L}_\text{physics}Lphysics penalizes violations of the PDE, Lboundary\mathcal{L}_\text{boundary}Lboundary enforces initial and boundary conditions (ICs/BCs), and serves as a hyperparameter to balance the physics term. In the original PINN formulation, the data loss Ldata\mathcal{L}_\text{data}Ldata is the mean squared error (MSE) over N_f observed points:
+Ldata()=1Nfi=1Nfu~(;xfi,tfi)ufi2, \mathcal{L}_\text{data}(\theta) = \frac{1}{N_f} \sum_{i=1}^{N_f} \left\| \tilde{u}(\theta; x_f^i, t_f^i) - u_f^i \right\|^2, Ldata()=Nf1i=1Nfu~(;xfi,tfi)ufi2,
+while boundary terms are incorporated into this MSE to ensure compliance with ICs/BCs at designated points. The physics loss Lphysics\mathcal{L}_\text{physics}Lphysics arises from the PDE residual; for a general PDE F=0\mathcal{F} = 0F=0, the residual r is computed as r = F\mathcal{F}F, evaluated at N_c collocation points via automatic differentiation to obtain required derivatives (e.g., partials with respect to x and t). Thus,
+Lphysics()=1Nci=1NcF2. \mathcal{L}_\text{physics}(\theta) = \frac{1}{N_c} \sum_{i=1}^{N_c} \left\| \mathcal{F} \right\|^2. Lphysics()=Nc1i=1NcF2.
+The full unweighted loss in the seminal work simplifies to the sum of data and physics MSEs without an explicit , treating them equally. Boundary enforcement is handled softly by inclusion in the data loss, though separate Lboundary\mathcal{L}_\text{boundary}Lboundary terms can be added for clarity in more complex setups.
+Weighting strategies are crucial for effective training, as mismatched scales between loss terms can lead to suboptimal convergence. The original 2019 PINN approach used fixed equal weights, which often requires manual tuning of to prioritize physics over data or vice versa. Subsequent improvements introduced self-adaptive weighting, where (or equivalent per-term weights) is learned during training via gradient-based updates, such as ascent on a soft attention mechanism applied to residuals at each point. This adaptive approach dynamically balances terms without hyperparameter intervention, enhancing robustness across diverse PDEs. Soft constraints, like PDE residuals added to the loss, predominate in PINNs for their differentiability, in contrast to hard constraints enforced directly in the network architecture (e.g., via custom layers), though the former enables seamless backpropagation.
+Training proceeds by minimizing the composite loss using gradient descent optimizers (e.g., Adam), with automatic differentiation facilitating computation of gradients through both the network outputs and embedded derivatives in the residuals. This end-to-end differentiability allows the optimizer to propagate errors from physics violations back to , ensuring the learned satisfies both data and equations simultaneously.
+
+Core Applications
+
+Forward Problems: Solving PDEs
+
+In the forward problem formulation within physics-informed neural networks (PINNs), the objective is to approximate the solution u(x,t)u(\mathbf{x}, t)u(x,t) to a given partial differential equation (PDE) N=f(x,t)\mathcal{N} = f(\mathbf{x}, t)N=f(x,t), subject to specified initial conditions (ICs) and boundary conditions (BCs), without relying on traditional mesh-based discretization. PINNs achieve this by parameterizing the solution with a deep neural network u^(x,t)\hat{u}_\theta(\mathbf{x}, t)u^(x,t), where \theta denotes the trainable parameters, and enforcing the PDE, ICs, and BCs through a composite loss function during training. This mesh-free approach leverages automatic differentiation to compute derivatives, enabling direct evaluation of the PDE residual Nf\mathcal{N} - fNf at arbitrary points in the domain.
+Training proceeds via a collocation-based method, where collocation points are randomly sampled within the spatio-temporal domain, on the boundaries, and at initial times. The loss function minimizes the mean squared error of the PDE residual at these interior collocation points, alongside terms for IC and BC residuals, typically using optimizers like Adam followed by L-BFGS. This enforces the physics constraints in a data-efficient manner, often requiring fewer samples than purely data-driven methods, and allows for large time steps in time-dependent problems. The reference to loss function components for PDE residuals underscores how this residual minimization drives the network toward satisfying the governing equations pointwise.
+Representative examples illustrate the efficacy of PINNs for forward problems. For the 1D nonlinear heat equation, PINNs have achieved relative L2 errors on the order of 10410^{-4}104 with appropriate network architectures, demonstrating convergence as the number of layers and neurons increases. In fluid dynamics, PINNs solve the 2D incompressible Navier-Stokes equations, such as in lid-driven cavity flows, yielding relative L2 errors around 10310^{-3}103 for velocity and pressure fields after training on thousands of collocation points. The seminal application includes solving the Allen-Cahn equation for phase-field modeling, where PINNs approximated the solution with an L2 error of approximately 71037 \times 10^{-3}7103, as demonstrated in the original framework.
+Compared to the finite element method (FEM), PINNs offer distinct advantages, particularly for irregular domains and high-dimensional PDEs. By avoiding mesh generation, PINNs handle complex geometries without the computational overhead of meshing, which can be prohibitive in irregular or evolving domains. In high dimensions, such as 10D PDEs arising in quantum mechanics or finance, traditional methods like FEM suffer from the curse of dimensionality due to exponential growth in degrees of freedom, whereas PINNs scale more favorably as the network dimensionality aligns naturally with the problem's input size. Evaluation typically employs L2 error norms, uu^L2/uL2\|u - \hat{u}_\theta\|_{L^2} / \|u\|_{L^2}uu^L2/uL2, to quantify accuracy against exact or reference solutions, confirming errors in the range of 10310^{-3}103 to 10410^{-4}104 for well-conditioned problems with sufficient training.
+
+Inverse Problems: Parameter Discovery
+
+In inverse problems within the framework of physics-informed neural networks (PINNs), the goal is to infer unknown parameters \lambda of a governing partial differential equation (PDE) or even discover the form of the PDE itself from observed data uobsu_{\text{obs}}uobs. This is achieved through a joint optimization process that simultaneously trains the neural network parameters \thetawhich approximate the solution u(x,t;)u(x, t; \theta)u(x,t;)and the PDE parameters \lambda, ensuring the predicted solution fits both the data and the underlying physics. Unlike traditional inverse methods that rely heavily on numerical solvers, PINNs embed the PDE constraints directly into the learning process, enabling parameter estimation even from sparse or limited observations.
+For data-driven discovery of PDEs, PINNs assume a candidate form for the governing equation, such as N+iigi(u)=0N + \sum_i \lambda_i g_i(u) = 0N+iigi(u)=0, where NNN represents known differential operators (e.g., spatial derivatives) and the gi(u)g_i(u)gi(u) are basis functions capturing potential nonlinear terms, with i\lambda_ii as coefficients to be determined. The network outputs u(x,t;)u(x, t; \theta)u(x,t;) and its derivatives, which are substituted into this form to evaluate residuals, allowing the optimization to identify the active terms and their strengths by minimizing a combined loss that balances data fidelity and physical consistency. This approach leverages automatic differentiation to compute derivatives without explicit discretization, making it particularly suited for complex, high-dimensional systems.
+A representative example is the estimation of parameters in Darcy flow, where PINNs infer the heterogeneous permeability field (x)\kappa(x)(x) from sparse pressure measurements, achieving accurate reconstructions by enforcing the steady-state PDE (p)=0\nabla \cdot (\kappa \nabla p) = 0(p)=0 alongside data constraints, with relative errors below 1% even for noisy inputs. Similarly, in reaction-diffusion systems, PINNs have been used to discover diffusion and reaction coefficients from sparse spatiotemporal measurements, such as in the PDE tu=D2u+Ru(1u)\partial_t u = D \nabla^2 u + R u (1 - u)tu=D2u+Ru(1u), where DDD and RRR are inferred with high fidelity using sparse regression integrated into the physics-informed framework. Another application involves vehicle collision dynamics, where PINNs enable inverse problem solving by inferring parameters such as impact velocities or material properties from observed outcomes like crash deformations. For instance, a dual PINN framework has been proposed to model precision immobilization technique maneuvers, allowing the network to work backward from simulated collision data to determine causative factors, demonstrating robustness in high-dimensional mechanical systems. Specialized variants like Singularity-Guided PINNs (SG-PINNs) further enhance inverse problem solving by decomposing solutions into smooth and jump components to handle singularities, such as sharp changes in wave propagation, enabling accurate recovery of underlying causes from observations like ripples in water with near-zero error. This decomposition addresses limitations in standard PINNs for problems involving discontinuities, improving precision in inverse inference.
+The optimization relies on an extended loss function formulated as
+L(,)=Ldata(,)+Lphysics(,),
+\mathcal{L}(\theta, \lambda) = \mathcal{L}_{\text{data}}(\theta, \lambda) + \mathcal{L}_{\text{physics}}(\theta, \lambda),
+L(,)=Ldata(,)+Lphysics(,),
+where Ldata\mathcal{L}_{\text{data}}Ldata measures the mismatch between the network prediction and observations (e.g., mean squared error), and Lphysics\mathcal{L}_{\text{physics}}Lphysics enforces the PDE residual N+g(u())|N + \lambda \cdot g(u(\theta))|N+g(u()) at collocation points, with both terms minimized via gradient-based methods like Adam. This joint training enables seamless integration of data and physics, as gradients with respect to \theta and \lambda are computed automatically. A seminal demonstration of this capability is the 2019 work by Raissi et al., which successfully discovered the nonlinear terms of the Kuramoto-Sivashinsky equation tu+t2u+x4u+1(xu)2+2uxu=0\partial_t u + \partial_t^2 u + \partial_x^4 u + \lambda_1 (\partial_x u)^2 + \lambda_2 u \partial_x u = 0tu+t2u+x4u+1(xu)2+2uxu=0 from limited time-series data, recovering coefficients with errors under 5%.
+PINNs exhibit robustness to noisy data in inverse settings due to the physics regularization term, which acts as a prior enforcing structural consistency and mitigating overfitting, allowing reliable parameter discovery even when observations are corrupted by up to 10% Gaussian noise. This regularization helps propagate information from the PDE across the domain, compensating for data scarcity.
+
+Specialized Variants
+
+Piece-wise and Domain Decomposition Methods
+
+Piece-wise and domain decomposition methods address limitations of standard physics-informed neural networks (PINNs) in handling complex geometries, multi-scale features, or discontinuities in solutions, such as shocks in advection equations, by partitioning the computational domain into smaller subdomains. This decomposition enhances accuracy for non-smooth solutions and enables parallel training, reducing computational overhead for large-scale problems.
+In piece-wise approximation approaches, such as extended PINNs (XPINNs), the domain is divided into non-overlapping subdomains, each approximated by a separate local neural network. XPINNs, introduced by Jagtap, Kharazmi, and Karniadakis in 2020, generalize space-time domain decomposition for nonlinear partial differential equations (PDEs), particularly suited for multi-scale problems where global networks struggle with varying solution scales. Interface conditions between subdomains are enforced through additional loss terms to ensure continuity of the solution and its derivatives, promoting seamless global approximations. This method significantly reduces training time compared to monolithic PINNs by allowing independent optimization of local networks.
+The loss function in these methods combines local residuals within each subdomain with interface penalties. For a PDE residual R(u)\mathcal{R}(u)R(u) in subdomain k\Omega_kk, the local loss is Lk=1Nki=1NkR(uk(xi))2\mathcal{L}_k = \frac{1}{N_k} \sum_{i=1}^{N_k} |\mathcal{R}(u_{\theta_k}(\mathbf{x}_i))|^2Lk=Nk1i=1NkR(uk(xi))2, where uku_{\theta_k}uk is the local network with parameters k\theta_kk and NkN_kNk collocation points in k\Omega_kk. The global loss includes these subdomain terms plus interface contributions for flux continuity, such as L=1Mj=1Muk(yj)uk+1(yj)2+uk(yj)nuk+1(yj)n2\mathcal{L}_{\Gamma} = \frac{1}{M} \sum_{j=1}^{M} |u_{\theta_k}(\mathbf{y}_j) - u_{\theta_{k+1}}(\mathbf{y}_j)|^2 + |\nabla u_{\theta_k}(\mathbf{y}_j) \cdot \mathbf{n} - \nabla u_{\theta_{k+1}}(\mathbf{y}_j) \cdot \mathbf{n}|^2L=M1j=1Muk(yj)uk+1(yj)2+uk(yj)nuk+1(yj)n2, where \Gamma denotes the interface and n\mathbf{n}n the normal vector. The total loss L=kLk+L\mathcal{L} = \sum_k \mathcal{L}_k + \lambda \mathcal{L}_{\Gamma}L=kLk+L is minimized, with \lambda balancing terms, akin to standard PINN formulations but localized.
+Domain decomposition variants, including conservative PINNs (cPINNs) and parallel PINNs (pPINNs), extend these ideas for specific challenges like conservation laws. cPINNs, proposed by Jagtap et al. in 2020, incorporate discrete domain decomposition to enforce conservation properties in nonlinear conservation laws, using local networks with interface fluxes derived from the PDE structure. This ensures physical consistency across subdomains, improving stability for problems with discontinuities like shocks. pPINNs build on cPINNs and XPINNs by enabling distributed computing via MPI or GPU parallelism, partitioning training across processors while maintaining interface synchronization. These approaches scale to large domains, with pPINNs demonstrating up to an order-of-magnitude speedup in training for advection-dominated flows.
+Singularity-Guided Physics-Informed Neural Networks (SG-PINNs) further extend piecewise methods to handle sharp changes and singularities, such as shockwaves in explosions or sudden chemical reactions. SG-PINNs decompose the solution into a smooth part and a jump part, enabling accurate simulations of phenomena like high-speed aerodynamics and nuclear fusion that challenge standard PINNs. This piecewise constant decomposition addresses singularitiespoints where equations approach infinitywithout destabilizing the training process. In inverse problems, SG-PINNs facilitate backward inference from observed outcomes, such as recovering causal structures from ripples in water, achieving near-zero error rates compared to traditional approaches. The method also supports sparse reconstruction by leveraging physics-informed priors to generate clear 3D images from limited data, with potential applications in medical imaging.
+An illustrative example is the application of piece-wise methods to the Helmholtz equation in acoustics, where domain decomposition handles heterogeneous media with varying wave speeds. XPINNs partition the acoustic domain into subregions with distinct material properties, training local networks to approximate pressure fields while enforcing continuity of pressure and normal velocity at interfaces, yielding accurate wave propagation predictions with reduced error compared to global PINNs.
+
+Integration with Other Frameworks
+
+Physics-informed neural networks (PINNs) have been effectively combined with the Theory of Functional Connections (TFC), a mathematical framework that enables exact enforcement of linear constraints through analytical basis functions. In TFC-augmented PINNs, the approximate solution takes the form
+u~(x)=NN(x)+i=1ncii(x),
+\tilde{u}(x) = \mathrm{NN}(x) + \sum_{i=1}^{n} c_i \phi_i(x),
+u~(x)=NN(x)+i=1ncii(x),
+where NN(x)\mathrm{NN}(x)NN(x) denotes the output of the neural network, cic_ici are coefficients solved via a linear system derived from the constraints, and i(x)\phi_i(x)i(x) are predefined basis functions that inherently satisfy the boundary or initial conditions. This hybrid approach, first proposed in 2020, ensures precise constraint satisfaction without relying solely on the neural network's optimization, leading to faster convergence rates compared to vanilla PINNs, often reducing training time by orders of magnitude while maintaining high accuracy for parametric differential equations.
+Another notable integration is the Physics-informed PointNet (PIPN), which merges PINNs with the PointNet architecture to address challenges in irregular geometries. PointNet processes unstructured point cloud data representing domains, while physics losses enforce governing equations across multiple datasets in a single training run. Developed in 2022, PIPN excels in applications like computational fluid dynamics on unstructured meshes, enabling simultaneous solutions for steady-state incompressible flows and thermal fields over diverse irregular shapes, with relative errors below 1% in benchmark tests on airfoil and cavity geometries.
+PINNs have also been enhanced with Fourier features to improve handling of periodic problems, such as those involving oscillatory solutions in wave equations. By mapping inputs through random Fourier transformations before feeding into the network, these hybrids mitigate spectral bias and better capture high-frequency components, as shown in 2021 studies that demonstrated improved accuracy for multi-scale periodic phenomena without additional computational overhead. More recently, in 2024, Physics-informed Kolmogorov-Arnold Networks (PIKANs) integrate PINNs with Kolmogorov-Arnold representations, replacing fixed activations with learnable univariate functions for greater interpretability and efficiency in solving forward and inverse problems. In 2025, emerging variants such as Transformer-based PINNs (e.g., Transolver) have further integrated attention mechanisms to handle complex geometries with high efficiency.
+These framework integrations collectively enhance PINNs' generalization capabilities, particularly for complex boundaries and multi-domain scenarios, by leveraging complementary strengths in constraint handling, geometric flexibility, and representational power.
+
+Domain-Specific Applications
+
+Mechanics and Elasticity
+
+Physics-informed neural networks (PINNs) have been applied to solve linear and nonlinear elasticity partial differential equations (PDEs) to determine stress and strain distributions in materials under various loading conditions. In these formulations, the neural network approximates the displacement field, and the physics constraints are incorporated into the loss function through the residual of the equilibrium equation. The governing PDE for linear elasticity is the momentum balance +f=0\nabla \cdot \boldsymbol{\sigma} + \mathbf{f} = 0+f=0, where \boldsymbol{\sigma} is the stress tensor, f\mathbf{f}f represents body forces, and the constitutive relation =C:\boldsymbol{\sigma} = \mathbf{C} : \boldsymbol{\varepsilon}=C: links stress to the strain tensor \boldsymbol{\varepsilon} via the material stiffness tensor C\mathbf{C}C. Automatic differentiation enables efficient computation of the necessary gradients for strains and stresses directly from the network outputs. This approach has been demonstrated in two-dimensional plane strain problems, where PINNs accurately predict deformations in cantilever beams and thick-walled cylinders with comparable accuracy to finite element methods but without mesh generation.
+In inverse problems within mechanics, PINNs facilitate the inference of material properties, such as Young's modulus, from observed displacement data by minimizing a combined loss of data fidelity and physics residuals. This data-driven physics-constrained optimization allows for parameter discovery in heterogeneous solids, where traditional methods struggle with sparse measurements. For instance, in structural health monitoring, PINNs have been used to identify damage in plates by solving inverse formulations tied to elasticity equations. Applications extend to fracture mechanics, where PINNs model crack propagation in brittle materials using phase-field approximations integrated into the network loss, enabling simulation of dynamic fracture without explicit crack tracking. Additionally, PINNs support topology optimization by embedding compliance minimization objectives directly into the physics-informed loss, optimizing material distribution for minimum strain energy under load.
+A notable application involves Kirchhoff-Love plate theory in 2024, where PINNs approximated thin plate deflections and stresses, incorporating boundary conditions and plate equilibrium into the training process.
+PINNs have also been applied to dynamic problems in mechanics, including vibration analysis of elastic structures. By solving the governing PDEs for transverse vibrations, such as the Euler-Bernoulli beam equation, PINNs simulate free vibration responses and enable computation of natural frequencies and mode shapes. For example, in the free vibration analysis of three-dimensional functionally graded porous beams, PINNs approximate the deflection field using a deep feedforward network and treat natural frequencies as trainable parameters in an inverse formulation to identify higher modes, showing agreement with analytical and numerical solutions. Similar approaches have been used for free vibration of cables incorporating bending stiffness, approximating time-dependent transverse displacements governed by a PDE that combines bending and axial effects. Implementations for structural vibration problems further demonstrate PINNs' effectiveness in forward simulations and inverse identification of dynamic parameters, such as natural frequencies, in systems ranging from discrete mass-spring models to continuous structures. These dynamic applications extend the meshless advantages of PINNs to time-dependent problems, complementing their use in static elasticity cases.
+PINNs offer advantages over traditional finite element methods (FEM), particularly in handling heterogeneous materials, as their meshless nature avoids remeshing complexities in multi-material interfaces. The meshless formulation excels in domains with cracks or irregularities, allowing seamless representation of discontinuities without element distortion.
+
+Stochastic and Biological Systems
+
+Physics-informed neural networks (PINNs) have been extended to handle stochastic systems, particularly through formulations involving backward stochastic differential equations (BSDEs), which are useful for high-dimensional problems in finance and control where approximating conditional expectations is required. In these approaches, PINNs approximate the solution processes Y_t and Z_t of the BSDE, defined by the dynamics
+dYt=f(t,Yt,Zt)dt+ZtdWt,
+dY_t = -f(t, Y_t, Z_t) \, dt + Z_t \, dW_t,
+dYt=f(t,Yt,Zt)dt+ZtdWt,
+with a given terminal condition Y_T = g(X_T), where W_t is a Brownian motion, f is the driver function, and g is the terminal payoff. The loss function enforces both the terminal condition and the drift consistency derived from It's lemma applied to the forward process, enabling efficient solving of high-dimensional BSDEs without curse-of-dimensionality issues.
+A notable application is in pricing American options, where BSDE-based PINNs compute option prices and hedging strategies in high dimensions by incorporating the early exercise feature through a least-squares Monte Carlo approximation within the neural network training. For instance, in a 2021 framework, deep BSDE solvers achieved accurate pricing for multi-asset American options, outperforming traditional methods in dimensions up to 100 by minimizing a combined loss over continuation and exercise values.
+In biological systems, biologically-informed neural networks (BINNs), a specialized variant of PINNs, incorporate prior knowledge of biological pathways and reaction-diffusion processes to model complex dynamics from sparse data, such as tissue growth or cellular interactions. BINNs parameterize the governing equations with neural networks constrained by known biological terms, like diffusion and reaction rates in partial differential equations, allowing discovery of nonlinear effects in systems like collective cell migration or tumor proliferation. For example, BINNs have been applied to reaction-diffusion models in tissues, inferring density-dependent diffusivities and growth rates from limited experimental observations, achieving robust predictions even with noisy or incomplete datasets. Recent extensions as of 2024 include multi-scale BINNs for tumor modeling, integrating cellular and tissue-level dynamics.
+Inverse problems in biological modeling, such as parameter estimation in epidemiology, leverage BINNs to discover unknown coefficients or functional forms from observational data, often integrating sparse measurements to fit models like predator-prey interactions. A representative example is the data-driven discovery of the Lotka-Volterra equations governing predator-prey dynamics, where PINNs solve the inverse problem by minimizing residuals of the ordinary differential equations alongside data-fitting losses, accurately recovering interaction rates , , , from simulated time-series data with errors below 5% in noisy settings. This approach draws briefly from broader inverse problem techniques in PINNs for parameter identification.
+Extensions to stochastic biological systems include Bayesian PINNs (B-PINNs), which propagate uncertainty through variational inference on network weights, providing probabilistic predictions for systems with noisy inputs or aleatoric uncertainty, such as variable reaction rates in epidemiological models. B-PINNs quantify posterior distributions over solutions, enabling reliable uncertainty estimates in forward simulations and inverse discoveries, as demonstrated in handling measurement noise in differential equation systems with credible intervals capturing true variabilities.
+
+Electrochemistry: Lithium-Ion Battery State of Charge Estimation
+
+Physics-informed neural networks (PINNs) are used to estimate the state of charge (SOC) of lithium-ion batteries by embedding governing physical equations from electrochemical modelssuch as mass conservation, Butler-Volmer kinetics, and diffusion equationsinto the neural network's loss function. This hybrid approach combines data-driven learning with physics constraints, resulting in improved accuracy, better generalization to unseen conditions, reduced data requirements, and enhanced robustness to noise compared to purely empirical methods. Research shows PINNs can achieve low estimation errors (e.g., <1-2% in many cases) even with limited or noisy data.
+
+Electromagnetism in Conductive Media
+
+Physics-informed neural networks (PINNs) have been applied to electromagnetic problems in conductive media. Key applications include modeling magnetohydrodynamic (MHD) flows, where magnetic fields influence electrically conductive fluids. In MHD flows, the interaction between magnetic fields and fluid motion induces damping in the momentum equations through the Lorentz force, characterized by the Hartmann number $ Ha = B_0 L \sqrt{\sigma / (\rho \nu)} $, where $ B_0 $ is the magnetic field strength, $ L $ is a characteristic length, $ \sigma $ is the electrical conductivity, $ \rho $ is the density, and $ \nu $ is the kinematic viscosity. PINNs incorporate the coupled Navier-Stokes and induction equations into the loss function to provide accurate forward and inverse solutions.
+Another prominent application is electro-diffusion in heterogeneous conductive tissues, such as the brain, for reconstructing electric potentials from electroencephalography (EEG) signals. These PINNs enforce Ohm's law $ \mathbf{J} = \sigma(\mathbf{x}) \mathbf{E}(\mathbf{x}) $ and quasi-static Maxwell equations, including $ \nabla \cdot (\sigma \nabla \phi) = -I $ for the electric potential $ \phi $, where $ I $ is the impressed current source density. By embedding these physical laws as constraints in the loss function, PINNs enable mesh-free, continuous reconstructions that maintain physical consistency even with sparse data or complex geometries, often outperforming traditional methods like finite element or boundary element approaches in flexibility and computational efficiency.
+
+Limitations and Future Directions
+
+Challenges and Limitations
+
+Physics-informed neural networks (PINNs) encounter significant accuracy challenges in advection-dominated systems, where high Pclet numbers lead to sharp gradients that the networks struggle to capture, resulting in unstable training and poor approximation of solutions. For instance, in convection-dominated problems with coefficients > 10, PINNs exhibit relative errors exceeding 80%, failing to enforce physical constraints effectively due to the soft regularization in their loss formulation. Similarly, chaotic or hyperbolic systems with discontinuities, such as shockwaves in traffic flow models, yield high relative L errors (e.g., 0.309 for the LWR model), as the networks cannot resolve non-smooth features. This issue is exacerbated by spectral bias in multilayer perceptrons (MLPs), which preferentially learn low-frequency components, neglecting high-frequency details essential for accurate PDE solutions.
+Computational demands pose another major hurdle, as automatic differentiation for higher-order derivatives scales poorly with problem dimensionality and complexity, leading to prolonged training times and resource-intensive optimization. Training instability arises from imbalanced loss terms, where physics residuals often dominate data-fitting components, creating a non-convex optimization landscape that traps gradients in suboptimal minima. Studies from 2021 have shown that PINNs underperform traditional finite element methods (FEM) for stiff PDEs, such as reaction-diffusion systems with reaction rates > 5, achieving errors up to 93% compared to FEM's robust handling of stiffness. The non-convex nature of these landscapes further complicates convergence, particularly for stiff problems where soft constraints fail to mimic the hard enforcement in numerical solvers.
+Theoretically, PINNs lack rigorous convergence guarantees outside of simple, linear cases, with performance highly sensitive to the choice and distribution of collocation points, which can lead to inconsistent approximations if not optimally selected. In practice, hyperparameter tuning remains a critical challenge, especially the weighting factors for balancing loss components, as manual or adaptive adjustments are often required to mitigate imbalances and achieve stable training, yet no universal strategy exists. Scalability to three-dimensional or higher problems is limited for real-time applications, as the exponential growth in parameters and evaluation points hinders efficient inference, restricting PINNs to offline or low-dimensional simulations in most scenarios.
+
+Emerging Trends and Advances
+
+Recent advancements in physics-informed neural networks (PINNs) have focused on integrating Kolmogorov-Arnold Networks (KANs) to enhance interpretability and accuracy, particularly in complex dynamical systems. Physics-Informed Kolmogorov-Arnold Networks (PIKANs), introduced in 2024, replace traditional multilayer perceptrons (MLPs) with KAN architectures that decompose multivariate functions into sums of univariate functions applied to affine combinations of inputs, enabling more transparent modeling of physical laws. For instance, in fluid dynamics applications, PIKANs have demonstrated superior performance in simulating high-speed flows by embedding governing partial differential equations (PDEs) directly into the network's loss function, achieving lower relative errors compared to standard PINNs while requiring fewer parameters. The core representation in PIKANs can be expressed as:
+(x1,,xn)=q=1nq(p=1nq,p(xp)),
+\Phi(x_1, \dots, x_n) = \sum_{q=1}^n \Phi_q \left( \sum_{p=1}^n \phi_{q,p}(x_p) \right),
+(x1,,xn)=q=1nq(p=1nq,p(xp)),
+where q\Phi_qq and q,p\phi_{q,p}q,p are univariate functions, typically parameterized by splines or basis expansions, and the physics-informed loss enforces PDE residuals alongside boundary conditions.
+Operator learning extensions have further propelled PINN capabilities, with physics-informed variants of DeepONets emerging as a key trend in 2024-2025. These models learn nonlinear solution operators for parametric PDEs by incorporating physical constraints into the branch and trunk networks, enabling efficient forward and inverse mappings for problems like convective heat transfer and multiphase flows. For example, multi-resolution physics-informed DeepONets have shown up to 50% reduction in prediction errors for time-dependent PDEs compared to classical operators, facilitating real-time simulations in engineering contexts. PINN-based surrogate models offer lightning-fast approximations that replace computationally intensive supercomputer simulations, enabling rapid solutions to engineering problems such as designing more aerodynamic wings.
+Integration of large language models (LLMs) for automated hyperparameter tuning represents a 2025 innovation, leveraging agentic frameworks to optimize PINN architectures and training parameters. Tools like PINNsAgent use LLMs to iteratively suggest and evaluate configurations, such as activation functions and layer depths, resulting in faster convergence for PDE surrogates without manual intervention. This approach has been applied to diverse tasks, including EEG signal processing, where periodic activations in PINNs modeled physiological oscillations more accurately than standard tanh functions in FitzHugh-Nagumo-based neural dynamics.
+Applications of PINNs continue to expand in challenging domains, with notable growth in turbulence modeling, multiphase flows, and geoenergy systems as highlighted in 2024 reviews. In turbulence, augmented PINNs incorporating Spalart-Allmaras models have achieved up to 73% reduction in mean absolute errors for backward-facing step flows, outperforming traditional data-driven methods. For multiphase flows in porous media, PINNs have enabled precise history-matching in fractured reservoirs, capturing imbibition dynamics with relative errors below 5%. In geoenergy, particularly subsurface flow simulations, physics-informed approaches have improved parameter estimation for reactive transport, supporting carbon sequestration and geothermal applications as detailed in comprehensive data-driven reviews.
+Chebyshev-based KAN variants, developed in 2024, have shown particular promise for periodic PDEs, outperforming MLPs by leveraging orthogonal polynomials to handle oscillatory solutions. These ChebPIKANs exhibit significantly lower errors in problems like the Kuramoto-Sivashinsky equation, due to enhanced spectral representation and stability. Looking ahead, hybrid integrations with quantum computing are gaining traction; for instance, hybrid quantum-classical PINNs (HQPINNs) in 2025 have modeled quantum control problems with improved optimization efficiency, potentially revolutionizing high-dimensional simulations. Additionally, efforts toward certified accuracy via rigorous error bounds are advancing, with a posteriori certification methods providing provable guarantees on prediction errors for heat equations.
+
+References
+
+https://doi.org/10.1016/j.jcp.2018.10.045
+
+https://doi.org/10.1038/s42254-021-00314-5
+
+Data-driven Solutions of Nonlinear Partial Differential Equations
+
+Scientific Machine Learning through Physics-Informed Neural ... - arXiv
+
+Physics-informed neural networks: A deep learning framework for ...
+
+https://ui.adsabs.harvard.edu/abs/2019JCoPh.378..686R/abstract
+
+https://doi.org/10.1126/science.aaw4741
+
+https://doi.org/10.1016/j.jcp.2019.05.024
+
+https://doi.org/10.1016/j.cma.2020.113028
+
+https://doi.org/10.1016/j.advwatres.2020.103610
+
+maziarraissi/PINNs: Physics Informed Deep Learning - GitHub
+
+Is it time to swish? Comparing activation functions in solving ... - arXiv
+
+Stiff-PDEs and Physics-Informed Neural Networks
+
+Dynamic Weight Strategy of Physics-Informed Neural Networks for ...
+
+Scientific Machine Learning Through PhysicsInformed Neural ...
+
+Physics-informed learning of governing equations from scarce data
+
+Parallel physics-informed neural networks via domain decomposition
+
+Extended Physics-Informed Neural Networks (XPINNs)
+
+Parallel Physics-Informed Neural Networks via Domain Decomposition
+
+A Physics-Informed Neural Network Method for Solving Parametric ...
+
+Physics-informed PointNet: A deep learning solver for steady-state ...
+
+ Physics Informed Kolmogorov-Arnold Neural Networks ...
+
+(PDF) Physics-informed neural networks for solving elasticity problems
+
+Application of Physics-Informed Neural Networks to the Solution of ...
+
+A physics-informed deep learning framework for inversion and ...
+
+Transfer learning enhanced physics informed neural network for ...
+
+A Physics-Informed Neural Network-based Topology Optimization ...
+
+From PINNs to PIKANs: Recent Advances in Physics-Informed ...
+
+Full article: Physics-Informed Neural Network with Fourier Features ...
+
+FBSDE based neural network algorithms for high-dimensional ...
+
+ Integration Matters for Learning PDEs with Backwards SDEs - arXiv
+
+Biologically-informed neural networks guide mechanistic modeling ...
+
+Data-driven discovery of the governing equations of dynamical ...
+
+ Characterizing possible failure modes in physics-informed neural ...
+
+Physics-informed neural networks for PDE problems
+
+https://doi.org/10.3390/math13203289
+
+ Can Physics-Informed Neural Networks beat the Finite ...
+
+Adaptive weighting of Bayesian physics informed neural networks ...
+
+Physics-Informed Neural Network (PINN) Evolution and Beyond
+
+ From PINNs to PIKANs: Recent Advances in Physics ...
+
+https://arxiv.org/abs/2508.05190
+
+History-Matching of Imbibition Flow in Multiscale Fractured Porous ...
+
+A Review of Differentiable Simulators
+
+Using Physics-Informed neural networks for solving Navier-Stokes equations
+
+Physics-Informed Neural Network Modeling of Vehicle Collision Dynamics in Precision Immobilization Technique Maneuvers
+
+Neural fields for rapid aircraft aerodynamics simulations
+
+Physics-informed neural networks as surrogate models of hydrodynamic simulators
+
+Singularity-Guided Physics-Informed Neural Networks for Solving Inverse Problems
+
+Singularity-Guided Physics-Informed Neural Networks for Solving Inverse Problems
+
+Physics-Informed Neural Network-Based SOC Estimation for Lithium-Ion Batteries
+
+Application of physics-informed neural networks in lithium-ion battery state estimation
+
+Physics-informed neural network for bending and free vibration analysis of three-dimensional functionally graded porous beam resting on elastic foundation
+
+Physics-Informed Neural Networks for Solving Free Vibration Response of Cables Considering Bending Stiffness
+
+MATLAB Implementation of Physics Informed Deep Neural Networks for Forward and Inverse Structural Vibration Problems
+
+Magnetohydrodynamics with Physics Informed Neural Operators
+
+Electro-Diffusion Physics-Informed Neural Network (ED-PINN) for 3D Brain Electric Field Reconstruction from EEG Signals
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

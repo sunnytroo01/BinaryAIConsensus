@@ -1,0 +1,194 @@
+AlphaZero Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+AlphaZero
+ Ara Eve Leo Sal 
+1x
+ AlphaZero is a general-purpose reinforcement learning algorithm developed by DeepMind, a subsidiary of Alphabet Inc., that achieves superhuman performance in complex board games including chess, shogi, and Go by learning solely through self-play starting from random moves, with no incorporation of human game knowledge or domain-specific heuristics beyond the basic rules. Introduced in late 2017, AlphaZero employs a single deep neural network to approximate both the policy function (for selecting moves) and the value function (for evaluating positions), integrated with Monte Carlo tree search during gameplay to guide decision-making and update the network via temporal-difference learning from simulated games. Trained on specialized hardware consisting of 4,000 to 5,000 TPUs (tensor processing units), it required approximately 9 hours for chess, 12 hours for shogi, and 13 days for Go to reach its evaluated performance levels through around 700,000 iterations of self-play.
+In evaluations, AlphaZero demonstrated overwhelming superiority over established champion programs: in chess, it defeated Stockfish (the 2016 TCEC season 9 winner) in a 1,000-game match with 155 wins, 6 losses, and 839 draws; in shogi, it beat the 2017 Computer Shogi Association world champion Elmo with a 91.2% win rate across 1,000 games; and in Go, it surpassed AlphaGo Zero (a prior DeepMind system) by winning 61% of 100 games. These results, achieved after just 4 hours of training to initially outperform Stockfish in chess, 2 hours for Elmo in shogi, and 30 hours for AlphaGo Zero in Go, highlighted AlphaZero's ability to discover novel strategies, such as aggressive piece sacrifices in chess and unconventional pawn structures, often described by experts as creative and intuitive. Beyond gaming, the algorithm's generalized approach has influenced subsequent DeepMind research, including extensions to real-world applications like optimization problems in computing, underscoring its broader impact on artificial intelligence.
+
+Background and Development
+
+Relation to AlphaGo Zero
+
+AlphaGo Zero represented a significant advancement in artificial intelligence by mastering the game of Go through pure reinforcement learning, starting from random play without any reliance on human-generated data, expert knowledge, or supervised learning. This approach utilized a single neural network to represent both the policy (move selection) and value (position evaluation) functions, trained via self-play and Monte Carlo Tree Search (MCTS), enabling it to surpass previous versions of AlphaGo that incorporated human game records.
+AlphaZero directly extended this methodology to create a general-purpose algorithm capable of achieving superhuman performance across multiple board games, including chess and shogi, in addition to Go. Unlike AlphaGo Zero, which was tailored specifically to the rules and board representation of Go, AlphaZero employed a unified framework where adaptations for different games required only changes to the input representation and action space definitions, without altering the core learning algorithm or network architecture. This generalization allowed a single AlphaZero system to learn tabula rasastarting from scratchfor each game, demonstrating the versatility of self-play reinforcement learning beyond a single domain.
+A key improvement in AlphaZero was the end-to-end training of a shared policy-value network that could handle diverse game complexities, such as varying board sizes and branching factors, while maintaining the efficiency of AlphaGo Zero's MCTS integration for search-guided decision-making. This unified network design facilitated rapid adaptation to new games, as the same reinforcement learning loopiterating through self-play, evaluation, and improvementproduced expert-level play across chess, shogi, and Go within comparable training timelines.
+The development timeline underscores AlphaZero's position as an immediate successor: AlphaGo Zero was publicly detailed in October 2017, and AlphaZero was announced just two months later in December 2017 as a broader extension of that work.
+
+Comparison to Traditional Game Engines
+
+Traditional game engines, such as Stockfish for chess and Elmo for shogi, rely on decades of human expertise encoded through hand-crafted evaluation functions, opening books, endgame tablebases, and sophisticated search algorithms like alpha-beta pruning. These engines evaluate positions using carefully tuned weights for features like material balance, king safety, and pawn structure, developed by expert programmers and players, allowing them to search tens of millions of positions per second on standard hardware. For instance, Stockfish employs alpha-beta pruning to efficiently explore deep tactical lines, prioritizing moves that lead to captures or checks, which enhances its strength in sharp, calculative scenarios.
+In contrast, AlphaZero employs a tabula rasa approach, starting from random play with no prior human knowledge, domain-specific heuristics, or curated databases, and learns entirely through self-play reinforcement learning guided by a single deep neural network. This neural network outputs both move probabilities and position values, replacing traditional hand-crafted evaluations and enabling the discovery of intuitive strategies that emerge organically from millions of simulated games. Unlike conventional engines, AlphaZero integrates Monte Carlo Tree Search with neural network guidance, searching far fewer positionsaround 80,000 per secondyet achieving deeper strategic insights by focusing on high-value branches rather than exhaustive enumeration.
+In chess, this manifests as AlphaZero favoring positional understanding and novel openings over Stockfish's tactical prowess; for example, AlphaZero intuitively develops pieces for long-term control and sacrifices material for initiative in ways that bypass traditional engines' materialistic biases. Similarly, in shogi, Elmo's optimizations incorporate game-specific heuristics for promotions and drops, honed by human analysis, whereas AlphaZero's generalized self-play uncovers unconventional formations without such tailoring, emphasizing fluid piece activity across the larger board. These differences highlight AlphaZero's ability to transcend human-derived rules, producing playstyles that blend creativity with precision unattainable by rule-bound traditional systems.
+
+Technical Architecture
+
+Neural Network Design
+
+AlphaZero employs a deep neural network architecture based on residual convolutional layers to process game states and output both move policy probabilities and position value estimates. The network takes as input a multi-plane representation of the board state, capturing the current position along with recent move history to encode dynamic game information. For chess, this consists of 119 planes arranged in an 88 stack. These encode piece positions for both players over the current position and the previous 7 moves (96 planes: 6 piece types per player 8 positions), along with additional planes for castling rights, side to move, no-progress and total move counts, and repetition factors (23 planes). For shogi, the input uses a 362-plane format on a 99 board, adapting the encodings for shogi's piece types, promotions, prisoner counts, and rules such as drop moves.
+The core of the network is a residual tower comprising 20 to 40 residual blocks, each consisting of two convolutional layers with 256 filters and 33 kernels, followed by batch normalization and rectified linear activations, enabling the model to learn complex spatial patterns in the board state without vanishing gradients. This body processes the input through an initial convolutional layer with 256 filters and a 33 kernel, after which the residual blocks refine the features. The architecture culminates in two output heads attached to the residual tower: the policy head, which applies a convolutional layer followed by a fully connected layer and softmax to produce a probability distribution over all possible legal moves (approximately 4,672 for chess queen moves and promotions); and the value head, which uses additional convolutional and fully connected layers with tanh activation to output a scalar estimate (-1 to +1) of the expected outcome for the current player, where a win is valued at +1, a loss at -1, and a draw at 0.
+Training optimizes the network parameters using a combined loss function that jointly supervises the policy and value predictions against targets derived from self-play games enhanced by Monte Carlo Tree Search (MCTS). The total loss is the sum of the value loss (mean squared error between predicted value v_(s_t) and actual game outcome z_t), the policy loss (cross-entropy between predicted policy p_(s_t) and MCTS-improved target policy _t), and an L2 regularization term. This is formalized as:
+L=(ztv(st))2tlogp(st)+c2
+L = (z_t - v_\theta(s_t))^2 - \pi_t^\top \log p_\theta(s_t) + c \|\theta\|^2
+L=(ztv(st))2tlogp(st)+c2
+where s_t denotes the state at time t, and c is the regularization coefficient. The policy loss encourages the network to approximate the improved move distribution from search, while the value loss aligns predictions with empirical outcomes, with the negative sign in the policy term reflecting the maximization of log-likelihood.
+
+Reinforcement Learning Mechanism
+
+AlphaZero employs a tabula rasa reinforcement learning approach, beginning with a randomly initialized neural network that lacks any domain-specific knowledge beyond the game's rules. This initial network generates self-play games, where two instances of the same network play against each other, producing trajectories of positions, moves, and outcomes. The resulting data is then used to update the network parameters through backpropagation, minimizing prediction errors for both move probabilities and position values.
+The core of this process is bootstrapping, where the neural network serves as its own teacher by evaluating positions during self-play, enabling iterative improvement without any external supervision or human-generated data. In each training iteration, the current network guides move selection via Monte Carlo Tree Search (MCTS), which refines the raw policy outputs into more effective action probabilities; these, along with the game's final outcomes, form the training targets. There is no initial supervised learning phaselearning proceeds purely through reinforcement from self-play, with approximately 44 million games generated for chess to achieve superhuman performance.
+Value estimation during training relies on the actual game results as targets, providing unbiased Monte Carlo returns, while the search phase incorporates temporal difference learning to propagate value estimates through the tree, updating node values as the average of child evaluations. This is complemented by policy iteration, where the MCTS-enhanced policies from self-play iteratively refine the network's move selection, leading to increasingly sophisticated strategies over successive generations of games. The entire mechanism thus forms a closed-loop system of self-improvement, converging on optimal play through repeated cycles of generation, evaluation, and optimization.
+
+Monte Carlo Tree Search Integration
+
+AlphaZero employs a variant of Monte Carlo Tree Search (MCTS) that leverages the policy-value neural network to guide the search process during gameplay, replacing traditional random rollouts with network-derived move probabilities $ P $ and position evaluations $ V $. This integration allows for effective decision-making with shallower search trees, as the neural network provides informed priors and value estimates rather than relying on extensive simulations to the game's end.
+The MCTS proceeds in four key steps. In selection, the algorithm traverses from the root node to a leaf by repeatedly choosing actions that balance exploitation of known high-value moves and exploration of promising untried options, using the Predictor + Upper Confidence Bound for Trees (PUCT) formula. Expansion adds child nodes corresponding to legal actions at the selected leaf. Evaluation applies the neural network to the leaf state, yielding the value $ V $ for backpropagation and prior probabilities $ P $ to initialize child nodes. Backpropagation then updates the visit counts and average values $ Q $ along the path from root to leaf using the evaluated $ V $. The PUCT formula for action selection is given by
+PUCT(s,a)=Q(s,a)+cP(s,a)(logN1+n)1/2,
+\text{PUCT}(s, a) = Q(s, a) + c \cdot P(s, a) \cdot \left( \frac{\log N}{1 + n} \right)^{1/2},
+PUCT(s,a)=Q(s,a)+cP(s,a)(1+nlogN)1/2,
+where $ Q(s, a) $ is the mean value of action $ a $ in state $ s $, $ c $ is an exploration constant, $ P(s, a) $ is the neural network's prior probability, $ N $ is the visit count of the parent node, and $ n $ is the visit count of the child node corresponding to action $ a $.
+During competitive matches, AlphaZero performs 800 simulations per move, which suffices to achieve superhuman performance levels while requiring fewer computational resources than conventional search methods like alpha-beta pruning in traditional engines. This efficiency stems from the neural network's ability to prune unpromising branches early, concentrating simulations on high-potential paths.
+
+Training Process
+
+Self-Play and Data Generation
+
+AlphaZero employs an iterative self-play mechanism to generate its training data, where two instances of the current neural network act as opponents in simulated games. Each move is selected through Monte Carlo Tree Search (MCTS), which uses the neural network to guide the search by providing prior probabilities and value estimates for positions. Upon completion, each game is recorded as a sequence of states, actions taken, and the final outcome (win, loss, or draw from the perspective of the starting player).
+To ensure data efficiency and focus on the network's evolving capabilities, AlphaZero maintains a replay buffer containing positions from the most recent self-play games, discarding older data via a FIFO (first-in, first-out) approach. This prevents the model from being hindered by outdated strategies and emphasizes learning from current performance. Positions are sampled uniformly across games for training, with an emphasis on early-game states to better develop opening strategies, as these are critical for strategic diversity in board games.
+Game diversity is achieved by having the network play against versions of itself at varying effective strengths, primarily through modifications during the opening phase. A temperature parameter is applied to the move probabilities from MCTS for the first 30 moves (or fewer in Go), encouraging a broader exploration of openings rather than optimal but repetitive play. Additionally, Dirichlet noise is added to the prior probabilities at the root node of the MCTS to introduce randomness and promote branching into less-visited actions, preventing the self-play from converging too quickly to narrow paths.
+Through this process, AlphaZero reaches superhuman levels after approximately 9 hours of self-play in chess, 12 hours in shogi, and 13 days in Go, generating tens of millions of positions in each casefor instance, 44 million games in chesswhile first surpassing prior benchmarks after 4 hours in chess, 2 hours in shogi, and 30 hours in Go, yielding similarly vast datasets.
+
+Hardware and Timeline
+
+AlphaZero's training relied heavily on Google's Tensor Processing Units (TPUs) for efficient parallel computation. Self-play games were generated using approximately 5,000 first-generation TPUs to enable massive parallelism in simulating games, while the neural networks were trained on 64 second-generation TPUs. During evaluation matches, inference was performed on 44 first-generation TPUs, allowing AlphaZero to evaluate around 80,000 positions per second under time controls.
+The development timeline began with a preliminary version detailed in a December 2017 preprint, where AlphaZero for chess achieved superhuman performance after just 9 hours of training, specifically surpassing Stockfish following 300,000 training steps in about 4 hours. This initial training encompassed 700,000 total steps across mini-batches of 4,096 positions each, starting from random initialization and requiring no human data beyond the game's encoded rules. The full version appeared in a December 2018 Science paper, incorporating extended evaluation but maintaining the core 700,000-step regimen for chess.
+In terms of scaling, the network architecture featured 20 residual blocks. Key differences between the versions included longer overall training durations in the full release for stability, alongside refined hyperparameters such as learning rates and exploration constants to mitigate variance in self-play outcomes.
+
+Game Performance
+
+Results in Chess
+
+AlphaZero's performance in chess was first demonstrated in a preliminary evaluation in December 2017, where it competed against Stockfish 8 after just four hours of training from scratch. In a 100-game match under time controls of approximately one minute per move, AlphaZero achieved 28 wins, 72 draws, and 0 losses, corresponding to an Elo rating approximately 100 points higher than Stockfish 8.
+In the full evaluation published in December 2018, AlphaZero faced Stockfish 8 (the 2016 TCEC season 9 winner) in a 1000-game match under time controls of three hours per game plus 15 seconds per move, resulting in 155 wins, 6 losses, and 839 draws for AlphaZero. Under faster time controls of three minutes per move, AlphaZero secured 29 wins, 0 losses, and 71 draws in a separate 100-game match against Stockfish 8. These outcomes highlighted AlphaZero's superiority across different time constraints.
+AlphaZero's gameplay introduced novel strategies that diverged from traditional engines, emphasizing sacrificial play for initiative and dynamic pawn structures over material preservation. For instance, it frequently sacrificed pawns or pieces to gain long-term positional advantages, such as open lines for attacks or control of key squares, leading to aggressive and creative openings like the Queen's Gambit Declined or Sicilian Defense variations. This approach contrasted with Stockfish's more conservative, materialistic evaluation. During matches, AlphaZero evaluated about 80,000 positions per second using Monte Carlo tree search, far fewer than Stockfish's 70 million, yet achieved superior results by prioritizing high-quality evaluations over brute-force search.
+These matches were conducted under hardware constraints that favored Stockfish's design: AlphaZero ran on 4 tensor processing units (TPUs) and 44 CPU cores for inference during play, while Stockfish utilized a 64-core CPU optimized for parallel search. Despite this, AlphaZero's neural network-guided search proved more efficient, demonstrating the effectiveness of its reinforcement learning paradigm in a domain dominated by handcrafted heuristics.
+
+Results in Shogi
+
+AlphaZero achieved superhuman performance in shogi after approximately 110,000 self-play games, equivalent to 1.5 days of training on 5,120 tensor processing units (TPUs). This rapid learning curve demonstrated the algorithm's efficiency in mastering the game's rules and strategies solely through self-play reinforcement learning, without any prior human knowledge or opening books.
+In a preliminary evaluation, AlphaZero competed against Elmo, the 2017 world computer shogi champion, in a 100-game match under tournament time controls (3 minutes per move plus 2 minutes for the first 60 moves). AlphaZero secured 90 victories, 8 defeats, and 2 draws, showcasing its dominance even early in training. The full evaluation confirmed this superiority in a 1000-game match under standard time controls of three hours per game plus 15 seconds per move, where AlphaZero achieved a 91.2% win rate against Elmo.
+Notably, AlphaZero's play style diverged from traditional human and engine approaches, frequently employing aggressive pawn pushes to open lines and seize initiative, strategies rarely seen in conventional shogi theory. This innovation underscored the algorithm's ability to explore novel tactics. Shogi's inclusion of piece drops significantly expands its complexity, with a state-space size of about 10^{226} positionsfar larger than chess's 10^{46}yet AlphaZero seamlessly incorporated these rules into its neural network evaluations and Monte Carlo Tree Search.
+
+Results in Go
+
+AlphaZero applied the same general algorithm to Go as it did to chess and shogi, using a 1919 board without any game-specific adjustments beyond the rules. This approach built directly on AlphaGo Zero's self-play reinforcement learning framework but eliminated all reliance on human-generated game data, starting instead from completely random play. Compared to AlphaGo Zero, which required 3 days of training on 4 TPUs to achieve mastery, AlphaZero for Go was trained for 13 hours on thousands of TPUs for self-play generation.
+In the evaluation of 100 games under standard time controls (3 hours per game plus 15 seconds per move), the fully trained AlphaZero defeated AlphaGo Zero with 60 wins to 40 losses and 0 draws, achieving a 60% win rate.
+AlphaZero demonstrated greater computational efficiency during play, evaluating approximately 1,600 positions per move via Monte Carlo Tree Search compared to AlphaGo Zero's 10,000, yet maintaining its dominant win rate through a more precise neural network policy. This efficiency contributed to a playing style that professional Go players described as more human-like and intuitive, favoring creative, balanced strategies over brute-force computation.
+
+Analysis and Impact
+
+Strengths and Limitations
+
+AlphaZero demonstrates remarkable generalization capabilities, as the same algorithm, without any modifications to its core architecture or hyperparameters, achieves superhuman performance across diverse board games including chess, shogi, and Go, relying solely on the rules of each game as input. This tabula rasa approach enables the discovery of novel, superhuman strategies that diverge from centuries of human expertise, such as aggressive piece sacrifices in chess for long-term positional dominance or unconventional territorial plays in Go. Furthermore, AlphaZero's efficiency in learning is profound; it reaches world-class proficiency in chess after just four hours of training and full superhuman levels in approximately nine hours, contrasting sharply with the years or decades required for human grandmasters to accumulate comparable knowledge through guided study and practice.
+Despite these advances, AlphaZero's methodology imposes significant limitations, particularly its exorbitant computational demands, requiring 5,000 first-generation TPUs for self-play game generation and 64 second-generation TPUs for neural network training over several days to attain peak performance. The system's reliance on deep neural networks renders its decision-making processes largely uninterpretable, functioning as a black box where the rationale behind specific movessuch as why a particular sacrifice is preferredremains opaque to human analysis, hindering insights into its strategic reasoning. Additionally, AlphaZero exhibits potential brittleness to perturbations in the environment, as its policies are optimized strictly for the fixed rules provided during training, necessitating full retraining for even minor rule modifications, which limits its adaptability in dynamic or evolving domains.
+Empirical results highlight AlphaZero's strengths in long-term strategic planning, where it excels at evaluating complex positional trade-offs over dozens of moves, often outperforming traditional engines that prioritize immediate tactical gains. However, it occasionally falters in short-term tactical puzzles. In head-to-head matches, AlphaZero establishes dominance with win rates typically in the 80-90% range or higher when accounting for draws; for instance, it achieved 91.2% wins against the top shogi engine Elmo and winning 60 out of 100 games against AlphaGo Zero in Go, while scoring 689.5 points (155 wins, 839 draws, 6 losses) against Stockfish in a 1,000-game chess match. The original evaluations, however, provide incomplete coverage of long-term stability, focusing primarily on fixed-match outcomes without extended assessments of performance degradation or robustness over prolonged, repeated play under varying conditions.
+
+Reactions from Experts
+
+Demis Hassabis, CEO of DeepMind, described AlphaZero as representing a historical turning point for artificial intelligence, emphasizing its ability to exhibit human-like intuition and creativity in gameplay without relying on human knowledge.
+Garry Kasparov, former world chess champion, praised AlphaZero as revolutionary, noting in a foreword to a book on its impact that it marked a profound shift in AI by prioritizing piece activity and aggressive positions over material conservation, surpassing traditional engines in a way that revitalized chess theory. In a Science editorial accompanying the 2018 publication, Kasparov further highlighted AlphaZero's significance beyond chess, calling it a model for duplicating virtual knowledge accumulation in other fields.
+Criticisms emerged regarding the compute resources disparity in AlphaZero's match against Stockfish, where AlphaZero utilized four Tensor Processing Units (TPUs) while Stockfish ran on 44 CPU cores with 10 GB of hash memory, leading developers to argue that the hardware imbalance favored the neural network approach. Additionally, the initial preprint faced reproducibility challenges due to DeepMind withholding full source code and architecture details, making independent validation difficult and costly without crowdsourced reverse-engineering efforts.
+In the shogi community, professionals expressed amazement at AlphaZero's novel tactics, such as advancing the king toward the board's centercontrary to established theory and appearing risky from a human viewpointwhich demonstrated unconventional strategies beyond traditional play.
+Go experts observed a stylistic evolution in AlphaZero compared to AlphaGo, noting its more intuitive and fluid approach that balanced attack and defense with flair, differing from prior AI systems while resembling top human play in some aspects; AlphaZero defeated AlphaGo Zero in 60 out of 100 games, underscoring this shift.
+The 2018 Science publication of AlphaZero's methods was widely lauded for generalizing reinforcement learning across games, though some researchers questioned potential biases in self-play training, where Elo ratings could become unrealistically inflated without external validation, as noted in related DeepMind works. No major updates to the original AlphaZero system have occurred since 2018.
+
+Legacy and Subsequent Works
+
+AlphaZero's algorithmic framework has directly inspired several successor systems at DeepMind, notably MuZero, introduced in a 2019 preprint and later detailed in a 2020 Nature publication. MuZero extends AlphaZero's model-based reinforcement learning approach by learning an explicit model of the environment's dynamics, rewards, and representations without requiring prior knowledge of the rules, enabling it to achieve superhuman performance across board games like Go, chess, and shogi, as well as Atari video games. This advancement addressed a key limitation of AlphaZero, which assumed access to game rules for simulation, by allowing MuZero to infer necessary environmental models solely from interactions, thus broadening applicability to domains with partially observable or unknown dynamics.
+Building further on this lineage, AlphaDev, unveiled by DeepMind in 2023, adapts AlphaZero-inspired reinforcement learning to optimize low-level software algorithms, specifically targeting sorting routines in the C++ standard library. By framing algorithm discovery as a single-player game where the agent refines assembly code sequences to minimize execution time on random inputs, AlphaDev uncovered novel sorting strategies for small arrays (up to length 5) that outperform human-designed benchmarks, resulting in up to 70% speedups for short sequences when integrated into the LLVM libc++ library. These improvements have been upstreamed into widely used open-source implementations, demonstrating AlphaZero's principles in accelerating foundational computing tasks beyond games.
+Beyond direct successors, AlphaZero has profoundly influenced reinforcement learning applications in diverse fields, including mathematics, quantum control, and robotics. In mathematics, AlphaTensor (2022) employs an AlphaZero-like search to discover faster algorithms for matrix multiplication, surpassing longstanding human records for dimensions up to 4x4 and achieving up to 20% efficiency gains for larger matrices by optimizing tensor decompositions through self-play. For quantum control, researchers have adapted AlphaZero's deep reinforcement learning to optimize quantum dynamics, such as gate sequences in quantum circuits, enabling model-free solutions that outperform traditional methods in tasks like state preparation and error mitigation. In robotics and control systems, AlphaZero's policy iteration and lookahead techniques have informed model predictive control frameworks, enhancing stability and performance in adaptive discrete-event systems, as explored in MIT analyses of its principles for suboptimal control.
+Academically, AlphaZero has driven a surge in research on model-free and self-supervised reinforcement learning, with its seminal 2018 Science paper garnering over 3,700 citations as of 2025 in Crossref and influencing a shift toward scalable, general-purpose RL agents in both games and real-world optimization. This body of work, exceeding 5,000 citations across related DeepMind publications since 2018, underscores AlphaZero's role in catalyzing advancements that extend far beyond its original game-playing domain.
+
+References
+
+A general reinforcement learning algorithm that masters chess ...
+
+ Mastering Chess and Shogi by Self-Play with a ... - arXiv
+
+AlphaZero: Shedding new light on chess, shogi, and Go
+
+AlphaZero and MuZero - Google DeepMind
+
+Mastering the game of Go without human knowledge - Nature
+
+DeepMind's AlphaZero now showing human-like intuition in ...
+
+Rise of the machines: new book shows how revolutionary AlphaZero is
+
+Chess, a Drosophila of reasoning - Science
+
+Alpha Zero: Comparing "Orangutans and Apples" - ChessBase
+
+Mastering Atari, Go, Chess and Shogi by Planning with a Learned ...
+
+Mastering Atari, Go, chess and shogi by planning with a learned model
+
+Faster sorting algorithms discovered using deep reinforcement ...
+
+AlphaDev discovers faster sorting algorithms - Google DeepMind
+
+Discovering faster matrix multiplication algorithms with ... - Nature
+
+Global optimization of quantum dynamics with AlphaZero deep ...
+
+ Lessons from AlphaZero for Optimal, Model Predictive, and Adaptive ...
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

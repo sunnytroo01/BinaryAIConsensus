@@ -1,0 +1,268 @@
+Common subexpression elimination Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Common subexpression elimination
+ Ara Eve Leo Sal 
+1x
+ Common subexpression elimination (CSE) is a compiler optimization technique that identifies repeated computations of identical subexpressions within a program and replaces subsequent occurrences with references to the initial result, thereby eliminating redundancy and improving execution efficiency.
+The technique dates back to the early days of optimizing compilers, with roots in the FORTRAN I compiler developed in the 1950s, and saw significant advancements in the 1960s through IBM's FORTRAN H and academic research on global analysis methods. Pioneering work by John Cocke in 1970 introduced global common subexpression elimination using value numbering to detect redundancies across the entire program flow graph, enabling optimizations beyond local scopes. Frances Allen's 1971 catalogue of optimizing transformations further formalized CSE as a key method for reducing executed instructions and code size, often in conjunction with code motion.
+CSE operates by analyzing the program's control flow and data dependencies, typically in intermediate representations like static single assignment (SSA) form, to ensure that a prior computation dominates all uses and remains valid without intervening modifications. It encompasses variants such as local CSE within a single basic block, global CSE across multiple blocks using dominance relations, spatial CSE for redundancies in the same iteration, and temporal CSE for reusing values across loop iterations. Challenges include handling memory aliasing, side effects like exceptions, and ensuring no invalid reuse due to variable modifications, often addressed through alias analysis and data-flow algorithms.
+In modern compilers, CSE remains a foundational optimization, contributing substantially to performance gainssuch as up to 80% speed improvements in historical systems like FORTRAN Hand integrates with other techniques like dead code elimination and instruction scheduling to generate efficient machine code. Its application extends beyond general-purpose programming to domain-specific areas, including digital signal processing where it minimizes operations in constant multiplication decompositions.
+
+Fundamentals
+
+Definition
+
+Common subexpression elimination (CSE) is a compiler optimization technique that searches for instances of identical or similar expressions within a program and replaces subsequent computations of those expressions with references to the result of the first computation, thereby eliminating redundant calculations.
+The core goal of CSE is to minimize program execution time and reduce code size by avoiding the recomputation of identical subexpressions, such as arithmetic operations (e.g., additions or multiplications) or pure function calls that yield the same value under identical inputs. This optimization targets redundancies that can be detected at compile time, ensuring that the benefits are realized without introducing errors from side effects or aliasing.
+In terms of scope, CSE applies to both scalar expressions, like basic arithmetic or logical operations on single values, and aggregate expressions, including memory loads or operations on data structures, provided the redundancies are statically identifiable and the expressions produce the same value regardless of execution path. A subexpression is defined as any reusable component within a larger expressionsuch as a sub-tree in an abstract syntax treethat computes the same value multiple times and can be safely hoisted or referenced to avoid repetition.
+
+Historical Development
+
+Common subexpression elimination (CSE) emerged in the late 1950s as part of early efforts to optimize compiled code, with initial implementations appearing in the Fortran I compiler developed at IBM. This system incorporated basic forms of CSE alongside techniques like constant folding and fast index computations to reduce redundant operations in generated machine code. Pioneering work in the field was advanced by Soviet researcher Andrei Ershov, who in 1957 introduced a fast CSE algorithm using hashing for the BESM programming problem solver, enabling efficient reuse of computed values through backward analysis.
+The 1960s and 1970s marked a foundational period for CSE through theoretical advancements in program analysis. Frances E. Allen's 1969 paper on program optimization formalized key techniques, including CSE within basic blocks and invariant code motion, laying the groundwork for systematic compiler optimizations. In 1970, John Cocke presented "Global Common Subexpression Elimination" at the Symposium on Compiler Optimization, extending CSE across entire programs by leveraging control flow analysis to identify and eliminate redundant expressions beyond local scopes. Allen and Cocke further collaborated on a 1971 catalogue of optimizing transformations, which detailed CSE as a core method for eliminating computations that recompute available values, influencing subsequent compiler design.
+By the 1980s, CSE had become integrated into production compilers, with the GNU Compiler Collection (GCC), first released in 1987, incorporating local and global variants as standard optimization passes to enhance code efficiency. The 1990s brought significant evolution through the introduction of static single assignment (SSA) form in 1991, which facilitated more precise global CSE via value numbering techniques that track expression equivalences across program flows. This progression from rudimentary peephole optimizations in early systems to sophisticated interprocedural analysis in modern frameworks like LLVM reflects CSE's enduring role in compiler technology.
+
+Core Principles
+
+Local Common Subexpression Elimination
+
+Local common subexpression elimination (CSE) is a compiler optimization technique that identifies and removes redundant computations within a single basic block, which consists of straight-line code without branches or loops. This approach focuses on intra-block redundancy by detecting identical expressions and replacing subsequent occurrences with references to the initial computation, thereby reducing code size and execution time. It employs simple mechanisms such as value numbering or hashing to assign equivalence classes to expressions based on their operands and operators.
+The detection method involves a linear traversal of the basic block from top to bottom, maintaining a table that maps computed expressions to their results or value numbers. For each expression encountered, such as an assignment x y op z, the compiler hashes the combination of the operator op and the value numbers of operands y and z. If the hash matches an existing entry and the stored value remains available (i.e., not overwritten by side effects), the current expression is replaced with a reference to the stored value; otherwise, a new entry is created. This process ensures that equivalent expressions share the same value number, enabling efficient redundancy elimination without complex data-flow analysis.
+A typical algorithm for local value numbering can be sketched as follows, processing instructions sequentially in a basic block:
+Initialize an empty (/page/Hash_table) H mapping expression signatures to value numbers
+Initialize a counter for new value numbers starting at 1
+For each instruction in the (/page/Basic_block) (top to bottom):
+ If the instruction is x y op z:
+ Compute signature = hash(VN, op, VN) // VN is value number of (/page/Operand)
+ If signature exists in H and value is available:
+ Assign VN = H
+ Replace instruction with x temp (where temp holds the stored value)
+ Else:
+ Assign VN = new value number (increment counter)
+ Store H = VN
+ Else if the instruction is x constant or x input:
+ Assign VN = new value number
+This pseudocode illustrates how hashing facilitates quick lookups and replacements, with value numbers (VN) tracking equivalence.
+Consider a basic block with the instructions a b + c followed by d b + c. Upon processing the first instruction, the expression b + c receives a new value number, say 5, and is stored in the hash table. For the second instruction, the identical expression hashes to the same entry, so d is assigned value number 5 and replaced with d a, eliminating the redundant addition.
+Despite its efficiency, local CSE has limitations: it cannot detect redundancies across basic block boundaries or handle expressions interrupted by control flow, side effects like variable redefinitions, or aliasing, which may invalidate stored values. In contrast, global CSE extends this analysis across the control flow graph of an entire function.
+
+Global Common Subexpression Elimination
+
+Global common subexpression elimination extends the scope of the optimization to program regions encompassing multiple basic blocks, including those with branches and loops, by leveraging data flow analysis to identify redundant expressions across control dependencies. Unlike local approaches confined to single blocks, global CSE uses reaching definitions analysis to track which variable definitions propagate to a point and available expressions analysis to determine expressions computed on all incoming paths without redefinition of their operands. This enables the safe reuse of computations that would otherwise be repeated due to divergent control flow.
+The detection method begins with constructing a control flow graph (CFG) that models the program's execution paths as nodes (basic blocks) and edges (control transfers). On this graph, the available expressions lattice is computed through forward data flow analysis, where each node maintains a set of expressions that are guaranteed to be available upon entry. Redundancies are then eliminated by replacing recomputations with references to prior evaluations whenever an expression is available at the point of use, provided no intervening modifications occur. This process iteratively propagates information across the CFG to converge on fixed-point solutions for availability.
+Key concepts in global CSE include the use of dominators and post-dominators to ensure safe expression reuse. A node d dominates a point p if every path from the entry to p passes through d, allowing computations in d to be safely hoisted for availability at p; conversely, post-dominators ensure that reuse sites reach all necessary exit paths without omission. Handling side effects is critical, as expressions involving memory operations may alter state; alias analysis is employed to conservatively determine whether two references might point to the same location, preventing incorrect eliminations that could change program semantics. Building upon local CSE as a foundational step within blocks, global analysis integrates these elements to address inter-block redundancies.
+The available expressions set $ A(p) $ at a program point $ p $ is defined as the expressions computed on all paths to $ p $, with no subsequent redefinition of their variables. The propagation equation for this forward must-analysis is:
+A(p)=qpred(p)(G(q)A(q))
+A(p) = \bigcap_{q \in \mathrm{pred}(p)} \big( G(q) \cup A(q) \big)
+A(p)=qpred(p)(G(q)A(q))
+where $ G(q) $ is the set of expressions generated within predecessor block $ q $, $ A(q) $ is the available set upon exit from $ q $, and $ \mathrm{pred}(p) $ denotes the predecessors of $ p $. This intersection-based meet operator ensures only universally available expressions are retained, and the equation is solved iteratively until the data flow framework stabilizes, typically using worklist algorithms on the CFG.
+
+Illustrative Examples
+
+Basic Arithmetic Example
+
+Consider a simple arithmetic sequence in a program where the same subexpression is computed multiple times without any intervening modifications to its operands. For instance, the following unoptimized code computes the addition of variables a and b twice:
+int x = a + b;
+int y = a + b;
+int z = x * 2;
+This assumes that variables a and b have no side effects, such as being modified by function calls or pointers between uses, ensuring the subexpression's value remains consistent.
+Common subexpression elimination identifies the redundant computation of a + b in the assignment to y and replaces it with a reference to the previously computed value in x. The optimized code becomes:
+int x = a + b;
+int y = x;
+int z = x * 2;
+This transformation reuses the value from x, eliminating the second addition operation.
+The step-by-step process involves: (1) scanning the code to detect identical subexpressions like a + b; (2) verifying that the subexpression's value has not changed since its first computation; and (3) substituting the reference to the stored value, which reduces the number of arithmetic instructions from three (two additions and one multiplication) to two (one addition and one multiplication). This demonstrates the core principle of value reuse in local common subexpression elimination by avoiding recomputation in straight-line code.
+
+Control Flow Example
+
+Consider a simple if-then-else structure where the same expression is computed in both branches of a conditional statement. Although only one branch is executed at runtime, the source code contains duplicate instances of the expression, which global CSE can eliminate by hoisting the computation to before the conditional. The following pseudocode illustrates this scenario:
+if (cond) {
+ t1 = (/page/List_of_French_composers);
+ // other statements using t1, e.g., result1 = t1 * 2;
+} else {
+ t2 = (/page/List_of_French_composers);
+ // other statements using t2, e.g., result2 = t2 * 3;
+}
+In this unoptimized form, the addition a + b appears redundantly in both branches, leading to duplicate code that increases binary size, assuming no side effects in the conditional test or branches that modify a or b.
+To apply global common subexpression elimination (CSE), the compiler constructs a control flow graph (CFG) for the function, where nodes represent basic blocks and edges denote possible control transfers. Available expressions analysis is then performed on the CFG to identify expressions like a + b that are computed on all paths to their uses and remain unchanged thereafter. In this case, since the expression is identical in both branches and the uses are local to each, the compiler can hoist the computation to a point before the branch, replacing the duplicate evaluations with a single shared temporary. The optimized code becomes:
+t = a + b;
+if (cond) {
+ // other statements, using t, e.g., result1 = t * 2;
+} else {
+ // other statements, using t, e.g., result2 = t * 3;
+}
+This transformation requires verifying that the expression a + b has no intervening definitions or side effects (e.g., no modifications to a or b within the branches that could alter the value), as such issues would invalidate the availability. If side effects are present or the expression is redundant only on some paths, the optimization may need to be limited or deferred to more advanced techniques like partial redundancy elimination.
+The outcome is a reduction in code size by eliminating the duplicate computation, improving instruction cache efficiency and potentially simplifying further optimizations, while preserving program semantics and ensuring the expression is evaluated exactly once per execution path. This demonstrates how global CSE, building on available expressions detection, resolves redundancies across divergent control paths in the source code.
+
+Implementation Techniques
+
+Algorithmic Approaches
+
+Classical algorithms for common subexpression elimination typically operate on expression trees by performing a bottom-up traversal to label subtrees and detect identical structures, enabling the construction of a directed acyclic graph (DAG) where common subexpressions are shared. This approach, as outlined in the Sethi-Ullman method for generating optimal code from arithmetic expressions, assigns labels to each node based on the operator and the labels of its children, allowing the compiler to recognize and reuse identical subtrees during code generation. By representing the expression as a DAG rather than a tree, redundant computations are inherently eliminated at the intermediate representation stage.
+To extend this to control flow graphs for global analysis, expressions are hashed to unique identifiers during a traversal of the basic blocks, facilitating the substitution of redundant computations across the program. Hashing typically combines the operator with the value numbers (unique IDs) of operands, stored in a table that maps hashes to temporary variables holding the computed values. If a matching hash is found, the current expression is replaced by a reference to the stored value, ensuring consistency provided the operands have not been modified.
+Modern variants leverage data flow analysis frameworks, particularly available expressions analysis, to handle global common subexpressions more robustly across control flow paths. This forward data flow problem iteratively solves equations to determine, at each program point, the set of expressions computed on all incoming paths without intervening modifications to their operands. Backward propagation may be incorporated in extensions, such as for partial redundancy elimination, to refine availability by considering conditional anticipability of expressions. For efficiency in implementations with a large number of potential expressions, bit vectors represent sets of available expressions, allowing fast union and intersection operations during iterative fixed-point computation over the control flow graph.
+The time complexity of local common subexpression elimination is linear O(n) in the size of the basic block, achieved through a single pass with constant-time hash lookups. Global variants exhibit worst-case O(n) complexity due to the need for multiple iterations over the edges of the control flow graph until convergence in data flow solving.
+A typical implementation pass for expression hashing and substitution in a basic block can be outlined as follows:
+Initialize an empty (/page/Hash_table) mapping expression hashes to temporary variables
+Initialize a value number mapping for variables (initially each has unique ID)
+
+For each statement in the (/page/Basic_block):
+ If the statement assigns a variable v to an expression e = op(left, right):
+ Compute hash = hash_function(op, value_number(left), value_number(right))
+ If hash exists in the table:
+ Replace the statement with v = temp (where temp is table)
+ Else:
+ Generate a new temporary temp for the value of e
+ Add hash -> temp to the table
+ Update value_number(v) = new value number for temp
+ Else if the statement is an assignment v = source:
+ Update value_number(v) = value_number(source)
+ Update value numbers for any modified variables
+This pseudocode performs local elimination; global extension requires propagating value numbers across blocks using dominance or availability information.
+
+Integration with SSA Form
+
+Static Single Assignment (SSA) form represents code such that each variable is assigned exactly once, with all uses of that variable referring to its unique definition. This structure aids common subexpression elimination (CSE) by enabling identical expressions to share the same SSA name across multiple uses, as long as the defining assignment dominates those uses and no intervening redefinitions occur. In this way, SSA explicitly tracks value equalities through variable names, making it straightforward to detect and reuse computations without re-evaluating them.
+The integration process begins with constructing the SSA intermediate representation (IR) from the program's control flow graph, inserting phi functions at merge points to reconcile values from different paths. Once in SSA form, sparse conditional constant propagation (SCCP) is performed to refine variable values by propagating constants along executable paths while marking unreachable code. This is followed by copy propagation, which substitutes redundant expressions with references to the original SSA variable, and dead code removal to excise unused instructions, thereby implementing CSE efficiently.
+A key advantage of SSA for CSE is its simplification of global analysis, as the single static assignment per variable provides precise def-use chains that highlight value equalities without requiring complex aliasing checks. Phi functions further enhance this by managing value merges at control flow joins, allowing CSE to proceed without explicit tracking of expression availability across branches. This approach reduces the overhead of traditional availability computations in global CSE.
+For example, consider the following code snippet before SSA transformation:
+label1: x = a + b
+ ... (some code)
+label2: y = a + b
+Assuming label1 dominates label2, the SSA form assigns the same name to both expressions:
+label1: x1 = a + b
+ ... ((/page/Phi) insertions if needed)
+label2: y1 = x1 // Copy (/page/Propagation) replaces the redundant computation
+This direct reuse eliminates the second addition, with dead code removal cleaning up any remnants.
+
+Advantages and Limitations
+
+Performance Benefits
+
+Common subexpression elimination (CSE) delivers key performance benefits by removing redundant computations, resulting in faster execution, more compact code, and reduced energy use. These gains are most notable in compute-bound applications where expressions are recomputed frequently, such as in scientific simulations or numerical algorithms.
+Runtime improvements from CSE arise from avoiding unnecessary operations, particularly in loops. A verified global CSE implementation in a formally verified compiler achieved average speedups of 10% to 20% across Polybench/C benchmarks, which emphasize compute-intensive workloads similar to those in SPEC CPU suites. These reductions stem from fewer arithmetic instructions and better utilization of processor resources, with the impact scaling based on the density of redundant expressions in the code.
+CSE also contributes to smaller code size by substituting repeated expressions with temporary variables or registers, thereby decreasing the overall instruction count in optimized binaries and improving instruction cache efficiency. This reduction in code footprint lowers cache miss rates, providing indirect runtime benefits through better memory access patterns. In embedded contexts, compiler optimizations including CSE lead to energy savings; for instance, analyses on ARM-based platforms using benchmarks such as FDCT have shown reductions of up to 4% in energy consumption.
+Empirical evaluations in LLVM-based compilers highlight CSE's role in broader optimization pipelines.
+
+Potential Drawbacks
+
+One major limitation of common subexpression elimination (CSE) arises from pointer aliasing, where multiple pointers or references may access the same memory location. In such cases, the compiler cannot safely eliminate redundant expressions involving memory loads or stores, as a write through one pointer might invalidate the value loaded via another, leading to false negatives where potential optimizations are conservatively skipped. This issue is particularly pronounced in languages like C and C++, where alias analysis must be precise to avoid incorrect assumptions, but conservative analyses often err on the side of caution to prevent runtime errors. For instance, if two pointers potentially alias, a subsequent load cannot reuse a prior computation even if the expressions appear identical, requiring additional alias analysis infrastructure that may still miss opportunities due to its inherent limitations.
+Global CSE, which performs analysis across function boundaries or entire programs, introduces substantial compilation overhead compared to local variants. The interprocedural data-flow analysis required to identify common subexpressions at a global scope demands significant computational resources, particularly for large or complex codebases, often extending overall compile times due to repeated passes over the control flow graph. This overhead stems from the need to track expression availability and liveness across multiple basic blocks and functions, which can be resource-intensive and may not always yield proportional runtime benefits in memory-constrained or time-sensitive build environments.
+Basic CSE is ineffective against partial redundancies, where an expression is computed multiple times along some but not all paths to a program point. Unlike fully redundant expressions that CSE can eliminate outright, partial redundancies require insertions of computations at strategic points to transform them into fully redundant ones, a capability beyond standard CSE algorithms. As a result, basic CSE leaves such inefficiencies unaddressed, necessitating extensions like partial redundancy elimination (PRE) to achieve more comprehensive optimization, though this adds further analytical complexity.
+CSE can complicate debugging by obscuring the relationship between source code and the optimized binary. By replacing multiple instances of an expression with a single computation, the optimizer may eliminate intermediate variable assignments or reorder instructions, causing debuggers to display noncurrent variable values that do not match programmer expectations during single-stepping or breakpoint hits. This leads to issues such as the program counter jumping unexpectedly or failing to halt at apparent source lines, as the mapping from source statements to machine code becomes distorted, often requiring specialized techniques like variable recovery analysis to approximate unoptimized behavior.
+
+References
+
+ Lecture Notes on Common Subexpression Elimination
+
+ a survey of compiler optimization techniques
+
+ A Catalogue of Optimizing Transformations - Rice University
+
+SA-C compiler optimizations
+
+https://ieeexplore.ieee.org/document/739059
+
+ Code Optimization April 22, 2015 - Columbia CS
+
+ A history of compilers
+
+Frances Allen Bibliography - A.M. Turing Award Winner - ACM
+
+Global common subexpression elimination - ACM Digital Library
+
+History - GCC Wiki
+
+ Value Numbering - Department of Computer Science
+
+ Compilers: Principles, Techniques, and Tools
+
+ Optimizations - UT Computer Science
+
+ CS153: Compilers Lecture 19: Optimization - Harvard University
+
+ Lecture 7: Redundancy elimination
+
+ Maximally and arbitrarily fast implementation of linear and feedback ...
+
+ Global Value Numbers and Redundant Computations 1 Introduction
+
+Global common subexpression elimination
+
+ Global Common Subexpression
+
+ Program and Proof Optimizations with Type Systems 1 - Ando Saabas
+
+ Global Common Subexpression Elimination ith D t fl A l i with Data ...
+
+ Chapter 10 Scalar Optimizations
+
+ Simple, light, yet formally verified, global common subexpression ...
+
+ Identifying Compiler Options to Minimise Energy Consumption for ...
+
+ Enabling polyhedral optimizations in LLVM - Polly
+
+Aliasing - an overview | ScienceDirect Topics
+
+LLVM Alias Analysis Infrastructure LLVM 22.0.0git documentation
+
+Optimize Options (Using the GNU Compiler Collection (GCC))
+
+Global CSE/Partial Redundancy Elimination - GNU Project
+
+ Lecture 10 Partial Redundancy Elimination
+
+Debugging Optimized Code (GNAT User's Guide for Native Platforms)
+
+ Debugging optimized code without being misled - People @EECS
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

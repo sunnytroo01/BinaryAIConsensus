@@ -79,30 +79,13 @@ def load_text_bytes():
 
 
 def maybe_scrape_data():
-    """If not enough training data, scrape Grokipedia."""
+    """Check training data exists (should be in git repo)."""
     files = glob.glob(os.path.join(DATA_DIR, '*.txt'))
     total_size = sum(os.path.getsize(f) for f in files)
 
-    if total_size >= 500 * 1024 * 1024:  # Need at least 500 MB
-        return  # Already have enough data
-
-    # Delete old small articles (the 200 hand-written ones)
-    if files and total_size < 10 * 1024 * 1024:
-        print(f"  Removing old training data ({len(files)} files, {total_size/1024/1024:.1f} MB)...")
-        for f in files:
-            os.remove(f)
-
-    print("  Scraping 1 GB from Grokipedia (B200 has fast internet)...")
-    print()
-
-    # Import and run scraper
-    scraper_path = os.path.join(BASE, 'scrape_grokipedia.py')
-    if os.path.exists(scraper_path):
-        import subprocess
-        subprocess.run([sys.executable, '-u', scraper_path], cwd=BASE)
-    else:
-        print("  ERROR: scrape_grokipedia.py not found!")
-        print("  Upload training data to:", DATA_DIR)
+    if len(files) < 10 or total_size < 1000:
+        print(f"  ERROR: No training data in {DATA_DIR}")
+        print(f"  Make sure you did: git pull")
         sys.exit(1)
 
 

@@ -1,0 +1,362 @@
+Vienna Ab initio Simulation Package Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Vienna Ab initio Simulation Package
+ Ara Eve Leo Sal 
+1x
+ The Vienna Ab initio Simulation Package (VASP) is a computer program designed for atomic-scale materials modeling, enabling electronic structure calculations and quantum-mechanical molecular dynamics simulations from first principles. It employs density functional theory (DFT) within the Kohn-Sham formalism, alongside methods such as Hartree-Fock and hybrid functionals, to solve the many-body Schrdinger equation for periodic systems. VASP utilizes plane-wave basis sets combined with either norm-conserving or ultrasoft pseudopotentials, or the projector-augmented-wave (PAW) method, for efficient representation of valence electrons while treating core electrons approximately. These capabilities make it a versatile tool for investigating structural, dynamic, and electronic properties of materials, including solids, surfaces, nanostructures, and molecules.
+Developed primarily by Georg Kresse and Jrgen Furthmller at the University of Vienna's Faculty of Physics, VASP originated from early ab initio codes in the early 1990s, building on foundational work in plane-wave DFT implementations. Key methodological advancements were introduced in seminal papers, such as the 1993 publication on ab initio molecular dynamics for liquid metals using pseudopotentials, which laid the groundwork for efficient total-energy calculations. Subsequent developments in 1996 enhanced iterative schemes for Kohn-Sham ground-state solutions, incorporating algorithms like residual minimization with direct inversion in the iterative subspace (RMM-DIIS) and blocked Davidson methods for improved convergence in metallic and semiconductor systems. Today, VASP is maintained and distributed commercially by VASP Software GmbH, supporting parallel computing via MPI and OpenMP for large-scale simulations on high-performance computing clusters. Its broad adoption in computational materials science stems from high accuracy in predicting properties like band structures, phonons, and reaction pathways, often benchmarked against experimental data across diverse applications in physics, chemistry, and engineering.
+
+Background
+
+Ab initio Methods
+
+Ab initio methods, also known as first-principles calculations, involve solving the Schrdinger equation to determine the electronic structure of materials directly from fundamental physical laws, without relying on empirical parameters or experimental fitting. These approaches aim to compute properties such as energies, forces, and densities by treating electrons as quantum particles interacting via Coulomb forces, providing a rigorous foundation for understanding atomic and molecular systems. The core challenge lies in handling the many-body nature of electron interactions, which scales exponentially with system size, necessitating approximations to achieve computational feasibility.
+The time-independent Schrdinger equation for a many-electron system is given by
+H^=E,
+\hat{H} \Psi = E \Psi,
+H^=E,
+where H^\hat{H}H^ is the Hamiltonian operator encompassing kinetic energy, external potential from nuclei, and electron-electron repulsion, \Psi is the many-electron wavefunction, and EEE is the total energy. To address the coupled nuclear-electronic dynamics, the Born-Oppenheimer approximation is employed, which separates the motions of nuclei and electrons based on the vast mass difference (approximately 1836 for protons), allowing electronic structure to be solved for fixed nuclear positions. This approximation underpins most ab initio calculations, enabling the computation of potential energy surfaces as functions of nuclear coordinates.
+Early ab initio methods relied on wavefunction-based techniques, such as the Hartree-Fock method, which approximates the many-electron wavefunction as a single Slater determinant to account for antisymmetry and mean-field interactions. However, Hartree-Fock exhibits significant limitations for solid-state systems, primarily due to its neglect of electron correlation effects beyond the mean field, leading to overestimated band gaps and poor descriptions of insulating or metallic behaviors in periodic structures. This inadequacy prompted a transition in the 1960s and 1970s to more advanced frameworks, including many-body perturbation theory (MBPT), which treats correlation as a perturbation on the Hartree-Fock solution to capture higher-order interactions.
+The evolution from wavefunction-based methods to density-based approaches accelerated in the 1960s-1980s, driven by the need for scalable computations in complex systems like solids. Seminal developments included the formulation of MBPT for quasiparticle energies in solids, as in Hedin's Green's function framework (1965), which improved upon Hartree-Fock by incorporating screening and self-energy corrections. Concurrently, the shift to density functional theory (DFT) in the Kohn-Sham formulation (1965) reformulated the problem in terms of electron density, offering a practical ab initio framework that balances accuracy and efficiency for extended systems. By the 1980s, these methods had matured, enabling widespread applications in materials science while highlighting ongoing challenges in exact correlation treatments.
+
+Density Functional Theory
+
+Density functional theory (DFT) serves as the cornerstone of the Vienna Ab initio Simulation Package (VASP), enabling efficient ab initio calculations of ground-state electronic structures and properties of materials by reformulating the many-body problem in terms of the electron density rather than the full wavefunction.
+The theoretical foundation of DFT rests on the Hohenberg-Kohn theorems, which establish that the ground-state electron density n(r)n(\mathbf{r})n(r) uniquely determines the external potential v(r)v(\mathbf{r})v(r) (up to an additive constant) for a system of nonrelativistic interacting electrons, and that the total energy EEE is a functional of the density, with the true ground-state density yielding the minimum value among all physically admissible densities.
+To make DFT practically solvable, Kohn and Sham recast the problem as an equivalent system of non-interacting electrons moving in an effective potential, leading to the Kohn-Sham equations:
+(22+Veff(r))i(r)=ii(r),
+\left( -\frac{\nabla^2}{2} + V_{\mathrm{eff}}(\mathbf{r}) \right) \psi_i(\mathbf{r}) = \epsilon_i \psi_i(\mathbf{r}),
+(22+Veff(r))i(r)=ii(r),
+where the effective potential Veff(r)=v(r)+VH(r)+Vxc(r)V_{\mathrm{eff}}(\mathbf{r}) = v(\mathbf{r}) + V_{\mathrm{H}}(\mathbf{r}) + V_{\mathrm{xc}}(\mathbf{r})Veff(r)=v(r)+VH(r)+Vxc(r) includes the external potential v(r)v(\mathbf{r})v(r), the Hartree potential VH(r)V_{\mathrm{H}}(\mathbf{r})VH(r) from the classical electrostatic repulsion of the density, and the exchange-correlation potential Vxc(r)=Exc/n(r)V_{\mathrm{xc}}(\mathbf{r}) = \delta E_{\mathrm{xc}}/\delta n(\mathbf{r})Vxc(r)=Exc/n(r) derived from the universal but unknown exchange-correlation functional ExcE_{\mathrm{xc}}Exc. The density is then obtained as n(r)=ii(r)2n(\mathbf{r}) = \sum_i |\psi_i(\mathbf{r})|^2n(r)=ii(r)2, with the kinetic energy expressed exactly for this fictitious non-interacting system.
+Practical computations require approximations for ExcE_{\mathrm{xc}}Exc. The local density approximation (LDA) assumes the exchange-correlation energy is local, given by ExcLDA=n(r)xchom(n(r),(r))drE_{\mathrm{xc}}^{\mathrm{LDA}} = \int n(\mathbf{r}) \epsilon_{\mathrm{xc}}^{\mathrm{hom}}(n(\mathbf{r}), \zeta(\mathbf{r})) \, d\mathbf{r}ExcLDA=n(r)xchom(n(r),(r))dr, where xchom\epsilon_{\mathrm{xc}}^{\mathrm{hom}}xchom is the per-electron exchange-correlation energy of the homogeneous electron gas at density nnn and spin polarization \zeta, parametrized from quantum Monte Carlo simulations of the uniform gas. The generalized gradient approximation (GGA) extends LDA by including dependence on the density gradient n|\nabla n|n, as in the Perdew-Burke-Ernzerhof functional, which improves descriptions of binding energies, lattice constants, and surface properties by better capturing density variations.
+Despite their widespread utility, these approximations have notable limitations; for instance, LDA systematically underestimates band gaps in semiconductors and insulators by 30100% due to residual self-interaction errors and incomplete inclusion of exact exchange effects, often necessitating hybrid functionals that incorporate a portion of Hartree-Fock exchange or post-DFT approaches like the GW method for more accurate excited-state properties.
+
+History and Development
+
+Origins
+
+The Vienna Ab initio Simulation Package (VASP) traces its origins to foundational work in ab initio computational methods for materials science, specifically building upon early plane-wave pseudopotential codes developed in the late 1980s. The core codebase was initially derived from a program written by Mike Payne during his time at the Massachusetts Institute of Technology (MIT), which also served as the basis for the CASTEP code. This early framework emphasized density functional theory (DFT) implementations using plane waves and pseudopotentials, enabling simulations of electronic structures in periodic systems.
+In July 1989, Jrgen Hafner, after spending six months in Cambridge collaborating on related projects, brought this MIT-derived code to the Technical University of Vienna (now part of the University of Vienna). This transfer marked the beginning of localized development in Vienna, where the code was adapted for broader applications in solid-state physics and materials modeling. Initial enhancements focused on integrating local pseudopotentials and the Car-Parrinello steepest descent algorithm, laying the groundwork for efficient ab initio molecular dynamics simulations.
+Development accelerated in September 1991 under the leadership of Georg Kresse and Jrgen Furthmller, who began refining the code into a dedicated tool for DFT-based calculations. The early version, released around 19931994, was named VAMP (Vienna Ab initio Molecular-dynamics Program), emphasizing its capabilities for molecular dynamics using pseudopotentials and plane-wave basis sets. VAMP enabled pioneering simulations, such as ab initio molecular dynamics for liquid metals, demonstrating high efficiency for metallic and semiconducting systems.
+By the mid-1990s, the package transitioned from VAMP to VASP, with the official naming occurring around February 1995. This evolution shifted the focus toward a more versatile simulation package optimized for plane-wave pseudopotential methods in periodic boundary conditions, incorporating iterative schemes for total-energy calculations and improved handling of complex systems like transition metals. The rename reflected a maturation from dynamics-centric tools to a comprehensive ab initio platform, while retaining the Vienna group's emphasis on computational efficiency and accuracy.
+
+Key Milestones
+
+Georg Kresse has led the development of VASP since completing his PhD under Jrgen Hafner in 1993 at the Technische Universitt Wien, building on the software's origins from the CASTEP code and an early version known as VAMP.
+A significant advancement occurred in the mid-2000s with the VASP 5 branch (initiated around 2004, with key releases mid-2000s), which introduced support for hybrid functionals such as PBE0 and HSE to better capture exchange-correlation interactions in complex materials, along with GW calculations and linear response theory. The projector-augmented-wave (PAW) method, implemented in the late 1990s, saw further refinements for more accurate treatment of core electrons.
+To facilitate commercial distribution while preserving its academic foundation at the University of Vienna, VASP Software GmbH was established in 2018, though licensing arrangements for non-academic use had been in place since the early 2000s.
+The release of VASP 6 in 2020 marked another key milestone, introducing enhanced support for GPU acceleration via OpenACC and integrations for machine learning-based interatomic potentials to accelerate large-scale simulations. Subsequent releases, including VASP 6.4 in 2023 and VASP 6.5 in late 2024, have provided further enhancements in performance and new features such as improved electron-phonon calculations (as of 2025).
+Over more than 25 years of continuous development by the Kresse group, the foundational VASP publications, such as those describing the iterative schemes and PAW implementation, have accumulated over 60,000 citations by 2025, underscoring their impact on computational materials science.
+
+Methodology
+
+Plane Wave Basis and Pseudopotentials
+
+The Vienna Ab initio Simulation Package (VASP) utilizes a plane wave basis set to expand the Kohn-Sham orbitals in its density functional theory framework. The electronic wavefunctions are represented as a superposition of plane waves, expressed mathematically as nk(r)=GcGnkei(k+G)r\psi_{n\mathbf{k}}(\mathbf{r}) = \sum_{\mathbf{G}} c_{\mathbf{G}n\mathbf{k}} \, e^{i(\mathbf{k} + \mathbf{G}) \cdot \mathbf{r}}nk(r)=GcGnkei(k+G)r, where G\mathbf{G}G denotes the reciprocal lattice vectors, k\mathbf{k}k is the Bloch vector within the first Brillouin zone, and the coefficients cGnkc_{\mathbf{G}n\mathbf{k}}cGnk are determined variationally. The basis set size is controlled by a kinetic energy cutoff EcutE_{\rm cut}Ecut, specified via the input parameter ENCUT, which truncates the sum over G\mathbf{G}G such that 22mk+G2<Ecut\frac{\hbar^2}{2m} |\mathbf{k} + \mathbf{G}|^2 < E_{\rm cut}2m2k+G2<Ecut; higher values of ENCUT increase accuracy but also computational demand. This approach inherently enforces periodic boundary conditions, rendering it well-suited for simulating crystalline solids, surfaces, and interfaces where translational symmetry prevails.
+A primary advantage of the plane wave basis lies in its computational efficiency, particularly through the use of fast Fourier transforms (FFTs) to apply the Hamiltonian operator, which involves operations in both real and reciprocal space. FFTs enable rapid evaluation of the kinetic energy, nonlocal pseudopotential projectors, and Hartree potential, scaling favorably for large systems. Furthermore, integration over the Brillouin zone is handled via Monkhorst-Pack or other k-point meshes, ensuring convergence of properties like total energy and electronic density as the sampling density increases; for insulators, fewer k-points suffice compared to metals.
+To mitigate the computational expense arising from the singular Coulomb potentials of atomic cores, VASP employs pseudopotentials that substitute the all-electron treatment with an effective potential acting on valence electrons only, thereby eliminating the need to resolve rapid oscillations in core regions. Core electrons are frozen and accounted for via precomputed atomic contributions, drastically reducing the required plane wave basis size and enabling simulations of heavier elements. VASP supports norm-conserving pseudopotentials, which adhere to conditions such as charge norm conservation0rcl(r)2r2dr=0rc~l(r)2r2dr\int_0^{r_c} |\phi_l(r)|^2 r^2 \, dr = \int_0^{r_c} |\tilde{\phi}_l(r)|^2 r^2 \, dr0rcl(r)2r2dr=0rc~l(r)2r2dr within a core radius rcr_crcand matching logarithmic derivatives, preserving scattering properties and accuracy for valence electrons.
+Additionally, ultrasoft pseudopotentials are implemented, relaxing the norm-conservation constraint to produce smoother pseudo-wavefunctions that demand lower ENCUT values, often halving the basis set size relative to norm-conserving variants while augmenting the charge density with generalized functions for exact reconstruction. This variant further lowers the computational cost, particularly for transition metals and d- or f-block elements, without compromising key physical observables when properly converged. Both types are provided in the POTCAR files distributed with VASP, selected based on the balance between accuracy and efficiency for specific applications.
+
+Projector Augmented Wave Method
+
+The Projector Augmented Wave (PAW) method serves as VASP's primary approach for achieving all-electron-like accuracy in electronic structure calculations while maintaining computational efficiency. Developed by Peter E. Blchl, it generalizes pseudopotential techniques by enabling the exact reconstruction of all-electron wavefunctions and densities from smoother pseudo-wavefunctions, particularly within augmentation regions around atomic cores. This formalism is particularly suited for plane-wave basis sets, where the pseudo-part of the wavefunction is expanded in plane waves outside the augmentation spheres.
+In the PAW method, the all-electron wavefunction $ \psi $ is obtained by transforming the pseudo-wavefunction $ \tilde{\psi} $ using a set of projector functions $ |p_i\rangle $ and partial waves $ |\phi_i\rangle $, which are localized solutions to the atomic Schrdinger equation. The transformation incorporates one-center corrections within spherical augmentation regions to account for the difference between all-electron and pseudo quantities:
+=~+i(i~i)pi~
+|\psi\rangle = |\tilde{\psi}\rangle + \sum_i \left( |\phi_i\rangle - |\tilde{\phi}_i\rangle \right) \langle p_i | \tilde{\psi} \rangle
+=~+i(i~i)pi~
+This linear relation allows the true electron density and other operators to be reconstructed accurately, including core-valence interactions, without solving the full all-electron equations. The projectors $ \langle p_i | $ are dual to the pseudo partial waves $ |\tilde{\phi}_i\rangle $, ensuring orthogonality and efficient computation.
+VASP implemented the PAW method between 1997 and 1999, building on Blchl's original formulation with extensions for practical use in periodic systems as described by Kresse and Joubert (1999). This implementation employs the frozen-core approximation, where core electrons are treated atomically and remain fixed, while valence electrons are handled dynamically. It fully supports spin-orbit coupling through the LSORBIT tag and noncollinear magnetism, enabling accurate treatment of relativistic effects and magnetic properties in materials like transition metals and semiconductors.
+The PAW approach in VASP offers significant benefits over traditional pseudopotentials, providing higher precision for derived properties such as magnetic moments, Hellmann-Feynman forces, and total energies, all at a cost comparable to norm-conserving pseudopotentials. By exactly representing the one-electron density matrix within augmentation spheres and introducing compensation charges to maintain normalization, it minimizes errors in core-related observables without the prohibitive expense of full all-electron methods like the linearized augmented plane wave approach. This accuracy has made PAW the default method in VASP for most applications requiring reliable structural and electronic properties.
+
+Features
+
+Calculation Types
+
+VASP supports a range of calculations to determine the electronic structure of materials, primarily through self-consistent field (SCF) methods that solve the Kohn-Sham equations to obtain the ground-state total energy and charge density. These SCF calculations form the basis for deriving key properties such as the density of states (DOS), which reveals the distribution of electronic states available for occupation, and band structures, which map the energy eigenvalues along high-symmetry paths in the Brillouin zone to identify band gaps and dispersion relations. Typically, an initial SCF run on an optimized geometry provides the converged charge density, followed by non-SCF steps with denser k-point sampling for accurate DOS and band structure plots.
+For structural properties, VASP performs geometry optimizations to minimize the total energy with respect to atomic positions and lattice parameters, employing algorithms such as the conjugate gradient method for robust convergence in complex systems or damped molecular dynamics for faster relaxation in simpler cases. These optimizations ensure ionic configurations at local minima, essential for subsequent property calculations, and can incorporate constraints like fixed cell volumes or selective relaxation of coordinates.
+Ab initio molecular dynamics (AIMD) simulations in VASP enable the study of finite-temperature dynamics by integrating equations of motion using the Verlet algorithm, allowing exploration of thermal fluctuations and phase transitions over timescales typically up to a few picoseconds due to computational cost. The projector augmented wave (PAW) method ensures accurate forces on ions during these trajectories, facilitating reliable sampling of configuration space.
+Vibrational properties are computed through phonon calculations, which characterize lattice dynamics and stability; VASP implements density functional perturbation theory (DFPT) for efficient determination of phonon frequencies at the zone center via linear response, or the finite differences method to approximate second-order force constants by displacing atoms in a supercell. DFPT is particularly advantageous for insulating systems, while finite differences offer flexibility for metals and full dispersion relations when combined with post-processing tools. Additionally, as of VASP 6.5.0 (released December 2024), VASP supports electron-phonon interaction calculations using DFPT to compute coupling matrix elements, enabling the study of phenomena such as electron-phonon scattering, superconductivity, and thermal transport.
+
+Exchange-Correlation Approximations
+
+The Vienna Ab initio Simulation Package (VASP) implements a range of exchange-correlation (XC) approximations within density functional theory (DFT), which are used to model the complex many-electron interactions by approximating the exchange and correlation energies in the Kohn-Sham equations. These functionals vary in sophistication, from local approximations that depend only on electron density to more advanced methods incorporating gradients, kinetic energy densities, and nonlocal effects, enabling accurate predictions of material properties such as energies, structures, and electronic spectra.
+The local density approximation (LDA) in VASP employs the Perdew-Zunger parametrization of the Ceperley-Alder exchange-correlation functional, derived from quantum Monte Carlo simulations of the uniform electron gas. This form assumes the electron density is locally uniform, providing a simple yet computationally efficient starting point for calculations, though it often overestimates binding energies and underestimates lattice constants in solids.
+For improved accuracy, VASP defaults to generalized gradient approximation (GGA) functionals, which include density gradients to better capture inhomogeneities in real systems. The Perdew-Burke-Ernzerhof (PBE) functional serves as the standard, offering a nonempirical approach that balances performance across diverse properties like cohesive energies and reaction barriers. VASP also supports variants such as PW91, which refines exchange and correlation for molecular systems, and RPBE, optimized for enhanced surface energies and adsorption binding in catalytic applications.
+Hybrid functionals in VASP incorporate a fraction of exact Hartree-Fock exchange to mitigate self-interaction errors and improve band gap predictions. The Heyd-Scuseria-Ernzerhof (HSE06) screened hybrid, with 25% exact exchange and a range-separation parameter of 0.11 bohr, excels at describing band gaps and optical properties in semiconductors and insulators due to its reduced computational cost for extended systems compared to fully nonlocal hybrids. In contrast, the PBE0 functional mixes 25% exact exchange with the PBE semilocal terms without screening, providing higher accuracy for molecular excitation energies and reaction pathways at greater expense.
+Beyond standard DFT, VASP extends to meta-GGA functionals like the Strongly Constrained and Appropriately Normed (SCAN) approximation, which incorporates kinetic energy density for enhanced description of diverse bonding types, including weak interactions, while maintaining reasonable computational scaling. For van der Waals (vdW) forces absent in conventional functionals, the DFT-D3 dispersion correction adds a semiempirical, atom-pairwise term with damping to account for London dispersion, significantly improving predictions for layered materials and physisorption. Additionally, the random phase approximation (RPA), implemented via the adiabatic connection fluctuation-dissipation theorem, computes correlation energies including nonlocal effects for excited states and total energies, offering benchmark-level accuracy for molecular and solid-state excitations despite its high cost.
+
+Usage
+
+Input Structure
+
+The Vienna Ab initio Simulation Package (VASP) employs a file-based input system consisting of four primary text filesPOSCAR, INCAR, KPOINTS, and POTCARthat collectively define the atomic structure, computational parameters, k-point sampling, and pseudopotentials for a simulation. These files must be placed in the working directory, with VASP reading them in a specific order to set up the calculation, ensuring consistency such as matching species order between POSCAR and POTCAR.
+The POSCAR file specifies the crystal structure, including lattice vectors and atomic positions. It begins with a comment line (up to 40 characters), followed by a scaling factor (a single real number for uniform scaling or three for individual axes), three lines defining the lattice vectors in Cartesian coordinates (scaled by the factor), a line listing element symbols (optional), a line with the number of atoms per species, an optional line for selective dynamics ("Selective dynamics"), a line indicating coordinate type ("Direct" for fractional or "Cartesian"), and then the atomic positions (one per line, in the order of species). Selective dynamics allows flags (T or F) for each coordinate to fix or relax atoms during optimization. For example, the primitive cell of silicon in the diamond cubic structure might appear as:
+Si
+1.0
+ 2.715 2.715 0.000
+ 0.000 2.715 2.715
+ 2.715 0.000 2.715
+Si
+2
+Direct
+ 0.000 0.000 0.000
+ 0.250 0.250 0.250
+Positions require at least seven significant digits for precision, and the file shares its format with the output CONTCAR for restarts.
+The INCAR file controls the calculation's parameters and algorithms, using a simple tag-value format where each line sets a parameter (e.g., ENCUT = 400) and unset tags default to VASP's built-in values. Key tags include ENCUT, which sets the plane-wave energy cutoff in eV (typically 1.3 times the maximum ENMAX from POTCAR for convergence); PREC, which adjusts precision and grid sizes (e.g., "Normal" or "Accurate"); ISTART, which determines the starting wavefunction (0 for new calculation from atomic densities, 1 to read from WAVECAR); and NPAR, which optimizes parallelization by grouping bands (e.g., set to the number of nodes or cores divided by k-points). Other essential tags like EDIFF (electronic convergence criterion, e.g., 10^{-6} eV) and NSW (number of ionic steps for relaxation) steer the workflow. Exchange-correlation functionals are selected via tags such as GGA = PE for PBE.
+The KPOINTS file defines the sampling of the Brillouin zone via k-points, essential for integrating over reciprocal space. It starts with a comment line, followed by the number of k-points (0 for automatic generation), a line specifying the generation method (e.g., "Monkhorst-Pack", "Gamma", or explicit list), and then grid parameters or coordinates. The Monkhorst-Pack scheme generates a uniform grid (e.g., 4x4x4 subdivisions along reciprocal vectors) with optional shifts (default 0 0 0). Shifts of 0.5 0.5 0.5 are often used for off-centered grids, while the Gamma scheme ensures inclusion of the Gamma point. Explicit k-points list fractional or Cartesian coordinates with weights (summing to 1). For instance, a Monkhorst-Pack grid is:
+Automatic mesh
+0
+Monkhorst-Pack
+4 4 4
+0 0 0
+VASP automatically reduces the grid using symmetry if enabled, and denser meshes improve accuracy for properties like total energy.
+The POTCAR file supplies the pseudopotential data for each atomic species, generated by concatenating individual files from the VASP library (accessed via the VASP Portal). It must list species in the exact order as in POSCAR, with no mixing of exchange-correlation types across potentials. Each segment includes a header (e.g., TITEL for potential name, ZVAL for valence electrons like 4.000 for carbon, ENMAX for recommended cutoff like 400 eV, and POMASS for atomic mass) followed by tabulated projector data, ending with "End of Dataset". Preparation involves selecting PAW pseudopotentials (standard or variant like _sv for semicore states) and using commands like cat POTCAR_C POTCAR_O > POTCAR for multi-element systems. Users should not edit the file contents, as they are optimized for the PAW method.
+
+Output Analysis
+
+VASP produces a variety of output files that capture the progress and results of ab initio simulations, allowing users to assess convergence, extract physical properties, and prepare data for further analysis or visualization. These files are generated during the execution of calculations and vary in detail, from concise summaries to comprehensive logs, facilitating both quick checks and in-depth post-processing. The structure and content of these outputs are designed to support iterative workflows, such as restarting interrupted runs or integrating with external tools for property evaluation.
+The OSZICAR file provides a compact record of the electronic self-consistency convergence history, listing details for each electronic step such as the step number, current free energy, energy change, band structure energy change, number of Hamiltonian evaluations, residuum norm, and charge density difference. For ionic relaxation or molecular dynamics steps, it includes additional information like total free energy, forces, and temperature if applicable. This file is essential for monitoring the stability and efficiency of the self-consistent field (SCF) iterations and ionic updates without delving into voluminous data.
+The OUTCAR file acts as the main detailed log of the entire VASP run, encompassing a summary of input parameters, Kohn-Sham eigenvalues from electronic steps, stress tensors, atomic forces, local charges, magnetic moments, and dielectric properties. It also flags warnings on issues like poor convergence or numerical instabilities, alongside final total energies and wavefunction-related information. Users rely on OUTCAR to verify the integrity of results and extract key quantities like equilibrium geometries or equilibrium properties. The verbosity of this file can be adjusted via the NWRITE parameter in the input.
+The CHGCAR file stores the total (and spin) charge density on a real-space grid, along with projector-augmented wave (PAW) one-center occupancies, enabling visualization of electron distributions or use as an initial guess for restarting calculations with parameters like ICHARG=1. Similarly, the WAVECAR file holds binary data for wavefunction coefficients, including band energies, Fermi weights, and basis set details, which supports efficient continuation of runs by providing high-quality starting orbitals, particularly useful in dynamic simulations or relaxations. Both files are binary and can be large, but they are indispensable for density plotting or avoiding full SCF restarts in subsequent jobs.
+Post-processing of VASP outputs is commonly performed using specialized tools to derive derived quantities like band structures and densities of states (DOS). VASPKIT, for instance, processes files such as EIGENVAL, PROCAR, and DOSCAR to generate total and projected band structures, DOS plots (including l- or lm-decomposed), and charge density slices. The p4vasp suite offers an interactive graphical interface for visualizing band structures, DOS, convergence plots, and structural data directly from output files. For three-dimensional rendering, VESTA integrates seamlessly with CHGCAR and POSCAR/CONTCAR files to display atomic structures, isosurfaces of charge densities, and volumetric data with customizable rendering options. These tools enhance the interpretability of VASP results without requiring custom scripting.
+
+Applications
+
+Materials Science
+
+VASP has been extensively applied in materials science to compute electronic properties of bulk semiconductors, such as band structures and densities of states (DOS), enabling predictions of fundamental characteristics like indirect band gaps. For silicon (Si), VASP calculations using hybrid functionals such as HSE within density functional theory (DFT) yield an indirect band gap of approximately 1.14 eV at the Gamma-to-X point, closer to the experimental value of 1.12 eV at low temperatures, which is crucial for understanding its optoelectronic limitations compared to direct-gap materials. Similarly, for gallium arsenide (GaAs), VASP simulations yield a direct band gap of about 0.3 eV at the Gamma point using the local density approximation (LDA), though hybrid functionals like HSE06 improve accuracy to near-experimental 1.5 eV, highlighting VASP's utility in benchmarking semiconductor device materials. These computations provide insights into charge carrier dynamics without experimental synthesis, aiding the design of silicon-based photovoltaics and GaAs heterostructures.
+In defect studies, VASP facilitates the determination of formation energies for intrinsic defects in oxides, which govern electrical conductivity and catalytic performance. For instance, oxygen vacancies in rutile TiO, a prototypical photocatalyst, exhibit formation energies ranging from 3.5 to 4.5 eV depending on the charge state and Hubbard U correction, with neutral vacancies introducing mid-gap states that enhance n-type doping. These VASP-based results, often employing the projector augmented wave method with GGA+U functionals, reveal that bridging oxygen removal is thermodynamically favored over in-plane sites, influencing defect-mediated charge transport in energy storage and environmental applications. Such analyses have informed strategies to engineer defect concentrations for improved TiO-based solar cells and sensors.
+VASP also supports the evaluation of thermodynamic properties through phonon spectra calculations, which yield vibrational free energies essential for assessing phase stability in alloys at finite temperatures. Phonon dispersions computed via the finite displacement method in VASP demonstrate dynamical stability in ordered phases like AlLi in Al-Li alloys, where vibrational entropy contributions stabilize the ordered structure by up to 0.1 eV/atom relative to disordered solid solutions, impacting lightweight aerospace materials. For high-entropy alloys, these free energy calculations predict phase transitions by integrating quasiharmonic approximations, revealing how anharmonic effects lower formation barriers in multi-component systems. Additionally, ab initio molecular dynamics (AIMD) simulations in VASP briefly extend these to dynamic defect diffusion in bulk materials.
+A prominent application is the prediction of Li-ion battery cathode materials, exemplified by LiCoO, where VASP computes intercalation voltages to optimize energy density. DFT calculations yield an average open-circuit voltage of 4.0 V for Li extraction from LiCoO, aligning with experimental discharge profiles and attributing voltage plateaus to layered-to-spinel phase transitions, which guide doping strategies to mitigate capacity fade. These simulations, using PAW potentials and spin-polarized GGA, have accelerated the screening of cobalt-based cathodes for higher-voltage operation in electric vehicles.
+
+Surface and Interface Studies
+
+VASP facilitates the study of surface phenomena through slab models, which approximate low-dimensional systems by cleaving bulk structures and introducing vacuum regions to simulate isolated surfaces. These models enable relaxation of atomic positions to determine equilibrium geometries and adsorption sites for molecules on metal or oxide surfaces. For instance, in catalytic applications, VASP calculations using density functional theory (DFT) have been employed to investigate CO adsorption on the Pt(111) surface, revealing preferred atop and bridge sites with adsorption energies around -1.5 to -2.0 eV, depending on coverage and functional choice, which informs mechanisms in CO oxidation catalysis.
+Key properties such as work function and cleavage energies are routinely computed in VASP for these slabs. The work function, defined as the energy required to remove an electron from the surface to vacuum, is obtained by differencing the Fermi level from the average electrostatic potential in the vacuum region, typically requiring 812 of vacuum and accurate convergence settings like PREC=Accurate. Cleavage energies quantify the energy cost of creating surfaces and are calculated as the difference between slab and bulk formation energies per unit area, scaled by the number of layers to extrapolate to the clean surface limit. For charged or polar slabs, dipole corrections are essential to mitigate artificial interactions from periodic boundary conditions; VASP implements these via LDIPOL=.TRUE. and IDIPOL=3 in the INCAR file, ensuring a flat potential in the vacuum and accurate forces during relaxation.
+Interface simulations in VASP extend to grain boundaries in metals and epitaxial layers in semiconductors, using supercell models to capture atomic-scale structures and electronic properties. For grain boundaries, such as 5 tilt boundaries in face-centered cubic metals like Cu or Al, VASP DFT calculations reveal excess energies of 0.10.5 J/m and localized states that influence mechanical strength and diffusion. In epitaxial heterostructures, like semiconductor layers on substrates, VASP models strain and band alignment, for example, in GaAs/Si interfaces, showing valence band offsets around 0.5 eV that affect optoelectronic performance.
+A prominent example is the modeling of water dissociation on the rutile TiO(110) surface, where VASP simulations demonstrate that adsorbed HO molecules undergo OH bond breaking at bridging oxygen sites, with barriers of 0.81.2 eV, facilitated by surface vacancies or defects to enhance photocatalytic water splitting efficiency. These studies often incorporate van der Waals corrections briefly to account for weak physisorption in aqueous environments.
+
+Licensing and Community
+
+Distribution Model
+
+The Vienna Ab initio Simulation Package (VASP) is a proprietary software package developed and exclusively distributed by VASP Software GmbH, a for-profit company based in Vienna, Austria, since the early 2000s. This entity serves as the sole worldwide copyright owner and licensor, ensuring centralized registration and control over all legal copies to protect intellectual property and prevent unauthorized distribution.
+VASP's distribution model requires users to obtain a license for access, with no open-source availability. Licenses are issued on a per-research-group basis rather than institution-wide, though site licenses are available for larger academic or non-profit institutions to cover multiple groups. Academic, governmental, and non-profit research licenses are offered at reduced rates compared to commercial ones, reflecting the software's origins in academic research while supporting ongoing development through revenue generation. For instance, upgrade fees to newer versions have been reported at approximately 1,500 as of 2023. Commercial licenses, intended for industry and for-profit applications, incur higher fees to reflect their broader usage rights and the associated support needs.
+The licensing policy has evolved from VASP's initial development as a purely academic tool at the University of Vienna in the 1990sled by researchers including Prof. Georg Kresseto a commercial framework managed by VASP Software GmbH. This transition, formalized through the company's establishment, enabled sustainable funding for enhancements, bug fixes, and version releases, while maintaining the University of Vienna's involvement in core development efforts. All licenses must be obtained directly from VASP Software GmbH or authorized resellers like Materials Design, Inc., and are non-transferable between institutions without approval.
+
+User Support
+
+The official VASP website at vasp.at serves as the primary hub for user resources, providing comprehensive manuals through the VASP Wiki, which details input and output documentation, compilation advice, and code usage. Tutorials on the site guide users through practical calculations, including example input files for various simulations, accessible only to licensed users. Additionally, a dedicated forum on vasp.at enables licensed users to post questions, share experiences, and seek technical support from the community and developers.
+VASP organizes regular workshops to support advanced learning, with sessions held since the early 2000s, often at the University of Vienna or in collaboration with international partners, covering topics such as electron-phonon interactions, NMR, and XAS calculations. These 2-3 day events include lectures and hands-on tutorials, with recent online formats announced for 2025 to accommodate global participation.
+Users are required to cite key foundational papers in any publications resulting from VASP calculations, including the seminal work by Kresse and Hafner on ab initio molecular dynamics. This acknowledgment ensures proper credit to the developers and is a standard condition of use.
+The VASP community benefits from integrations with external tools, such as the Atomic Simulation Environment (ASE), which allows Python-based scripting for setting up, running, and analyzing VASP calculations. Error reporting and troubleshooting are facilitated through the official forum, where users can submit detailed queries for developer assistance, though full access requires a valid license.
+
+References
+
+About - VASP
+
+Ab initio molecular dynamics for liquid metals | Phys. Rev. B
+
+Efficiency of ab-initio total energy calculations for metals and ...
+
+Efficient iterative schemes for ab initio total-energy calculations ...
+
+Vienna Ab-initio Simulation Package (VASP) and Applications
+
+ Introduction to First-Principles Electronic Structure Methods
+
+Ab initio quantum chemistry: Methodology and applications - PMC
+
+ Ab initio and electronic structure methods ChE210D
+
+ XII. The Born-Oppenheimer Approximation - MIT
+
+ The Born-Oppenheimer Approximation
+
+ The Hartree-Fock Method in Atoms 1. Introduction
+
+ Density Functional Theory (DFT) - Rutgers Physics
+
+Many-Body Perturbation Theory - an overview | ScienceDirect Topics
+
+ Brief History of Electronic Structure Calculations in Computational ...
+
+Density functional theory: Its origins, rise to prominence, and future
+
+Abinitio simulations of materials using VASP: Densityfunctional ...
+
+Inhomogeneous Electron Gas | Phys. Rev.
+
+Self-Consistent Equations Including Exchange and Correlation Effects
+
+Ground State of the Electron Gas by a Stochastic Method
+
+Self-interaction correction to density-functional approximations for ...
+
+Generalized Gradient Approximation Made Simple | Phys. Rev. Lett.
+
+Density functional theory in the solid state - Journals
+
+ ienna imulation ackage b-initio - EHU
+
+History of VASP
+
+Georg Kresse - Google Scholar
+
+ ienna imulation ackage b-initio
+
+ Basics (DFT, PW, PAW, ) - VASP
+
+ Pseudopotentials (Part I): - VASP
+
+Projector augmented-wave method | Phys. Rev. B
+
+Does SCF calculation have to be done before calculating DOS?
+
+Structure optimization - VASP Wiki
+
+Computing the phonon dispersion and DOS - VASP Wiki
+
+Category:Exchange-correlation functionals - VASP Wiki
+
+https://www.vasp.at/wiki/GGA
+
+Hybrid functionals: formalism - VASP Wiki
+
+Toward reliable density functional methods without adjustable ...
+
+METAGGA - VASP Wiki
+
+A consistent and accurate ab initio parametrization of density ...
+
+https://www.vasp.at/wiki/DFT-D3
+
+Input - VASP Wiki
+
+POSCAR - VASP Wiki
+
+INCAR - VASP Wiki
+
+KPOINTS - VASP Wiki
+
+None
+
+Preparing a POTCAR - VASP Wiki
+
+OSZICAR - VASP Wiki
+
+OUTCAR - VASP Wiki
+
+CHGCAR - VASP Wiki
+
+WAVECAR - VASP Wiki
+
+Features VASPKIT 1.5 documentation
+
+p4vasp, the VASP Visualization Tool - GitHub
+
+VESTA - JP-Minerals
+
+A Density Functional Theory + U Study of Oxygen Vacancy ...
+
+The effect of vibrational entropy on the solubility and stability of ...
+
+The free energy of mechanically unstable phases - Nature
+
+ Li-intercalation Oxides for Rechargeable - Batteries - Ceder Group
+
+The CO/Pt(111) Puzzle | The Journal of Physical Chemistry B
+
+A DFT study of CO adsorption on pt (111) using van der Waals ...
+
+Computing the work function - VASP Wiki
+
+Electrostatic corrections - VASP Wiki
+
+A simplified methodology for the modeling of interfaces of ...
+
+Electronic properties of low- grain boundaries in InAs
+
+What Controls Photocatalytic Water Oxidation on Rutile TiO2(110 ...
+
+The adsorption and dissociation of H 2 O on TiO 2 (110) and M/TiO 2 ...
+
+VASP - Vienna Ab initio Simulation Package
+
+Contact - VASP
+
+FAQs - VASP
+
+How can I purchase a VASP license?
+
+VASP - ALCF User Guides - Argonne National Laboratory
+
+VASP - Center for High Performance Computing - chpc.utah.edu
+
+ Mississippi State University Notice of Proposed Sole Source ...
+
+https://www.vasp.at/wiki/The_VASP_Manual
+
+Tutorials - VASP
+
+Forum - VASP
+
+VASP workshop - VASP Wiki
+
+News - VASP
+
+Vienna Ab initio Simulation Package (VASP)
+
+VASP ASE documentation
+
+Known issues - VASP Wiki
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

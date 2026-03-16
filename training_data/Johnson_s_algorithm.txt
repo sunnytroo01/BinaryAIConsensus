@@ -1,0 +1,360 @@
+Johnson's algorithm Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Johnson's algorithm
+ Ara Eve Leo Sal 
+1x
+ Johnson's algorithm is a graph algorithm that computes the shortest paths between all pairs of vertices in a directed graph with arbitrary edge weights, including negative weights, provided there are no negative-weight cycles. It achieves this by reweighting the edges to eliminate negative weights while preserving the shortest path distances, allowing the use of more efficient single-source shortest path algorithms on the modified graph.
+Introduced by Donald B. Johnson in 1977, the algorithm addresses the all-pairs shortest paths (APSP) problem, which is fundamental in network analysis, routing, and optimization tasks where distances or costs must be determined between every pair of nodes. Unlike the FloydWarshall algorithm, which runs in O(n) time regardless of graph density and handles negative weights directly through dynamic programming, Johnson's algorithm is particularly advantageous for sparse graphs (where the number of edges m is much smaller than n, with n being the number of vertices), offering a time complexity of O(nm + n log n) when using a Fibonacci heap implementation for Dijkstra's algorithm.
+The algorithm proceeds in several key steps: first, a dummy vertex is added with zero-weight edges to all original vertices, and the BellmanFord algorithm is run from this dummy source to compute potential values h(v) for each vertex v, which represent the shortest path distances from the dummy to v and detect any negative cycles if present. Next, the edge weights are reweighted as w'(u, v) = w(u, v) + h(u) - h(v), ensuring all new weights are non-negative without altering the relative shortest path lengths between original vertices. Then, Dijkstra's algorithm is executed from each of the n original vertices on the reweighted graph to obtain the shortest paths in this non-negative setting. Finally, the original distances are recovered by adjusting the computed distances with the potentials: (u, v) = '(u, v) + h(v) - h(u). This reweighting technique, based on the property that adding a constant to all edges in a path does not change the shortest path selection, is a core innovation that combines the generality of BellmanFord with the efficiency of Dijkstra.
+Johnson's algorithm handles disconnected components implicitly through the dummy vertex addition, but it requires the absence of negative cycles, which would make shortest paths undefined. Its efficiency stems from performing only one BellmanFord run (O(nm) time) followed by n Dijkstra runs, making it superior to repeatedly applying BellmanFord from each source, which would take O(nm) time. In practice, it has been influential in theoretical computer science and applications like transportation networks and telecommunication routing, where graphs are often sparse and may include negative costs representing penalties or savings.
+
+Overview and Background
+
+Problem Statement
+
+Johnson's algorithm solves the all-pairs shortest paths (APSP) problem, which requires computing the shortest path distances between every pair of vertices in a directed, edge-weighted graph $ G = (V, E) $, where edge weights $ w(u, v) $ may be negative. The input consists of a graph with $ n = |V| $ vertices and $ m = |E| $ edges, along with the weight function $ w: E \to \mathbb{R} $; the output is an $ n \times n $ distance matrix where $ \delta(u, v) $ denotes the minimum total weight of any path from vertex $ u $ to vertex $ v $, or $ \infty $ if no such path exists.
+This problem arises in scenarios involving directed graphs with negative weights, such as financial networks or certain optimization models, where standard single-source algorithms like Dijkstra's fail due to their assumption of non-negative edge weights. In contrast, the Floyd-Warshall algorithm correctly handles negative weights and solves APSP in $ O(n^3) $ time, but this cubic complexity becomes prohibitive for large graphs.
+The algorithm assumes the graph contains no negative-weight cycles, as such cycles would render shortest paths undefined by allowing arbitrarily small distances; this condition can be verified using the Bellman-Ford algorithm in $ O(nm) $ time. The graph need not be strongly connected, with distances set to $ \infty $ for unreachable pairs. The primary motivation for specialized methods like Johnson's is to achieve efficiency in sparse graphs, where $ m \ll n^2 $, outperforming dense-graph approaches that scale poorly with sparsity.
+
+Historical Development
+
+Johnson's algorithm for the all-pairs shortest path problem was invented by Donald B. Johnson and first published in 1977.
+The algorithm appeared in the paper titled "Efficient Algorithms for Shortest Paths in Sparse Networks," published in the Journal of the ACM, Volume 24, Issue 1, pages 113. Johnson's work was motivated by the need for efficient solutions to shortest path problems in sparse networks, a common challenge in operations research and network analysis at the time.
+The development of Johnson's algorithm drew influences from earlier shortest path algorithms, particularly the Bellman-Ford algorithm for handling graphs with negative edge weights, originally described by Richard Bellman in 1958, and Edsger W. Dijkstra's 1959 algorithm for graphs with non-negative weights. Johnson integrated a reweighting technique using potentialscomputed via a variant of Bellman-Fordto transform negative weights into non-negative ones, enabling repeated applications of Dijkstra's algorithm for all-pairs computation.
+Following its publication, Johnson's algorithm gained prominence in the algorithms literature and was included in the second edition (2001) and subsequent editions of Introduction to Algorithms by Cormen, Leiserson, Rivest, and Stein. The core method has seen no major updates since 1977, though practical implementations have proliferated, such as in the Python library NetworkX, where it has been available since the library's early development in the 2000s.
+The original paper by Johnson did not incorporate advanced priority queue structures like Fibonacci heaps, which were introduced later in the 1980s by Fredman and Tarjan to optimize Dijkstra's algorithm within Johnson's framework, improving the time complexity for sparse graphs to O(mn + n log n), where m is the number of edges and n is the number of vertices.
+
+Core Components
+
+Potential Reduction Technique
+
+In Johnson's algorithm, vertex potentials are real-valued functions $ h: V \to \mathbb{R} $ assigned to each vertex $ v $ in the directed graph $ G = (V, E) $ with edge weights $ w: E \to \mathbb{R} $, such that the reweighted edge weights $ w'(u,v) = w(u,v) + h(u) - h(v) \geq 0 $ for all edges $ (u,v) \in E $. This reweighting transforms the graph into one with non-negative weights, enabling the use of algorithms like Dijkstra's that require such conditions, while ensuring no negative cycles exist in the original graph.
+The key property of these potentials is that they preserve the relative shortest path distances between vertices. Specifically, for any path $ P $ from source $ s $ to target $ t $, the total reweighted length equals the original path length plus a constant shift $ h(s) - h(t) $:
+w(P)=(u,v)Pw(u,v)=(u,v)Pw(u,v)+h(s)h(t)=w(P)+h(s)h(t).
+w'(P) = \sum_{(u,v) \in P} w'(u,v) = \sum_{(u,v) \in P} w(u,v) + h(s) - h(t) = w(P) + h(s) - h(t).
+w(P)=(u,v)Pw(u,v)=(u,v)Pw(u,v)+h(s)h(t)=w(P)+h(s)h(t).
+This additive offset is identical for all paths from $ s $ to $ t $, so the shortest path in the original graph remains the shortest in the reweighted graph, and vice versa.
+To compute the potentials $ h(v) $, an auxiliary dummy node $ q $ is introduced, connected to every vertex $ v \in V $ by edges of weight 0. The shortest-path distances $ \delta(q, v) $ from $ q $ to each $ v $ are then calculated using the Bellman-Ford algorithm, with $ h(v) = \delta(q, v) $. If Bellman-Ford detects a negative cycle reachable from $ q $, the original graph contains a negative cycle, rendering shortest paths undefined; otherwise, the resulting $ h(v) $ guarantees non-negative reweighted edges.
+The mathematical justification relies on the triangle inequality in the reweighted graph. For any vertices $ u, v \in V $,
+w(u,v)w(u,x)+w(x,v)
+w'(u,v) \leq w'(u,x) + w'(x,v)
+w(u,v)w(u,x)+w(x,v)
+holds if and only if the original inequality $ w(u,v) \leq w(u,x) + w(x,v) $ does, because the potentials cancel out in the reweighting. A path is shortest from $ s $ to $ t $ in the original graph if and only if it is shortest in the reweighted graph, as the constant shift $ h(s) - h(t) $ does not alter the ordering of path lengths from $ s $ to $ t $. This equivalence ensures that all-pairs shortest paths can be computed by running Dijkstra's algorithm on the reweighted graph from each source and adjusting the distances by subtracting $ h(s) - h(t) $.
+
+Underlying Algorithms
+
+The Bellman-Ford algorithm computes shortest paths from a single source vertex in a directed graph that may contain negative edge weights, as long as no negative-weight cycles exist. It initializes distances from the source to all other vertices as infinity, except the source itself which is zero, and then iteratively relaxes every edge in the graph exactly |V| - 1 times, where |V| is the number of vertices; in each relaxation step, for every edge (u, v) with weight w, the distance to v is updated if a shorter path through u is found. Following these iterations, a final relaxation pass checks for negative cycles by attempting one more relaxation; if any distance updates occur, a negative cycle is present. The algorithm's time complexity is O(|V| |E|), where |E| is the number of edges, making it suitable for sparse graphs but inefficient for dense ones due to the repeated full-edge scans.
+In Johnson's algorithm for all-pairs shortest paths (APSP), the Bellman-Ford algorithm plays a crucial preparatory role by computing vertex potentials h(v) for all v in V. To achieve this, a dummy source vertex q is added with edges of weight zero from q to every vertex in the original graph G = (V, E); Bellman-Ford is then run from q to obtain these potentials, which represent the shortest path distances from q. This step also detects any negative cycles in G, halting the process if found, as APSP is undefined in such cases.
+// Basic Bellman-Ford relaxation loop (from source s)
+initialize dist = 0, dist = for v s
+for i = 1 to |V| - 1:
+ for each edge (u, v) in E:
+ if dist > dist + w(u, v):
+ dist = dist + w(u, v)
+// Check for negative cycles
+for each edge (u, v) in E:
+ if dist > dist + w(u, v):
+ report negative cycle
+Dijkstra's algorithm, enhanced with Fibonacci heaps for efficiency, finds shortest paths from a single source in graphs with non-negative edge weights. It maintains a priority queue of vertices, initially containing the source with priority zero and others with infinity; repeatedly, it extracts the vertex u with the minimum distance, marks it as processed, and relaxes all outgoing edges from u by updating neighbors' priorities if a shorter path is discovered. The use of Fibonacci heaps supports decrease-key operations in amortized O(1) time, yielding an overall time complexity of O(|V| log |V| + |E|) per source vertex. This implementation is particularly effective for sparse graphs, as the heap operations scale well with the number of edges.
+Within Johnson's algorithm, Dijkstra's algorithm (with potentials applied via the earlier Bellman-Ford step to ensure non-negative reweighted edges) is executed once from each vertex in V to compute the APSP matrix. Specifically, for each source s, the reweighted graph has edge weights w'(u, v) = w(u, v) + h(u) - h(v), which are non-negative, allowing Dijkstra's to efficiently find shortest paths in this transformed graph; the original distances are recovered by adjusting with the potentials. This repeated application leverages Dijkstra's speed on non-negative weights to achieve efficient APSP overall. The potential reduction technique, detailed previously, enables this use of Dijkstra's despite original negative weights.
+// Dijkstra's with Fibonacci heap (from source s, non-negative weights)
+initialize dist = 0, dist = for v s
+priority_queue Q with all vertices (key = dist)
+while Q is not empty:
+ u = extract_min(Q)
+ for each neighbor v of u:
+ if dist > dist + w(u, v):
+ dist = dist + w(u, v)
+ decrease_key(Q, v, dist)
+A key limitation of the Bellman-Ford algorithm is its O(|V| |E|) time complexity, which becomes prohibitive for dense graphs where |E| approaches |V|^2, leading to up to O(|V|^3) performance. Dijkstra's algorithm, while faster at O(|V| log |V| + |E|) with Fibonacci heaps, cannot handle negative weights directly, as the greedy extraction of minimum-distance vertices may overlook shorter paths that temporarily increase distance; in Johnson's context, this is mitigated by the potential reweighting to enforce non-negativity.
+
+Algorithm Procedure
+
+Step-by-Step Description
+
+Johnson's algorithm begins by augmenting the input directed graph $ G = (V, E) $ with edge weights $ w(u, v) $ that may include negative values but no negative cycles. A new dummy vertex $ q $ is added, connected to every vertex $ v \in V $ by an edge of weight 0. This step ensures that $ q $ can reach all vertices in the modified graph, facilitating the computation of potentials without assuming strong connectivity.
+Next, the Bellman-Ford algorithm is executed with $ q $ as the source to compute the shortest-path distances $ h(v) = \delta(q, v) $ for all $ v \in V $. If Bellman-Ford detects a negative cycle during this phaseindicated by further relaxation being possible after $ |V| - 1 $ iterationsthe algorithm aborts, as the shortest paths are undefined in the presence of negative cycles. Otherwise, the potentials $ h(v) $ are obtained, providing a feasible solution to the single-source shortest paths problem from $ q $.
+The graph edges are then reweighted using the potentials: for each edge $ (u, v) \in E $, the new weight is set to $ w'(u, v) = w(u, v) + h(u) - h(v) $. This reweighting preserves the shortest-path distances between any pair of vertices while ensuring all $ w'(u, v) \geq 0 $, as the potentials satisfy the triangle inequality in the original graph. The dummy vertex $ q $ is subsequently removed from the graph.
+Finally, for each vertex $ s \in V $ as a source, Dijkstra's algorithm is run on the reweighted graph $ G $ with non-negative weights $ w' $ to compute the shortest-path distances $ \delta'(s, v) $ from $ s $ to all $ v \in V $. The original distances are recovered via $ \delta(s, v) = \delta'(s, v) + h(v) - h(s) $. If no path exists from $ s $ to $ v $ in the reweighted graph, $ \delta(s, v) $ is set to $ \infty $. This overall procedure transforms the all-pairs shortest paths problem into multiple single-source problems solvable with non-negative weights, enabling efficient computation even on sparse graphs.
+
+Pseudocode
+
+The pseudocode for Johnson's algorithm, as described by Johnson (1977), assumes a directed graph $ G = (V, E) $ represented as an adjacency list, where each edge $ (u, v) $ has a weight $ w(u, v) $ that may be negative but with no negative cycles. The algorithm first computes shortest-path potentials $ h(v) $ using Bellman-Ford on an augmented graph, reweights edges to ensure non-negativity, and then runs Dijkstra's algorithm from each source vertex using a binary heap priority queue for efficiency on sparse graphs. Infinity handling is included for unreachable vertices in disconnected components, and negative cycle detection is performed via an extra relaxation iteration in Bellman-Ford.
+function BellmanFord(G, s):
+ // Initialize distances
+ dist = (/page/Array) of size |V|, initialized to 
+ dist = 0
+ 
+ // Relax |V|-1 times
+ for i = 1 to |V|-1:
+ updated = false
+ for each edge (u, v, w) in G:
+ if dist and dist + w < dist:
+ dist = dist + w
+ updated = true
+ if not updated:
+ break // Early termination if no updates
+ 
+ // Check for negative cycles
+ for each edge (u, v, w) in G:
+ if dist and dist + w < dist:
+ return "Negative cycle detected"
+ 
+ return dist
+
+function Reweight(G, h):
+ // Modify edge weights in place
+ for each edge (u, v, w) in G:
+ w = w + h - h // Ensures w 0 if no negative cycles
+
+function Dijkstra(G, s):
+ // Assumes non-negative weights post-reweighting
+ dist = array of size |V|, initialized to 
+ dist = 0
+ pq = priority queue, insert (s, 0)
+ 
+ while pq not empty:
+ u = extract min from pq
+ if dist < extracted distance: continue // Obsolete entry
+ for each neighbor v of u with weight w:
+ if dist + w < dist:
+ dist = dist + w
+ decrease key in pq for v to dist
+ 
+ return dist // for unreachable vertices
+
+function Johnson(G):
+ // Add auxiliary vertex q
+ q = new vertex
+ V.add(q)
+ for each v in original V:
+ E.add((q, v, 0))
+ 
+ // Compute potentials h
+ h = BellmanFord(G, q)
+ if h == "Negative cycle detected":
+ return "Negative cycle exists"
+ 
+ // Remove auxiliary vertex
+ V.remove(q)
+ for each v in original V:
+ remove edge (q, v, 0) from E
+ 
+ // Reweight edges
+ Reweight(G, h)
+ 
+ // Compute all-pairs shortest paths
+ dist = 2D array |V| |V|, initialized to 
+ for each s in V:
+ d = Dijkstra(G, s)
+ for each v in V:
+ if d :
+ dist = d + h - h
+ // else: remains for disconnected components
+ 
+ return dist
+The reweighting step applies the transformation $ w'(u,v) = w(u,v) + h(u) - h(v) $ to eliminate negative weights while preserving shortest-path distances. In the main loop, the distance adjustment $ \delta(s,v) = \delta'(s,v) + h(v) - h(s) $ recovers the original shortest paths after each Dijkstra run.
+
+Illustrative Example
+
+Graph Setup
+
+To illustrate Johnson's algorithm, consider a directed graph $ G = (V, E) $ with $ |V| = 4 $ vertices labeled A, B, C, and D, and $ |E| = 7 $ edges, some of which have negative weights but no negative-weight cycles. This sparse graph serves as a representative example for the all-pairs shortest paths (APSP) problem in networks where negative edge weights are present, highlighting why Johnson's algorithm is more efficient than the $ O(|V|^3) $ Floyd-Warshall algorithm for sparse structures with $ |E| \ll |V|^2 $.
+The edges and their weights are as follows:
+
+A B: 3
+
+A C: 6
+
+A D: 9
+
+B C: -5
+
+B D: 2
+
+C D: 7
+
+D A: 4
+
+This configuration includes one negative-weight edge (B C) and ensures no negative cycles exist, as all possible cycles have positive total weight (e.g., the cycle A B C D A sums to 3 + (-5) + 7 + 4 = 9 > 0).
+For visual representation, the graph can be depicted using an adjacency list:
+
+A: B(3), C(6), D(9)
+
+B: C(-5), D(2)
+
+C: D(7)
+
+D: A(4)
+
+The negative edge B C is highlighted in bold to emphasize the challenge of negative weights, which precludes direct use of Dijkstra's algorithm without modification.
+To apply Johnson's algorithm, a dummy node q is introduced, connected to all original vertices with zero-weight edges: q A(0), q B(0), q C(0), q D(0). This augmented graph $ G' $ has $ |V'| = 5 $ and $ |E'| = 11 $, facilitating the initial Bellman-Ford computation from q.
+The expected output of the algorithm on this input is the all-pairs shortest-path distance matrix:
+From \ ToABCD
+A03-25
+B60-52
+C111407
+D4720
+This matrix provides the shortest-path distances between every pair of vertices, accounting for the negative weight via reweighting.
+
+Execution Walkthrough
+
+To apply Johnson's algorithm to the illustrative graph with vertices A, B, C, and D, begin with Step 1 by introducing a new auxiliary vertex q and adding directed edges from q to each of A, B, C, and D with weight 0; this extended graph has no negative cycles, as assumed for the original graph.
+In Step 2, execute the Bellman-Ford algorithm from source q on the extended graph to compute the potential function h(v), which gives the shortest-path distances from q to each vertex v. The resulting potentials are h(A) = 0, h(B) = 0, h(C) = -5, and h(D) = 0, confirming the absence of negative cycles since Bellman-Ford converges after |V| - 1 iterations.
+These potentials can be summarized in the following table:
+Vertexh(v)
+A0
+B0
+C-5
+D0
+Proceed to Step 3 by reweighting all original edges (excluding those from q) using the formula w'(u, v) = w(u, v) + h(u) - h(v), which ensures all reweighted edge weights w' are non-negative while preserving shortest-path distances in the original graph. For instance, consider the edge from B to C with original weight w(B, C) = -5; the reweighted value is w'(B, C) = -5 + 0 - (-5) = 0. Similar computations apply to all other edges, yielding a reweighted graph where every w'(u, v) 0.
+The reweighted edges are shown below:
+EdgeOriginal w(u, v)h(u)h(v)w'(u, v)
+A B3003
+A C60-511
+A D9009
+B C-50-50
+B D2002
+C D7-502
+D A4004
+In Step 4, run Dijkstra's algorithm on the reweighted graph from each original source vertex s {A, B, C, D} to obtain the shortest-path distances '(s, v) in the reweighted graph; adjust these back to the original weights using (s, v) = '(s, v) + h(v) - h(s). For example, from source A, Dijkstra's yields '(A, C) = 3 in the reweighted graph (via path A B C with weights 3 + 0); the original distance is then (A, C) = 3 + (-5) - 0 = -2, preserving the negative weight structure of the graph. Repeat this for all sources to compute the full all-pairs shortest paths.
+The final shortest-path distance matrix in the original graph (partial, focusing on key paths to verify negative distances are maintained) is as follows:
+From \ ToABCD
+A0(TBD)-2(TBD)
+B(TBD)0(TBD)(TBD)
+C(TBD)(TBD)0(TBD)
+D(TBD)(TBD)(TBD)0
+This matrix confirms that negative paths, such as A to C, are accurately captured without alteration from the reweighting process.
+
+Theoretical Foundations
+
+Correctness Proof
+
+The correctness of Johnson's algorithm relies on the properties of the reweighting scheme and the guarantees provided by its subroutines, assuming the input directed graph G=(V,E)G = (V, E)G=(V,E) with edge weights w:ERw: E \to \mathbb{R}w:ER contains no negative-weight cycles. The algorithm first augments GGG by adding a new source vertex sss with zero-weight edges to all vertices in VVV, then computes shortest-path distances h(v)=(s,v)h(v) = \delta(s, v)h(v)=(s,v) from sss using Bellman-Ford. These distances serve as node potentials for reweighting: the modified weights are defined as w(u,v)=w(u,v)+h(u)h(v)w'(u, v) = w(u, v) + h(u) - h(v)w(u,v)=w(u,v)+h(u)h(v) for each edge (u,v)E(u, v) \in E(u,v)E. Subsequent applications of Dijkstra's algorithm on the reweighted graph G=(V,E,w)G' = (V, E, w')G=(V,E,w) yield adjusted distances, from which the original shortest-path distances are recovered. The proof proceeds via lemmas establishing the invariance of path lengths under reweighting and the non-negativity of ww'w, culminating in a theorem on distance equivalence.
+Lemma 1 (Path Length Preservation under Reweighting). For any path P=(v0,v1,,vk)P = (v_0, v_1, \dots, v_k)P=(v0,v1,,vk) from v0v_0v0 to vkv_kvk in GGG, the total weight of PPP under ww'w satisfies
+w(P)=i=1kw(vi1,vi)=w(P)+h(v0)h(vk),
+w'(P) = \sum_{i=1}^k w'(v_{i-1}, v_i) = w(P) + h(v_0) - h(v_k),
+w(P)=i=1kw(vi1,vi)=w(P)+h(v0)h(vk),
+where w(P)w(P)w(P) is the total weight under the original www.
+This follows by direct substitution and telescoping: each intermediate term h(vi)h(v_i)h(vi) for 1ik11 \leq i \leq k-11ik1 cancels out in the sum i=1k(h(vi1)h(vi))\sum_{i=1}^k (h(v_{i-1}) - h(v_i))i=1k(h(vi1)h(vi)), leaving h(v0)h(vk)h(v_0) - h(v_k)h(v0)h(vk). Consequently, the relative ordering of paths between any pair of vertices is preserved, as all paths from a fixed source uuu to a fixed target ttt differ by the constant h(u)h(t)h(u) - h(t)h(u)h(t) in GG'G.
+Lemma 2 (Non-Negative Weights via Potentials). The potentials h(v)h(v)h(v) computed by Bellman-Ford ensure w(u,v)0w'(u, v) \geq 0w(u,v)0 for all edges (u,v)E(u, v) \in E(u,v)E.
+Bellman-Ford guarantees that h(v)h(v)h(v) satisfies the triangle inequality h(v)h(u)+w(u,v)h(v) \leq h(u) + w(u, v)h(v)h(u)+w(u,v) for every edge (u,v)(u, v)(u,v), with equality holding along shortest paths from sss. Rearranging yields w(u,v)h(v)h(u)w(u, v) \geq h(v) - h(u)w(u,v)h(v)h(u), so w(u,v)0w'(u, v) \geq 0w(u,v)0. This holds provided no negative cycles exist, as otherwise some h(v)=h(v) = -\inftyh(v)=. In graphs with negative weights but no negative cycles (e.g., directed acyclic graphs or graphs where negative edges do not form cycles), such finite potentials always exist, allowing the reweighting to succeed.
+Theorem (Correctness of Shortest-Path Distances). Let (u,v)\delta(u, v)(u,v) denote the shortest-path distance from uuu to vvv in GGG, and let (u,v)\delta'(u, v)(u,v) be the corresponding distance in GG'G. Then (u,v)=(u,v)+h(v)h(u)\delta(u, v) = \delta'(u, v) + h(v) - h(u)(u,v)=(u,v)+h(v)h(u).
+The proof is by induction on the length of the shortest path from uuu to vvv. For the base case of length 0 (u=vu = vu=v), both sides are zero. Assume true for all paths of length less than kkk; for a shortest path PPP of length kkk from uuu to vvv via some intermediate www, Lemma 1 implies w(P)=w(P)+h(u)h(v)w'(P) = w(P) + h(u) - h(v)w(P)=w(P)+h(u)h(v). By the induction hypothesis, (u,v)w(P)\delta'(u, v) \leq w'(P)(u,v)w(P) with equality for the shortest PP'P in GG'G, and since Dijkstra's algorithm correctly computes \delta' on the non-negative graph GG'G (by Lemma 2), the original distances recover correctly. Lemma 1 further ensures that shortest paths in GGG map to shortest paths in GG'G and vice versa.
+If the graph contains a negative cycle, Bellman-Ford detects it during the computation of h(v)h(v)h(v) (as some distance would relax indefinitely, yielding -\infty), and the algorithm aborts without proceeding to Dijkstra's steps. The addition of sss introduces no new cycles, so any negative cycle reachable from sss corresponds to one in the original graph.
+
+Complexity Analysis
+
+Johnson's algorithm consists of three main phases: computing vertex potentials using Bellman-Ford, reweighting the edges, and executing Dijkstra's algorithm from each vertex on the reweighted graph. The Bellman-Ford phase, which adds a dummy vertex connected to all others with zero-weight edges and computes shortest paths from it to detect negative cycles and obtain potentials h(v)h(v)h(v), runs in O(VE)O(|V||E|)O(VE) time, where V|V|V is the number of vertices and E|E|E is the number of edges. The reweighting step, which adjusts each edge weight w(u,v)w(u,v)w(u,v) to w(u,v)=w(u,v)+h(u)h(v)w'(u,v) = w(u,v) + h(u) - h(v)w(u,v)=w(u,v)+h(u)h(v) to ensure non-negativity, requires O(E)O(|E|)O(E) time.
+Following reweighting, the algorithm performs V|V|V invocations of Dijkstra's algorithm, one from each vertex as the source, to compute all-pairs shortest paths in the modified graph. When implemented with Fibonacci heaps, each Dijkstra run takes O(E+VlogV)O(|E| + |V| \log |V|)O(E+VlogV) time. Thus, the total time for all Dijkstra runs is O(VE+V2logV)O(|V||E| + |V|^2 \log |V|)O(VE+V2logV). Combining all phases, the overall time complexity of Johnson's algorithm is O(VE+V2logV)O(|V||E| + |V|^2 \log |V|)O(VE+V2logV).
+For space complexity, the algorithm requires O(V2)O(|V|^2)O(V2) space to store the final all-pairs distance matrix, in addition to O(E)O(|E|)O(E) space for representing the graph and auxiliary structures during computation.
+Optimizations are possible depending on the implementation of Dijkstra's algorithm and edge weight properties. For graphs with small integer edge weights (bounded by WWW), Dial's algorithma bucket-queue variant of Dijkstracan replace the heap-based version, yielding O(E+VW)O(|E| + |V|W)O(E+VW) time per run and thus an overall time of O(VE+V2W)O(|V||E| + |V|^2 W)O(VE+V2W). Using binary heaps instead of Fibonacci heaps for Dijkstra increases the per-run time to O(E+VlogV)O(|E| + |V| \log |V|)O(E+VlogV) in practice but asymptotically O((E+V)logV)O((|E| + |V|) \log |V|)O((E+V)logV), leading to a total of O(V(E+VlogV))O(|V|(|E| + |V| \log |V|))O(V(E+VlogV)).
+This complexity outperforms running Bellman-Ford VVV times, which would take O(V2E)O(|V|^2 |E|)O(V2E), particularly for sparse graphs where EV|E| \approx |V|EV, reducing the bound to roughly O(V2logV)O(|V|^2 \log |V|)O(V2logV). For dense graphs where E=(V2)|E| = \Theta(|V|^2)E=(V2), the VE|V||E|VE term dominates, yielding O(V3)O(|V|^3)O(V3), comparable to Floyd-Warshall but with higher constants. The algorithm excels asymptotically when E=O(VlogV)|E| = O(|V| \log |V|)E=O(VlogV), where the total time simplifies to O(V2logV)O(|V|^2 \log |V|)O(V2logV).
+
+Applications and Comparisons
+
+Practical Applications
+
+Johnson's algorithm finds application in network routing, particularly for route discovery in software-defined networks (SDN). In such systems, it computes all-pairs shortest paths more efficiently than traditional protocols like OSPF during initial route searches, achieving reduced response times.
+In transportation optimization, the algorithm supports shortest path analysis in large-scale road networks, including scenarios with big data volumes from traffic sensors. It handles sparse graphs effectively, enabling path computations that account for penalties modeled as negative weights, such as route preferences or subsidies in policy-based routing extensions.
+Implementations of Johnson's algorithm are available in established software libraries, enhancing its use in simulations and analyses. The Boost Graph Library in C++ provides a robust implementation for computing all-pairs shortest paths in graphs with negative weights, suitable for traffic simulation and network modeling. Similarly, the igraph library in R employs Johnson's algorithm for distance calculations in graphs with negative edges when handling multiple sources, as in social network or transportation studies.
+Despite these uses, Johnson's algorithm sees limited application in very large graphs due to its time complexity, which requires running Dijkstra's algorithm |V| times after reweighting, leading to O(VE + V^2 \log V) overall; for massive networks exceeding thousands of vertices, approximations or parallel variants are often preferred.
+
+Comparisons with Alternatives
+
+Johnson's algorithm offers significant advantages over the Floyd-Warshall algorithm for sparse directed graphs with negative edge weights, achieving a time complexity of O(V2logV+VE)O(|V|^2 \log |V| + |V| |E|)O(V2logV+VE) compared to Floyd-Warshall's O(V3)O(|V|^3)O(V3), making it preferable when E<V2/logV|E| < |V|^2 / \log |V|E<V2/logV. Floyd-Warshall, while simpler to implement and capable of handling negative weights without cycles, performs poorly on sparse graphs due to its cubic dependence on V|V|V, regardless of edge density. In contrast, Johnson's reweighting technique enables efficient use of Dijkstra's algorithm after transforming weights to non-negative values, reducing the overall cost for low-density networks.
+Running the Bellman-Ford algorithm V|V|V times provides a correct all-pairs shortest paths solution for graphs with negative weights, but at a time complexity of O(V2E)O(|V|^2 |E|)O(V2E), which is asymptotically slower than Johnson's approach for sparse graphs. Johnson's method improves upon this baseline by applying Bellman-Ford only once to compute potentials for reweighting, followed by V|V|V invocations of Dijkstra's algorithm, yielding better performance when E|E|E is o(VlogV)o(|V| \log |V|)o(VlogV). This reweighting step eliminates the need for repeated relaxations across all vertices, making Johnson more efficient without sacrificing correctness under the no-negative-cycle assumption.
+Modern variants like the Thorup-Zwick algorithm from 2001 offer approximate all-pairs shortest paths for undirected graphs with non-negative weights in expected O(mn1/k)O(mn^{1/k})O(mn1/k) preprocessing time with stretch 2k12k-12k1 for parameter k2k \geq 2k2, but they do not support directed graphs or negative weights, limiting their applicability compared to Johnson's exact solution for the latter cases. Johnson's algorithm requires the absence of negative cycles to ensure finite shortest paths, and while it is space-efficient for sparse graphs by avoiding dense intermediate structures during Dijkstra runs, it ultimately produces the full VV|V| \times |V|VV distance matrix. It is particularly suitable for sparse directed graphs with negative weights, such as those with V|V|V up to 10410^4104 and E105|E| \approx 10^5E105, where its complexity provides practical speedups.
+Although the original formulation of Johnson's algorithm from 1977 does not incorporate parallelization, recent GPU implementations developed post-2010 have accelerated its variants, achieving speedups of more than 4.5x over CPU versions on large sparse graphs by parallelizing the Dijkstra phases. These enhancements address scalability limitations in modern hardware environments while preserving the core reweighting strategy.
+
+References
+
+Efficient Algorithms for Shortest Paths in Sparse Networks
+
+ Lecture 14: Johnson's Algorithm - MIT OpenCourseWare
+
+ Johnson's Algorithm for All-Pairs Shortest Paths
+
+ Johnson's Algorithm
+
+Shortest Paths - Algorithms, 4th Edition
+
+ DP: All Pairs Shortest Paths, The Floyd-Warshall Algorithm
+
+johnson NetworkX 3.5 documentation
+
+Network Flow Theory. - RAND
+
+ Johnson's Algorithm - Web - UNLV Computer Science
+
+Johnson's algorithm for All-pairs shortest paths - GeeksforGeeks
+
+Fibonacci heaps and their uses in improved network optimization ...
+
+Implementation Of Johnson's Shortest Path Algorithm For Route ...
+
+https://ieeexplore.ieee.org/document/10883374
+
+ Solving the Nearly Symmetric All-Pairs Shortest-Path Problem
+
+Network orientation via shortest paths - Oxford Academic
+
+Johnson All Pairs Shortest Paths - Boost
+
+distances - igraph R manual pages
+
+All-Pairs Shortest Paths: Johnson's Algorithm - Baeldung
+
+ Improving The Floyd-Warshall All Pairs Shortest Paths Algorithm
+
+Accelerating Johnson's All-Pairs Shortest Paths Algorithm on GPU
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

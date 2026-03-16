@@ -1,0 +1,472 @@
+Itanium Grokipedia
+ 
+
+ Fact-checked by Grok 1 month ago 
+Itanium
+ Ara Eve Leo Sal 
+1x
+ The Itanium is a family of 64-bit microprocessors implementing the IA-64 instruction set architecture (ISA), jointly developed by Hewlett-Packard (HP) and Intel using the Explicitly Parallel Instruction Computing (EPIC) paradigm to enable high instruction-level parallelism (ILP) through compiler-driven optimizations. Designed primarily for high-end servers and workstations, it emphasizes advanced features such as explicit instruction bundling (three instructions per 128-bit bundle), predication to minimize branch penalties, data and control speculation to hide memory latencies, and a large register file including 128 general-purpose registers and 128 floating-point registers. Launched on May 29, 2001, with the initial Merced processor, Itanium aimed to address limitations of existing architectures like x86 by providing superior scalability for enterprise and technical computing workloads.
+The architecture's origins trace back to a 1994 partnership between HP and Intel, following HP's initial research into VLIW-based designs in the late 1980s, with the goal of creating a next-generation 64-bit platform for mission-critical applications. Subsequent generations, including Itanium 2 (introduced in 2002) and later models like Tukwila (2008) and Poulson (2012), incorporated multi-core designs, hyper-threading, larger caches, and process shrinks down to 32 nm, achieving up to 2x performance gains per generation while maintaining backward compatibility with IA-32 software. Despite early promisesuch as powering supercomputers and accumulating over $8.7 billion in revenue by 2007Itanium faced challenges from entrenched x86 ecosystems, limited software adoption, and competition from AMD's Opteron, leading to niche market positioning in areas like HP's Integrity servers.
+Intel announced the discontinuation of Itanium in January 2019 via Product Change Notification 116733-00, citing shifts in market demand toward x86-based products, with final orders accepted until January 30, 2020, and last shipments on July 29, 2021, for the Kittson series (Itanium 9700). Although support for existing systems continued through partners like HPE until December 31, 2025, the architecture's end marked the conclusion of a bold but ultimately unsuccessful attempt to redefine enterprise computing, influencing later designs in parallelism and compiler technologies.
+
+Architecture
+
+EPIC paradigm
+
+The Explicitly Parallel Instruction Computing (EPIC) paradigm, foundational to the Itanium architecture, shifts the responsibility of identifying instruction-level parallelism (ILP) from hardware to the compiler, allowing software to explicitly annotate independent instructions for concurrent execution and thereby minimizing runtime dependency resolution overhead. This design philosophy contrasts with conventional RISC and CISC approaches, which rely on complex hardware schedulers to detect parallelism dynamically, often at the cost of increased power consumption and design complexity.
+EPIC's origins trace back to advancements in VLIW research, notably the Multiflow TRACE project led by Josh Fisher in the 1980s, which pioneered trace schedulinga compiler technique for grouping instructions along likely execution paths to exploit ILP statically. This work influenced Hewlett-Packard's subsequent efforts, culminating in a 1993 collaboration with Intel to develop the IA-64 architecture, publicly announced in 1994 as a new computing paradigm to address limitations in scaling ILP for future processors.
+Central to EPIC are instruction bundles, fixed 128-bit units comprising three 41-bit instructions and a 5-bit template; the template encodes instruction types (e.g., integer, memory, or branch) and stop bits to delineate dependency boundaries, enabling the hardware to fetch and issue bundles atomically for parallel execution across multiple functional units. Complementing this, predicate execution employs 64 dedicated predicate registers to guard instructions conditionally, transforming branches into predicated operations that execute both paths simultaneously and nullify the incorrect one, thus reducing control hazards and enabling over 50% branch elimination in typical code.
+Proponents of EPIC asserted it could achieve superior instruction throughput by harnessing compiler sophistication for parallelism exposure, while permitting simpler hardware devoid of advanced decoders or reorder buffers, potentially supporting wider issue widths and larger register files for sustained performance in parallel workloads. For instance, by explicitly marking independent operations within bundles, EPIC avoids the latency of hardware ILP extraction, claiming up to 40% fewer branch mispredictions through predication alone.
+Unlike pure VLIW architectures, where the compiler bears full responsibility for schedulingincluding handling variable latencies via no-ops or delay slotsEPIC introduces hardware-assisted mechanisms for greater robustness, such as dynamic branch hints via predicate manipulation and interlocking to enforce dependencies without stalling the pipeline. These features enhance binary portability across processor generations and mitigate VLIW's sensitivity to compiler inaccuracies, though they still demand high-quality optimization tools for optimal efficacy.
+
+Instruction set and registers
+
+The IA-64 instruction set architecture (ISA), which underpins the Itanium processor family, is a 64-bit load-store design that separates memory operations from computation, enabling efficient pipelining and parallelism. It features a large register file to minimize memory accesses, including 128 general-purpose integer registers (GR0 through GR127), each 64 bits wide, used for addressing, arithmetic, and control flow; 128 floating-point registers (FR0 through FR127), each 82 bits to accommodate extended precision with status bits; 64 one-bit predicate registers (PR0 through PR63) for conditional execution; and 8 branch registers (BR0 through BR7), each 64 bits, dedicated to holding target addresses for branches and calls.
+Instructions in IA-64 employ a three-operand format, where most operations specify two source operands and one destination, promoting explicit data flow without implicit register reuse common in two-operand ISAs. To indicate parallelism, instructions are grouped into 128-bit bundles consisting of three 41-bit instructions and a 5-bit template that encodes dependencies and execution unit assignments, ensuring alignment on 16-byte boundaries for atomic fetch. Addressing modes include PC-relative displacement for position-independent code, such as in branch targets calculated as instruction pointer plus offset, and indirect addressing via base registers plus displacement or index for flexible memory access patterns. The architecture mandates little-endian byte order exclusively, with natural alignment required for loads and stores to avoid exceptions.
+Key instruction categories encompass integer operations like addition (add) for basic arithmetic and shifts (shl, shr) for bit manipulation; floating-point instructions including fused multiply-add (fma), which computes ab+ca \times b + cab+c in a single rounded operation to enhance precision and performance in numerical computations; memory instructions such as speculative loads (ld.s) that defer exceptions until use, paired with checks (chk.s) for control data speculation; and control-flow instructions like predicated branches (br) that execute conditionally based on predicate registers, reducing branch misprediction penalties, alongside call instructions (call) that link to branch registers for subroutine invocation. These categories support a wide range of computations while integrating predication across nearly all instructions to enable if-conversion during compilation.
+Distinctive features of the IA-64 ISA include register rotation, facilitated by a 7-bit register rename base (RRB) in the processor status register, which cyclically renames registers within the set to facilitate software loop unrolling and iteration without stack spills or explicit counter maintenance, ideal for vectorizable loops. Additionally, Not-a-Thing (NaT) valuesspecial 65th-bit indicators on general registersallow deferred exception handling in speculative execution; a load that faults sets a NaT bit instead of trapping immediately, enabling the computation to proceed until a consuming instruction like an add triggers resolution via a NaT check. These mechanisms, combined with bundle-based explicit parallelism, form the core of IA-64's programming model for high-performance computing.
+Register TypeDesignationCountWidthPrimary Use
+General-PurposeGR0GR12712864 bitsInteger arithmetic, addressing
+Floating-PointFR0FR12712882 bitsFloating-point operations
+PredicatePR0PR63641 bitConditional execution
+BranchBR0BR7864 bitsBranch targets and calls
+
+Microarchitecture features
+
+The Itanium processors employ a deep pipeline architecture optimized for the EPIC instruction set, with early designs featuring a 10-stage integer pipeline to accommodate wide instruction issue and high clock frequencies. Subsequent generations refined this to an 8-stage pipeline, decoupling the front-end fetch and back-end execution stages with an instruction buffer to sustain throughput of up to six instructions per cycle. These pipelines support out-of-order execution for loads and hardware mechanisms for speculative execution, including an Advanced Load Address Table (ALAT) to track speculative memory accesses and resolve dependencies dynamically.
+Execution units are designed for parallel operation, with configurations including multiple integer arithmetic logic units (ALUs), floating-point multipliers/accumulators (FMACs), and dedicated branch units per core. Baseline implementations provide four integer ALUs, two floating-point units, and three branch units, enabling peak rates of several gigaflops in floating-point operations; later evolutions expand to six ALUs, four FP units, and additional multimedia units for enhanced vector processing. Branch handling emphasizes compiler-provided static hints over dynamic hardware prediction to reduce complexity and power overhead, though limited hardware support for IP-relative branches achieves zero-cycle penalties on correct predictions.
+The memory subsystem features a split on-chip L1 cache with separate 16 KB instruction and 16 KB data caches, both four-way set-associative and write-through for low latency access. A unified on-chip L2 cache follows, typically 256 KB and eight-way associative, followed by an off-chip L3 cache of several megabytes that operates at core speed for high bandwidth. This hierarchy incorporates non-blocking designs and dynamic prefetching to tolerate latency in speculative workloads, with event monitoring for misses and references to aid performance tuning.
+Interconnects evolve from a shared front-side bus in initial models to point-to-point links in later generations, such as the QuickPath Interconnect (QPI), providing scalable bandwidth up to 6.4 GB/s per link for multi-socket systems. These support non-uniform memory access (NUMA) configurations, allowing up to four processors in glueless setups with coherent caching and up to 16 outstanding requests to maintain scalability in enterprise environments.
+Power and thermal efficiency improvements include extensive error-correcting code (ECC) coverage across caches and buses, along with voltage scaling introduced in later designs to reduce consumptionsuch as low-voltage variants operating at half the power of standard models while preserving performance. These features enable reliable operation in high-density servers, with mechanisms like phase shedding in voltage regulators to optimize idle power.
+
+Development history
+
+Inception and partnerships (19891994)
+
+In the late 1980s, Hewlett-Packard (HP) initiated internal research to develop a successor to its PA-RISC architecture, driven by the need for a more scalable 64-bit design to address limitations in handling increasingly complex enterprise workloads. This effort, which began as a secret project in December 1988 under HP Labs director Dick Lampman, focused on exploring advanced instruction-level parallelism to boost performance in high-end computing. Meanwhile, Intel, having learned from the commercial failure of its complex iAPX 432 microprocessor in the early 1980swhich aimed for high-level language support but suffered from performance issues and high costswas seeking opportunities to evolve beyond incremental x86 improvements toward a revolutionary enterprise-focused architecture.
+By late 1993, HP, facing the economic challenges of developing and manufacturing advanced processors independently, approached Intel to propose a collaboration on a 64-bit VLIW-based design, marking the start of formal joint efforts. This led to the official announcement on June 8, 1994, of a 50-50 partnership between HP and Intel to co-develop a new processor family codenamed Merced, intended to power future workstations and servers with superior scalability and efficiency. Key figures included HP's technical lead Jerry Huck, who advocated for the alliance, and Intel's senior vice president Albert Yu, who emphasized merging the companies' expertise to advance computer architecture. Intel's John Crawford was appointed to lead the joint design team, drawing on HP's research into explicit parallelism concepts.
+The partnership's primary goals were to create a clean-slate 64-bit architecture for enterprise computing that would supplant both x86 and existing RISC designs, targeting high-performance servers capable of explicit instruction scheduling to exploit parallelism without relying on hardware speculation. Initial visions outlined a processor aiming for clock speeds around 800 MHz and a 6-wide issue capability, though emphasis was placed on long-term innovation over precise near-term metrics, with production slated for the late 1990s. To ensure market adoption, the design incorporated plans for backward compatibility with x86 software through emulation, addressing early debates about forgoing native support in favor of a forward-looking ISA. This anticipated challenge highlighted tensions between innovation and legacy preservation, as HP and Intel sought to protect customer investments while pushing for a paradigm shift.
+
+Design phase and delays (19942001)
+
+The design of the Itanium processor, codenamed Merced during its development, evolved through a collaboration between Hewlett-Packard (HP) and Intel, shifting from HP's initial vision of a radically wide very long instruction word (VLIW) architecture toward a more practical explicitly parallel instruction computing (EPIC) approach. Early HP concepts explored issue widths as wide as 64 instructions to maximize instruction-level parallelism (ILP), but the joint effort scaled this down to a 6-wide execution pipeline that dispatched bundles of three 41-bit instructions within 128-bit words, balancing hardware complexity with compiler-driven scheduling. This EPIC paradigm incorporated semantics from HP's PA-RISC architecture, such as rotating register files for loop unrolling and predication to reduce branch penalties, enabling compilers to explicitly mark parallel operations without hardware speculation overhead.
+Development encountered substantial delays from 1994 to 2001, primarily due to process technology transitions from an initial 0.25 m node to the more advanced 0.18 m process to fit the chip's growing transistor count and performance needs, as well as the inherent complexity of verifying a design with over 25 million transistors. Verification efforts were hampered by the architecture's novelty, requiring extensive simulation to ensure EPIC bundle execution and branch prediction accuracy across billions of potential state combinations. Compiler development further contributed to lags, as optimizing for EPIC's reliance on static scheduling demanded new tools to identify ILP in legacy codebases, with early versions struggling to achieve expected parallelism without manual intervention.
+Key milestones highlighted these challenges: design verification issues delayed tape-out until July 1999, with first silicon produced in August 1999 but containing bugs in the execution pipeline and cache coherence, necessitating additional revisions. To accelerate tool development, Intel and HP partnered with universities, including efforts at institutions like the University of Illinois for compiler optimization research and simulation frameworks.
+Internal conflicts arose over resource allocation, as Intel increasingly prioritized enhancements to its dominant x86 architecture amid rising demand for Pentium processors, diverting engineering talent from the Itanium project. Debates intensified regarding x86 compatibility, culminating in the addition of a hardware emulation unit in 2000 to decode and execute legacy x86 instructions via a dedicated in-order pipeline, addressing concerns about software ecosystem migration without fully integrating x86 semantics into the core EPIC design.
+By 2001, the Merced design was frozen for production on the 0.18 m process at 800 MHz, but initial performance fell short of expectations, with SPECint_base2000 score of around 314 compared to approximately 480-550 for HP's PA-8700 and 400-550 for DEC Alpha 21264 at comparable clock speeds, placing Itanium behind in integer workloads while matching or slightly trailing in floating-point tasks like SPECfp_base2000. This gap stemmed partly from immature compilers unable to fully exploit the architecture's potential, underscoring the risks of the EPIC bet during the design phase.
+
+Launch and initial expectations (2001)
+
+The Itanium processor, codenamed Merced, officially launched on May 29, 2001, following years of development collaboration between Intel and Hewlett-Packard. Initial shipments began in June 2001 to original equipment manufacturers (OEMs) such as HP and Dell, with the first systems including HP's rx7620 server and Dell's Precision Workstation 730. These entry-level configurations, equipped with 733 MHz or 800 MHz Itanium processors, 1 GB of RAM, and basic storage, started at prices around $7,000 to $8,000, positioning Itanium as a premium option for high-end computing.
+Intel and its partners marketed Itanium as a revolutionary shift in computing architecture, leveraging the Explicitly Parallel Instruction Computing (EPIC) paradigm to unlock massive parallelism and deliver up to 10 times the performance of contemporary processors like the Pentium 4 through better exploitation of instruction-level parallelism. Intel CEO Craig Barrett emphasized the processor's potential to power enterprise workloads, including web servers and data analysis, heralding it as the foundation for a new generation of scalable systems. Expectations were high, with projections that Itanium would dominate high-end servers and workstations, supported by endorsements from major vendors including Compaq, IBM, and Silicon Graphics Inc. (SGI), who announced their own Itanium-based platforms.
+However, early performance benchmarks revealed significant shortfalls, primarily due to immature compilers that struggled to generate optimized EPIC code, limiting the architecture's promised parallelism. On the SPEC CPU2000 suite, the 800 MHz Itanium in the Dell Precision Workstation 730 achieved a SPECint_base2000 score of 314, lagging behind competitors like the 1.5 GHz Pentium 4's score of 526 and even some RISC processors such as the UltraSPARC III. Floating-point performance fared better at around 645 on SPECfp_base2000, but overall integer workloads underperformed expectations, with analysts noting Itanium's effective throughput as roughly equivalent to or below mid-range x86 systems despite its higher price point. These results stemmed from the need for specialized software tuning, as legacy x86 emulation added overhead for non-native applications.
+Initial adoption was confined to niche high-end server markets, with limited deployments in enterprise environments for tasks like database processing and scientific computing. Partnerships with SGI and Unisys expanded system offerings, but volume sales remained low as customers awaited software ecosystem maturity; HP positioned early systems more as development platforms than production-ready hardware. By late 2001, fewer than a dozen Itanium-based models were available from major vendors, reflecting cautious uptake amid economic uncertainty following the dot-com bust.
+Media coverage and analyst opinions lauded Itanium's architectural innovation as a bold departure from x86 dominance, praising its 64-bit addressing and potential for future scalability in mission-critical applications. However, criticism quickly mounted over the immature compiler technology and ecosystem, with outlets describing the launch as overhyped and performance as "disappointing" relative to established RISC alternatives. Illuminata analyst Jonathan Eunice called it a "development environment" rather than a mature product, highlighting the risks of betting on unproven paradigms in a rapidly evolving market.
+
+Processor generations
+
+Merced generation (2001)
+
+The Merced generation marked the debut of the Itanium processor family in 2001, featuring a single-core design targeted at high-end servers and workstations. Fabricated using a 0.18 m process technology, the processor contained approximately 25 million transistors. It operated at a base clock speed of 800 MHz for standard models, with a low-voltage variant clocked at 733 MHz to support power-sensitive applications. These processors integrated with the Intel 460GX chipset, enabling connectivity for memory and I/O in early Itanium-based systems.
+Merced's microarchitecture emphasized the EPIC paradigm through a 10-stage pipeline capable of issuing up to 6 instructions per cycle in bundles of three, supported by 2 integer arithmetic logic units (ALUs) and 2 floating-point units. While the theoretical peak performance promised high throughput for explicitly parallel code, real-world instructions per cycle (IPC) typically ranged from 1 to 2, limited by the rigidity of instruction bundling and early compiler inefficiencies in exploiting parallelism. The design supported 4-way symmetric multiprocessing (SMP), allowing configurations of up to four processors without additional glue logic for basic scalability.
+Key limitations included the absence of dedicated hardware for x86 instruction translation, relying instead on software emulation that resulted in significantly reduced performance for legacy applicationsoften 50% or slower compared to native x86 hardware of the era. Additionally, the processor exhibited high power consumption with a thermal design power (TDP) of 130 W, contributing to thermal management challenges in densely packed systems. Deployment was limited, appearing in initial products such as the Compaq ProLiant servers, but overall volumes remained low at around 10,000 units shipped in 2001 due to software ecosystem immaturity and performance shortfalls relative to expectations.
+
+McKinley and Madison generations (20022006)
+
+The McKinley processor, introduced in 2002 as the inaugural member of the Itanium 2 family, marked a substantial evolution from the initial Merced generation by enhancing execution efficiency and resource utilization within the IA-64 architecture. Fabricated using a 0.18 m process, it operated at clock speeds of 900 MHz to 1 GHz and incorporated up to 3 MB of integrated L3 cache, enabling up to twice the overall system performance compared to Merced-based platforms. Floating-point capabilities saw particularly strong gains, with SPECfp_base2000 scores reaching approximately 1,356 at 1 GHzroughly four times higher than Merced's typical resultsdue to doubled execution resources and refined pipeline design that better exploited EPIC parallelism.
+Key architectural advancements in McKinley included improved branch prediction mechanisms, which reduced misprediction penalties through advanced prediction tables and recovery paths, and an enhanced hardware x86 compatibility assist unit for seamless legacy binary execution. These features doubled the number of integer and load/store units relative to Merced, allowing for greater instruction-level parallelism while maintaining compatibility with the evolving Itanium instruction set. The processor powered early enterprise systems, demonstrating viability in high-end computing environments despite ongoing reliance on sophisticated compilers for optimal EPIC bundle scheduling.
+The Madison series, debuting in 2003, refined McKinley's design through a 0.13 m process shrink, enabling higher clock speeds up to 1.6 GHz and larger cache configurations of 6 MB or 9 MB L3. With around 410 million transistors, Madison variants delivered up to 50% greater frequency and doubled L3 cache bandwidth over McKinley, yielding SPECfp_base2000 rates exceeding 2,100 in single-processor configurations. These improvements extended to multi-processor scalability, where SPECfp_rate2000 scores surpassed 40 in small cluster setups, underscoring enhanced floating-point throughput for scientific and database workloads. Madison processors integrated into platforms like HP Integrity servers and SGI Altix systems, supporting demanding applications in enterprise and high-performance computing.
+In 2006, the Madison lineage culminated with the Montecito variant, Intel's first dual-core Itanium 2 processor fabricated at 90 nm, featuring two Madison-derived cores sharing up to 12 MB L3 cache per socket at 1.6 GHz. Operating at a thermal design power of up to 104 W per socket, Montecito emphasized reliability with advanced error correction and aimed to double per-socket performance through core replication, though power scaling remained challenging in multi-socket configurations exceeding four sockets due to interconnect bottlenecks and elevated thermal demands. Despite these hurdles, the generation's compiler dependency persisted, requiring optimized code generation to fully leverage its parallel execution potential.
+
+High-end evolutions (20062017)
+
+The high-end evolutions of the Itanium architecture from 2006 to 2017 built upon the dual-core Madison generation by introducing enhanced multi-core designs, process node shrinks, and advanced interconnects tailored for high-performance computing (HPC) and mission-critical enterprise applications. These developments emphasized scalability, reliability, availability, and serviceability (RAS) features, such as improved error correction and virtualization support, to address demanding workloads in sectors like finance, telecommunications, and scientific simulation.
+The Itanium 2 9100 series, codenamed Montvale and released in 2007, marked the transition to dual-core configurations on a 90 nm process, operating at up to 1.66 GHz with front-side bus speeds reaching 667 MT/s. It featured up to 24 MB of shared L3 cache and split L2 caches per core (1 MB instruction and 256 KB data), enabling better thread handling through demand-based switching and whole-core lockstep for fault tolerance. These processors supported up to four sockets in NUMA configurations, delivering approximately 19% performance uplift over prior models while maintaining compatibility with existing Itanium platforms for enterprise servers.
+In 2010, the Itanium 9300 series, known as Tukwila, advanced to a quad-core design on a 65 nm process with frequencies up to 1.86 GHz and a thermal design power (TDP) of 130 W. It introduced the first integrated on-die L3 cache of 30 MB shared across cores, along with Intel Hyper-Threading Technology for eight threads per processor, resulting in more than double the performance of Montvale in memory-intensive tasks. A key innovation was the adoption of the QuickPath Interconnect (QPI) at 4.8 GT/s, replacing the front-side bus to boost inter-processor bandwidth by up to 800% and support up to four sockets with enhanced DDR3 memory capacity reaching 2 TB per processor. These features significantly improved RAS through advanced ECC and second-generation virtualization, targeting scalable mission-critical systems.
+The Itanium 9500 series, codenamed Poulson and launched in 2012, represented a major leap with an eight-core architecture on a 32 nm process, clock speeds up to 2.53 GHz, and a TDP of up to 170 W. It integrated 54 MB of on-die cache (including 32 MB L3 and approximately 6 MB total L2 across cores, with 512 KB instruction and 256 KB data per core), enabling up to 16 threads and 12 instructions retired per cycle for superior multi-threaded efficiency. Architectural enhancements included optimized integer multiply units and a wider execution pipeline, providing up to 1.9x the performance of Tukwila in HPC benchmarks while supporting up to eight sockets via QPI at 6.4 GT/s. With 3.1 billion transistors, Poulson focused on power efficiency and scalability for large-scale enterprise and technical computing environments.
+The final evolution, the Itanium 9700 series codenamed Kittson in 2017, retained the eight-core layout on 32 nm but refined frequencies to up to 2.66 GHz with a TDP of 130-170 W and 32 MB L3 cache. It incorporated dual on-die memory controllers supporting scalable memory interfaces for up to 2 TB DDR4 per socket, supporting up to eight-socket configurations via QPI for HPC clusters. Kittson emphasized backward compatibility with prior generations and enhanced power management, delivering incremental performance gains in mission-critical applications while prioritizing reliability features like advanced RAS extensions. Overall, these evolutions sustained Itanium's niche in high-end servers, with annual system shipments stabilizing around 26,000 units through 2016 amid a focus on specialized, resilient computing.
+
+End of production and support (post-2017)
+
+Intel ceased development of new Itanium designs after 2017, citing the dominance of the x86 architecture in server markets as the primary reason for shifting resources away from the IA-64 platform. The final processor, codenamed Kittson (Itanium 9700 series), saw its last shipments in July 2021, marking the end of hardware production.
+A significant legal challenge arose from the 2010 HP-Oracle lawsuit, stemming from Oracle's decision to withdraw support for its software on Itanium-based HP servers, despite a prior agreement. The dispute originated in a September 2010 settlement of an unrelated case involving former HP CEO Mark Hurd, which obligated Oracle to maintain compatibility with HP's Itanium systems. Oracle's subsequent announcement to end support in 2011 prompted HP to sue for breach of contract, leading to a 2012 court ruling in HP's favor that enforced continued support and awarded damages, though the ecosystem suffered from reduced vendor confidence.
+Software support has progressively wound down, reflecting the hardware's obsolescence. The Linux kernel removed IA-64 architecture support in version 6.7, released in late 2023, after it had been marked as orphaned earlier that year due to lack of maintainers and minimal usage. HP-UX 11i v3, the primary operating system for Itanium servers, reached end of standard support on December 31, 2025, with Hewlett Packard Enterprise (HPE) ceasing all maintenance thereafter. However, the GNU Compiler Collection (GCC) temporarily reversed its deprecation of Itanium support in version 15, released in 2025, to aid legacy code maintenance amid ongoing discussions for full removal in future releases. As of November 2025, support remains in GCC 15 but is planned for removal in GCC 16.
+HPE has accelerated its transition to x86 and ARM architectures for enterprise servers, fully phasing out Itanium-based Integrity systems by the end of 2025 to align with broader industry trends toward more efficient, scalable platforms. Despite this, a small number of legacy Itanium installations persist in specialized sectors like telecommunications and finance, where custom applications and high-reliability requirements delay full migrations.
+As of 2025, no active Itanium production or new hardware shipments occur, but emulation tools such as QEMU continue to enable software testing and gradual transitions to modern architectures for remaining users.
+
+Hardware support
+
+Server systems and platforms
+
+The initial Itanium server platforms emerged in 2001 with Hewlett-Packard's Integrity rx series, designed as rackmount systems for enterprise workloads. The rx4610 model supported 2 to 4 first-generation Merced Itanium processors operating at 733 MHz or 800 MHz with 2 MB or 4 MB L3 cache, respectively, in a 7U chassis weighing up to 68 kg. It featured up to 64 GB of PC100 SDRAM ECC memory across 64 slots, 10 PCI slots (including 8 hot-plug 64-bit/66 MHz slots), and high-availability elements such as N+1 redundant 800W hot-swap power supplies and 6 hot-swap fans for cooling. Storage options included 2 hot-plug 36 GB drives, with system bandwidth reaching 4.2 GB/s for memory and 2.1 GB/s for I/O. These systems targeted mission-critical applications under HP-UX 11i v1.5, Windows XP, or Linux.
+Mid-era platforms expanded scalability and density, exemplified by the HP Integrity rx7640 introduced around 2005 with Itanium 2 processors, such as the single-core Madison generation at up to 1.6 GHz or later dual-core models. This 7U rackmount server accommodated up to 8 processors (up to 16 cores with dual-core configurations), 256 GB of DDR2 memory, and configurations with 2 cell boards, 10 GB base memory, and 5 PCI cards for enhanced I/O. It included 2 internal hard drives, a DVD drive, and redundant bulk power supplies, emphasizing reliability for database and virtualization tasks. Blade-based designs also proliferated, with the HP Integrity BL60p as an early Itanium 2 blade for the BladeSystem p-Class enclosure, supporting 2 processors, 2 hot-swappable U320 SCSI drives, and integration with up to 256 virtual machines under HP-UX for low total cost of ownership. The HPE Integrity Superdome 2, launched later in the decade, introduced modular blade architecture using 8-core Itanium 9700 series processors (Poulson generation) in CB900s blades, scaling to 16 blades per enclosure for up to 32 sockets and 8 TB memory in a unified system.
+Later platforms focused on high-performance computing and extreme scalability, particularly through SGI's offerings. The SGI Altix 4700 series utilized McKinley and subsequent Itanium 2 processors in NUMA configurations, supporting up to 1024 cores in bandwidth-optimized systems for scientific simulations, as evidenced by its ranking on supercomputing lists with 1024 Itanium cores. The HPE Superdome 2 evolved to support Kittson-generation Itanium processors (planned for mid-2017 refresh), maintaining up to 8 sockets in compact configurations while preserving compatibility with Poulson-era systems; following the Kittson refresh, no further Itanium platforms were developed due to the architecture's discontinuation. Form factors spanned rackmount (e.g., rx series), blades (e.g., Superdome 2 CB900s), and specialized systems for transaction processing.
+Hewlett-Packard (later HPE) dominated the Itanium server market, capturing approximately 90% share by 2009, with SGI, Fujitsu (via PrimeQuest series), and Hitachi each holding around 1%. Fujitsu's PrimeQuest servers supported up to 32 Itanium sockets for mission-critical Unix environments. Scalability relied on NUMA architectures, enabling single systems up to 64 processors in earlier Superdome configurations or 32 sockets in Superdome 2, with larger clusters possible for over 1000 processors in SGI Altix for HPC, with dense configurations featuring redundant N+1 power (e.g., 4x 800W supplies) and hot-swap cooling (e.g., multiple fans per enclosure) to manage thermal loads in multi-socket setups exceeding 100 kW.
+
+Chipset integrations
+
+The Itanium processor family relied on a variety of chipsets from Intel and key partners to handle system connectivity, memory management, and I/O expansion, evolving from early designs supporting basic PCI interfaces to more advanced configurations enabling large-scale multiprocessor systems. Intel's initial 460GX chipset, introduced alongside the Merced-generation Itanium in 2001, served as the primary northbridge solution, supporting up to four processors with standard 100 MHz SDRAM memory, PCI slots for expansion, and AGP 4x for graphics in workstation configurations. This chipset isolated memory and I/O subsystems from the processor bus, allowing customization for servers or workstations while providing bi-directional 1.3 GB/s bandwidth to memory.
+For the McKinley and subsequent Itanium 2 generations starting in 2002, Intel developed the E8870 chipset, which enhanced scalability for up to 16 processors in shared-memory modules and supported 128 GB of DDR SDRAM at 6.4 GB/s bandwidth. The E8870 included scalable node controllers for multiprocessor interconnects, though early implementations used front-side bus architectures rather than later serial links. Later iterations, particularly for the Tukwila-generation Itanium 9300 in 2010, integrated Intel's QuickPath Interconnect (QPI) with up to six links per processor for cache-coherent multiprocessing, enabling bandwidths of 96 GB/s for interprocessor communication and improved I/O handling shared with Xeon platforms.
+Hewlett-Packard (later HPE) contributed significantly to Itanium chipset designs, particularly for its Integrity server line. The sx2000 chipset, launched in 2005 for Madison-generation Itanium 2 systems like the Integrity Superdome, supported up to 64 processors in NUMA configurations with redundant cell boards and double-chip-spare memory for high availability. HP also integrated TACHYON-based Fibre Channel controllers, such as the A6795A adapter, providing 2 Gbps connectivity for storage area networks in Itanium environments running HP-UX. For NUMA scaling, HP systems incorporated PLX Technology PCI bridges to manage I/O expansion across nodes, ensuring low-latency access in multi-socket setups.
+Other vendors developed specialized chipsets for Itanium-based platforms. Silicon Graphics International (SGI) utilized the SN1 router ASIC in its Altix series, connecting up to 512 Itanium 2 processors via the proprietary NUMAlink interconnect, which provided directory-based cache coherence similar to InfiniBand for high-performance computing clusters with 2.4 GB/s per port bandwidth. Fujitsu's PRIMEQUEST servers employed a custom-developed chipset with proprietary ASICs, optimized for mission-critical mainframe workloads on Itanium 2 processors, supporting up to 32 sockets, 512 GB of memory, and enhanced reliability features like error-correcting code extensions.
+Over time, Itanium chipsets evolved from PCI-X support in early generations (offering up to 1 GB/s per slot) to PCIe 3.0 in the Poulson-generation Itanium 9500 by 2012, delivering 8 GT/s per lane for high-bandwidth I/O. Memory support progressed to DDR3-1600 in later designs, achieving up to 51.2 GB/s bandwidth per socket, while QPI facilitated cache-coherent NUMA multiprocessing across scales from 2 to 8 sockets. Itanium chipsets lacked integrated graphics processing, focusing exclusively on server applications and requiring external host bus adapters (HBAs) for storage and networking tasks like RAID or Ethernet.
+
+Software support
+
+Operating systems
+
+The Itanium architecture received native support from several Unix variants, reflecting its initial positioning in enterprise computing. HP-UX 11i provided full support starting in 2001, enabling deployment on HP Integrity servers, with ongoing updates through version 11i v3 until its scheduled end-of-support in December 2025, with Mature Support available until December 31, 2028. IBM ported AIX 5L to Itanium as part of Project Monterey, with initial availability in 2003, though adoption remained limited and support was discontinued in 2016. Oracle Solaris 10 offered native Itanium support from 2005, targeting high-end servers, but this was terminated in 2012 following Oracle's broader withdrawal from the platform.
+Linux kernel support for Itanium (ia64) began with version 2.4 in 2001, allowing early adoption in research and enterprise environments. Major distributions followed suit, including Red Hat Enterprise Linux 5, which maintained support through extended lifecycle phases until November 2020 for legacy users. Debian also provided ia64 packages, though with decreasing maintenance; kernel-level deprecation occurred in version 6.7 in 2023, while user-space compatibility persists for existing installations.
+Microsoft offered native Itanium support in Windows Server 2003 and 2008, optimized for high-performance computing and database workloads, with mainstream support ending in 2010 and extended support concluding in 2018 for the 2008 edition. No subsequent versions, including Windows Server 2012 or later, supported Itanium natively, marking the end of Microsoft's investment in the architecture.
+Proprietary operating systems further extended Itanium's ecosystem in specialized markets. OpenVMS, ported by HP in 2003, ran on Integrity servers for mission-critical applications, with HP providing support until 2020, after which VSI OpenVMS continued maintenance, with VSI providing support until December 31, 2035. HP NonStop OS, originally from Tandem, utilized Itanium for fault-tolerant transaction processing in financial and telecommunications sectors, with support ending December 31, 2025. Tru64 Unix, inherited from DEC, received limited Itanium support starting around 2001 but saw minimal adoption and was phased out by the mid-2000s in favor of other platforms.
+Porting operating systems to Itanium presented significant challenges due to the architecture's lack of binary compatibility with x86, necessitating full recompilation of applications and libraries rather than direct migration of existing binaries. This required substantial developer effort to optimize for Itanium's Explicitly Parallel Instruction Computing (EPIC) model, often leading to performance tuning specific to the hardware.
+
+Compilers and development tools
+
+Intel developed the primary compilers for the Itanium architecture, starting with the ECC (Itanium C Compiler) released in 2001 for early development and testing on platforms like Windows NT and UNIX. The ICC (Intel C++ Compiler) for IA-64 followed, incorporating advanced features such as bundle scheduling to group instructions into fixed 128-bit bundles for explicit parallel execution and predication to enable conditional execution without branches using 64 predicate registers. These compilers targeted C, C++, and Fortran, emphasizing the Explicitly Parallel Instruction Computing (EPIC) model to exploit instruction-level parallelism.
+Hewlett-Packard provided the aC++ compiler optimized for HP-UX on Itanium, focusing on EPIC-specific enhancements like control and data speculation to execute instructions ahead of dependency resolution, using speculative loads and NaT (Not a Thing) tokens for exception handling. It also supported register rotation through software pipelining, which overlaps loop iterations using rotating registers and predicates to minimize code expansion and improve loop performance. Open-source support emerged with GNU Compiler Collection (GCC) version 3.0 in 2002, introducing an IA-64 backend for C and C++ compilation. The Open64 compiler, derived from SGI's MIPS tools and released as open-source, further advanced IA-64 optimization research. In 2024, the GCC IA-64 backend was undeprecated in GCC 15, maintaining limited compatibility despite broader platform decline.
+Key optimization techniques in these toolchains included software pipelining via modulo scheduling to overlap loop operations and if-conversion to transform branches into predicated code, reducing misprediction penalties on Itanium's deep pipeline. Tools like Intel VTune Profiler aided development by analyzing parallelism, cache misses, and branch behavior on IA-64 systems, enabling targeted tuning of EPIC code.
+Developing for Itanium posed challenges due to the EPIC paradigm's reliance on compiler intelligence, often resulting in optimization times of hours for large applications because of complex global scheduling and profile-guided passes. To bridge legacy software, Intel's IA-32 Execution Layer (IA-32 EL) served as a dynamic binary translator, converting x86 instructions to native IA-64 at runtime for compatibility without full recompilation.
+Today, active development of Itanium compilers is limited, with Intel and HP focusing on maintenance rather than new features; archived versions remain available through developer portals for legacy support. Migration guides from vendors like HPE recommend porting code to x86-64 architectures, leveraging automated tools for syntax and optimization adjustments to ease transition from IA-64 environments.
+
+Virtualization and emulation
+
+Hewlett-Packard Enterprise (HPE) developed nPars, a hardware partitioning technology for Integrity servers based on Itanium processors, enabling the division of a single physical system into multiple independent partitions for improved resource isolation and management. Complementing this, Integrity Virtual Machines (Integrity VM), introduced in 2005, provided soft partitioning and full virtualization support for HP-UX environments on Itanium hardware, allowing multiple virtual machines to run concurrently on a single physical host while leveraging Intel's Virtualization Technology for Itanium (VT-i). These solutions facilitated efficient workload consolidation and resource allocation in enterprise settings, with Integrity VM requiring HP-UX 11i v2 (May 2005 update) or later as the host and guest operating system.
+For development purposes, Hewlett-Packard created the SKI simulator, an open-source IA-64 instruction set emulator designed to execute and debug Itanium code on non-IA-64 platforms such as x86 systems running Linux. SKI simulates the Itanium architecture as specified in Intel's Itanium 2 manuals, supporting user-level and basic operating system development without full platform emulation, and it includes features like a command-line interface for loading executables and inspecting machine state. This tool proved valuable for early software porting and testing before native hardware availability, though it lacks networking or peripheral simulation.
+To address compatibility with existing software ecosystems, Intel implemented the IA-32 Execution Layer (IA-32 EL), a dynamic binary translation system that enabled 32-bit x86 applications to run on Itanium processors with minimal overhead. IA-32 EL employed a two-phase approachinitial template-based translation followed by runtime optimizationbypassing the slower hardware x86 emulation mode in early Itanium models and achieving performance comparable to equivalently clocked x86 processors like Xeon, typically incurring 10-20% overhead on Itanium 2 systems. This layer was integrated into operating systems such as Windows and Linux for Itanium, supporting seamless execution of legacy x86 binaries in enterprise applications.
+During the early 2000s transition from Compaq's Alpha architecture to Itanium following HP's acquisition of Compaq, efforts focused on source-level migration rather than direct binary emulation, as no widespread runtime emulator like FX!32 (originally for x86 on Alpha) was developed specifically for Alpha binaries on Itanium; instead, HP provided porting guides and recompilation frameworks for OpenVMS and Tru64 UNIX applications to ensure compatibility.
+For reverse emulation, running Itanium (IA-64) code on non-Itanium architectures, QEMU offers partial support through its IA-64 target, enabling emulation of Itanium binaries and basic system images primarily for legacy application testing and preservation. However, QEMU's Tiny Code Generator (TCG) interpreter for IA-64 results in significantly reduced performance, often comparable to a 1990s-era Pentium 100 MHz processor, making it unsuitable for production workloads but useful for development or archival purposes. Microsoft did not provide native emulation for IA-64 binaries on x86-64 Windows via WOW64 or Application Virtualization (App-V), limiting support to source recompilation or containerized migration paths, as IA-64 was discontinued after Windows Server 2012.
+Migration from Itanium systems often involved HP's Systems Insight Manager (SIM), a centralized management tool that monitored and facilitated hardware inventory, configuration analysis, and phased transitions to x86 platforms, including automated reporting for decommissioning planning. HP also offered recompilation suites and porting kits, such as those for OpenVMS, to automate source code adaptation from Itanium to x86 equivalents, reducing manual effort in enterprise migrations. In the 2020s, financial institutions decommissioned Itanium-based infrastructure as part of broader modernization efforts, with case studies highlighting migrations to x86 cloud environments to cut costs and extend support lifecycles, though specific banking examples emphasize general legacy system shifts rather than Itanium-exclusive tools.
+Emulation generally imposed substantial performance penalties, with dynamic binary translation on Itanium for x86 code showing around 50% instructions-per-cycle (IPC) loss in unoptimized scenarios compared to native execution, though optimized layers like IA-32 EL mitigated this to near-parity. In hybrid environments, such as HPE's Superdome series, transitions from Itanium-based models (e.g., Superdome 2) to x86 variants (e.g., Superdome X and Flex) relied on virtualization for interim compatibility, allowing gradual workload shifts without full emulation overhead. For source-based migrations, compilers from prior toolchains could be referenced briefly to enable recompilation for x86 targets, streamlining the process alongside emulation where binaries remained irreplaceable.
+
+Market and reception
+
+Adoption in high-end servers
+
+Itanium's adoption in high-end servers reached its zenith between 2003 and 2008, a period marked by growing deployment in enterprise environments seeking robust 64-bit processing for demanding workloads. During this time, Hewlett-Packard (HP), later Hewlett Packard Enterprise (HPE), dominated the market, accounting for approximately 80% of Itanium system sales in 2007 and rising to 95% by 2008. This dominance was driven by HP's Integrity server line, which integrated Itanium processors with HP-UX and NonStop operating systems tailored for high-reliability computing. The architecture's focus on explicit parallelism appealed to sectors requiring fault-tolerant operations, contributing to Intel's server revenue growth amid the broader shift to 64-bit systems.
+Key markets for Itanium included mission-critical applications in finance, telecommunications, and government, where downtime costs were prohibitive. In finance and telecom, HP NonStop systems powered transaction processing and network management, leveraging Itanium's scalability for real-time operations. Government agencies adopted Itanium for high-performance simulations; notably, NASA's Columbia supercomputer, equipped with 10,240 Itanium 2 processors, achieved 51.87 teraflops in 2004, enabling advanced aerospace modeling and earning recognition as the world's fastest supercomputer at the time. These deployments underscored Itanium's role in environments prioritizing availability over raw speed.
+Market metrics highlight Itanium's niche but influential presence. In the third quarter of 2005 alone, Gartner reported 7,845 Itanium servers sold, contributing to growing cumulative shipments worldwide by mid-year according to IDC. The RISC/Itanium Unix server segment, where Itanium played a prominent role, generated $15.4 billion in revenue for 2005, representing a stable portion of the overall $51.7 billion global server market. Over its lifetime, Itanium shipments totaled hundreds of thousands of processors, with annual production estimates reaching 200,000 units by 2007.
+Success factors centered on reliability and scalability suited to enterprise databases and clustered systems. HP NonStop platforms delivered 99.9999% uptime (six nines), categorized as Availability Level 4 (AL4) by IDC, enabling continuous operation for transaction-heavy applications without single points of failure. For database workloads, Oracle Database scaled effectively on HP-UX Itanium systems, supporting multi-terabyte environments in clustered configurations up to 64 processors per node, as certified by Oracle for versions through 12c.
+Signs of decline emerged by 2010, as Itanium's market share dwindled below 1% of overall server revenues amid the rise of cost-efficient x86 multicore processors from Intel's Xeon line. The RISC/Itanium segment's revenue, for example, reached $2.4 billion in Q3 2011 with a 3.5% year-over-year increase but with shipments dropping sharply. Despite this, legacy installations persisted; HPE reported supporting around 50,000 active Itanium systems as of 2020, primarily in entrenched mission-critical sites reluctant to migrate due to compatibility and reliability concerns.
+
+Competition and decline
+
+The Itanium architecture faced significant competition from x86 processors, particularly Intel's own Xeon line and AMD's Opteron multicore chips introduced in 2003, which provided 64-bit extensions while maintaining backward compatibility with existing x86 software ecosystems. Unlike Itanium, which required recompilation for its Explicitly Parallel Instruction Computing (EPIC) model and lacked native support for legacy x86 binaries, Opteron enabled seamless execution of 32-bit x86 applications at high speeds, eroding Itanium's appeal in enterprise servers. RISC-based architectures also posed rivals, including IBM's Power series, Sun Microsystems' SPARC, and Hewlett-Packard's PA-RISC processors, which dominated high-end computing through the early 2000s before many transitioned or declined. Emerging 64-bit ARM processors from 2012 further intensified pressure by offering power-efficient alternatives for servers, though Itanium's decline predated widespread ARM adoption in that segment.
+Itanium's market contraction accelerated due to x86 achieving performance parity by around 2005, driven by advancements like hyper-threading and multicore designs that boosted throughput without the architectural overhaul required for Itanium. The compiler ecosystem for Itanium lagged behind, as optimizing for its EPIC paradigm proved complex and time-intensive compared to the mature x86 toolchain, limiting software availability and developer adoption. Intel's strategic pivot toward enhancing x86 post-2006, including aggressive process shrinks and feature additions, further marginalized Itanium by prioritizing the higher-volume architecture.
+Economic pressures exacerbated the decline, with Itanium's development incurring costs exceeding $1 billion due to its novel design and limited production scale, contrasting sharply with x86's billions of units shipped annually for economies of scale. Low sales volumes hindered cost recovery, while the 2008 financial recession prompted vendors to consolidate around commoditized x86 platforms, accelerating exits from proprietary RISC and Itanium investments.
+Key events underscored the contraction: Oracle, following its 2010 acquisition of Sun Microsystems, announced in 2011 the cessation of software development for Itanium, citing Intel's waning commitment and low market traction as factors propping up its SPARC-based alternatives. Intel formally cut funding and production in 2019, accepting last orders until January 2020 and ceasing shipments by July 2021. HPE announced that standard support for Itanium-based systems will end on December 31, 2025.
+By 2025, Itanium persists in niche legacy roles within specialized high-end servers, but holds less than 0.1% of the overall server market share, serving as a cautionary example of architecture lock-in challenges in a x86- and ARM-dominated landscape.
+
+Legacy in computing
+
+Despite its commercial challenges, the Itanium architecture left a lasting mark on processor design through its Explicitly Parallel Instruction Computing (EPIC) paradigm, which emphasized compiler-driven parallelism and features like predication to reduce branch mispredictions. Predication, where instructions are conditionally executed based on predicates rather than branches, influenced subsequent hardware-software co-designs by enabling more efficient exploitation of instruction-level parallelism (ILP) in superscalar processors. Similarly, Itanium's advanced speculation mechanisms, including advanced load speculation and checkpointing, informed speculation models in modern out-of-order execution engines, allowing compilers to safely reorder loads ahead of dependent operations.
+In software development, Itanium spurred innovations in compiler technology that extended beyond its ecosystem. Its reliance on sophisticated optimization for ILP extraction advanced techniques now integral to open-source compilers like GCC and LLVM, particularly in register allocation, instruction scheduling, and ABI design. The Itanium C++ ABI, for instance, became the standard for non-Windows platforms in GCC and Clang/LLVM, facilitating consistent binary interfaces across diverse architectures. These advancements highlighted the potential of compiler-hardware synergy, influencing how modern toolchains handle vectorization and auto-parallelization in heterogeneous computing environments.
+Itanium played a pivotal role in high-performance computing (HPC) during the early 2000s, powering scalable shared-memory systems that advanced supercomputing capabilities. SGI's Altix series, built on Itanium 2 processors, enabled massive single-system image configurations, with NASA's Columbia supercomputercomprising 10,240 Itanium 2 coresachieving 51.87 teraflops and ranking among the world's fastest systems in 2004. At its peak, Itanium-based systems accounted for over 80 entries on the TOP500 list in late 2004, representing about 16% of the total and demonstrating viability for large-scale scientific simulations in fields like astrophysics and climate modeling. This era underscored Itanium's strength in NUMA-aware environments, where its 64-bit addressing and cache coherence supported unprecedented memory scalability up to terabytes.
+Beyond HPC, Itanium found niche applications in mission-critical domains requiring high reliability and scalability. In medical imaging, GE Healthcare deployed Itanium-based HP NonStop platforms for its Centricity Enterprise systems, leveraging the architecture's fault-tolerant features for processing and archiving large volumes of diagnostic data from scanners. In defense simulations, Itanium powered high-end workstations and clusters for complex modeling, though specific deployments like those at national labs emphasized its role in secure, high-throughput computations. The development of migration tools and binary translation utilities during Itanium's lifecycle has since become standard practice for transitioning legacy workloads to x86 or ARM, incorporating lessons in emulation and recompilation.
+From a 2025 vantage, Itanium serves as a cautionary tale for emerging open ISAs like RISC-V, illustrating the perils of betting on novel paradigms without broad ecosystem buy-in, much as RISC-V navigates fragmentation risks in extensions and commercialization. Academically, it remains a key case study in ILP and compiler optimization, with EPIC principles referenced in research on parallelism extraction for multicore and GPU architectures. Its intellectual legacy endures through over 200 Intel patents related to EPIC innovations, many still cited in ongoing work on hardware-software partitioning.
+
+References
+
+ Intel Itanium Architecture Software Developer's Manual, Volume 1
+
+Intel officially launches 64-bit Itanium chip - Computerworld
+
+Intel, HP Reveal IA-64 Instruction Set Architecture
+
+ Fact Sheet - Intel
+
+ Product Change Notification
+
+EPIC: Explicitly Parallel Instruction Computing - IEEE Xplore
+
+ Understanding EPIC Architectures and Implementations
+
+Historical background for HP/Intel EPIC and IA-64 -- Mark Smotherman
+
+ Chapter 29 - Itanium Architecture - HPE Community
+
+Itanium A System Implementor's Tale - USENIX
+
+ Intel IA-64 Architecture Software Developer's Manual
+
+ Itanium processor microarchitecture
+
+ Intel Itanium 2 Processor Reference Manual
+
+ Intel QuickPath Architecture
+
+ New 130nm Itanium 2 Processors for 2003 - Hot Chips
+
+Itanium: A cautionary tale - CNET
+
+Intel's IAPX 432: Gordon Moore's Gamble And Intel's Failed 32-bit ...
+
+ The Itanium (I64) family
+
+COMPANY NEWS; Intel Forms Chip Pact With Hewlett-Packard
+
+The birth of a new processor - EDN Network
+
+ THE IA-64 ARCHITECTURE - GW Engineering
+
+PA-RISC Processors History and Performance - OpenPA
+
+USENIX '05 Technical Paper, General Track
+
+Why was the Itanium processor difficult to write a compiler for?
+
+NCSA ITANIUM-BASED LINUX CLUSTER TO AID SCIENTIFIC ...
+
+Intel software to boost Itanium's x86 processing speed - EE Times
+
+Advanced Micro to Describe a Chip That Will Take On Intel
+
+INTEL, HP LAUNCH NEW PROCESSOR - HPCwire
+
+Intel Launches Itanium: OEMs Unveil Systems
+
+Intel to aim Itanium at tough IT crowd - CNET
+
+ITANIUM SCORES HIGH IN PERFORMANCE TESTS - HPCwire
+
+Upgrading your server: A look at the Itanium | ZDNET
+
+HP i2000 Itanium Workstation - OpenPA
+
+Intel names Merced chip Itanium - CNET
+
+Merced - Microarchitectures - Intel - WikiChip
+
+ In-System FPGA Prototyping of an Itanium Microarchitecture
+
+Itanium 2 on the way, but will it sell? - CNET
+
+Intel Begins Shipping Itanium 2 Processors
+
+ HotChips 2002 - Intel Itanium 2 Processor
+
+Benchmarks in, McKinley girds for marathon - EE Times
+
+New Intel Server Processors Strengthen High-End Line-Up
+
+Products formerly Montecito - Intel
+
+Montecito: a dual-core, dual-thread Itanium processor - IEEE Xplore
+
+Intel Itanium 9300 Processor Raises Bar for Scalable, Resilient ...
+
+ Dual-Core Intel Itanium Processor 9100 Series
+
+Montvale - Microarchitectures - Intel - WikiChip
+
+ Intel Itanium Processor 9300 Series and 9500 Series
+
+ A 65 nm 2-Billion Transistor Quad-Core Itanium Processor
+
+ Intel Itanium Processor 9500 Series Product Brief
+
+Intel outs 'Poulson' speeds and feeds - The Register
+
+ Intel Itanium Processor 9300/9500/9700 Series: Datasheet
+
+Intel Itanium Processor 9760
+
+Intel to finally scatter remaining ashes of Itanium to the wind in 2021
+
+Intel to discontinue Itanium 9700 'Kittson' processor, the last of the ...
+
+HP Wins Court Ruling in Itanium Litigation - HP - Investor Relations
+
+HP Wins Itanium Court Case Against Oracle | CRN
+
+Oracle loses bid to upend HP's $3 billion win - Reuters
+
+Hewlett-Packard Co. v. Oracle Corp. - Justia Law
+
+Intel Itanium IA-64 Support Removed With The Linux 6.7 Kernel
+
+ HP-UX 11i v3 2025 Operating Environment Update Release (OEUR)
+
+GCC 15 to 'undeprecate' Itanium support - for now - The Register
+
+GCC 15 Un-Deprecates Itanium IA-64 Linux Support - Phoronix
+
+Intel's Itanium, once destined to replace x86 in PCs, hits end of line
+
+Industry Update: HPE to End Itanium Support by December 31, 2025
+
+Save the date: Itanium will finally die at the end of 2025
+
+ Itanium-based solutions by hp - HPE Community
+
+ HP Integrity rx7640 Server - Spectra
+
+ HPE Integrity Superdome 2 Server Digital data sheet - Mojo Systems
+
+ The power of invention: a history of ProLiant servers from HP
+
+ Update On SGI Technology - ECMWF
+
+Server vendors optimistic about Itanium 2 - InfoWorld
+
+Next Superdome CPU chips amble into HPE - The Register
+
+Ten Years After First Delay, Intel's Itanium Is Still Late - Bits
+
+The Math On Big NUMA Versus Clusters - AIwire
+
+ The Itanium Processor Cartridge - Hot Chips
+
+Intel Itanium and Itanium 2 Chipsets - Flylib.com
+
+ Intel E8870 Chipset
+
+ HP Integrity Superdome Servers 16- processor, 32 - Spectra
+
+ A6795A Fibre Channel Mass Storage Adapter Installation Guide
+
+HP upgrades chip set for entry-level Itanium servers - EDN Network
+
+The SGI Altix 3000 series. - The Netlib
+
+Fujitsu Adds Attractively-Priced PRIMEQUEST 420 Midrange Model ...
+
+ The Making of a Compiler for the Intel Itanium Processor
+
+ An Overview of the Intel IA-64 Compiler
+
+Developing High-Performance Applications for HP-UX on IA-64
+
+IA-64 Options - Using the GNU Compiler Collection (GCC)
+
+Open Research Compiler (ORC) - SourceForge
+
+Intel VTune Performance Analyzer 9.1 Update 8 for Linux ...
+
+ Intel Itanium Processor Family Reference Guide: IA-32 Execution ...
+
+Itanium IA-64 Support May Revert Back To Being ... - Phoronix
+
+NonStop Migration: Should you stay or should you go?
+
+ HP Integrity Virtual Machines A.03.00 Installation, Configuration, and ...
+
+ New OpenVMS Virtualization Technologies
+
+ski
+
+ski, xski, bskinc - An IA-64 Instruction Set Simulator - Linux
+
+IA-32 Execution Layer | Proceedings of the 36th annual IEEE/ACM ...
+
+ Intel Itanium - Computer Science and Engineering
+
+ Intel Itanium Processor Family Reference Guide: IA-32 Execution ...
+
+ Porting Applications from HP OpenVMS Alpha to HP ... - Digiater.nl
+
+IBM AIX for IA64 (Itanium) aka Project Monterey Runs Again!
+
+WOW64 Implementation Details - Win32 apps | Microsoft Learn
+
+ Transitioning from Insight Manager 7 to HP ... - HPE Community
+
+ HP OpenVMS Migrating an Application from OpenVMS VAX to ...
+
+ A Better Choice for Migration from Intel Itanium - Cisco
+
+Using the Intel Itanium2 processor performance monitoring unit to ...
+
+HPE Integrity Superdome 2 QuickSpecs
+
+AMD steps into the 64-Bit ring with Opteron - Tech Monitor
+
+Intel's 64-bit Xeon may steal thunder from Itanium CPU - EE Times
+
+ Opteron: Pushing x86 to the Limit - AcesHardware.com
+
+Big Blue's Power Systems Get Some Itanium Competition - IT Jungle
+
+The history of chip architecture-Electronics Headlines-EEWORLD
+
+SRWare IT-News - Why Intel can be glad Itanium failed
+
+Intel made a huge mistake 10 years ago - Hacker News
+
+ IBM System z10 Mainframe, HP Integrity, No Contest!
+
+Oracle Drops Itanium Support, Intel Soldiers On - CRN
+
+Death of HP-UX and Itanium - LinkedIn
+
+Intel stops production Itanium-cpus - Techzine Global
+
+Why did Intel's Itanium processors fail to replace x86 in workstations ...
+
+ Itanium A System Implementor's Tale - USENIX
+
+Itanium C++ ABI
+
+Architecture & Platform Information for Compiler Writers - LLVM
+
+NASA's SGI Altix Supercomputer Ranked Among the Best on Official ...
+
+Intel Enterprise Platforms Take Lion's Share Of 'Top500' Ranking
+
+TOP500 List - November 2004
+
+GE rolls out new Centricity Enterprise - AuntMinnie
+
+ Transforming Business-Critical Infrastructure through Migration to ...
+
+Arm vs. RISC-V in 2025: Which Architecture Will Lead the Way?
+
+Intel Patents Key Insights and Stats
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

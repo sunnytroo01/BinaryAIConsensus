@@ -1,0 +1,382 @@
+Collision detection Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Collision detection
+ Ara Eve Leo Sal 
+1x
+ Collision detection is the computational process of determining whether two or more objects in a digital simulation intersect or come into contact, often including the identification of contact points, penetration depths, and intersection times to enable realistic interactions. It serves as a foundational element in simulating physical phenomena, ensuring that objects do not unrealistically pass through one another in dynamic environments.
+In computer graphics and animation, collision detection is essential for applications such as video games, virtual reality, and film production, where it supports rigid-body dynamics, deformable object simulations, and crowd behaviors involving thousands of entities. Beyond graphics, it plays a critical role in robotics for path planning and obstacle avoidance, in computer-aided design (CAD) for assembly verification, and in physically-based modeling for accurate force computations in engineering simulations. The challenge lies in achieving real-time performance, as naive pairwise checks scale quadratically with the number of objects, necessitating efficient algorithms that balance accuracy and speed.
+Key techniques in collision detection are typically organized into phases: the broad phase uses bounding volume hierarchies (BVHs) like axis-aligned bounding boxes (AABBs) or oriented bounding boxes (OBBs) to quickly cull non-intersecting object pairs, often employing sweep-and-prune or spatial partitioning like grids for O(n + k) complexity where k is the number of potential collisions. The mid phase refines these candidates with more precise hierarchical tests, such as OBB-trees, while the narrow phase computes exact intersections using methods like the Gilbert-Johnson-Keerthi (GJK) algorithm for convex shapes or separating axis theorem (SAT) for polyhedra. For dynamic scenarios, continuous collision detection (CCD) predicts future intersections to handle high-speed motions, and specialized approaches address deformable or articulated models. Ongoing research focuses on GPU acceleration, multi-core parallelism, and robust handling of complex geometries with millions of primitives.
+
+Introduction
+
+Definition and Fundamentals
+
+Collision detection is the computational process of determining whether, where, and when two or more objects in a simulated environment intersect or are likely to intersect in space and time. This involves analyzing the geometric representations of objects under motion or transformation to identify overlaps or potential contacts. It serves as a foundational step in simulating physical interactions, assuming a basic understanding of 3D geometry such as points, vectors, and transformations.
+The importance of collision detection lies in its role within physics engines, where it enables realistic interactions by preventing unintended overlaps in simulations and providing data for subsequent processing. In real-time systems, it supports decision-making by identifying intersections that could affect object trajectories, ensuring stability and fidelity in dynamic environments like games and robotics. Without accurate detection, simulations may exhibit artifacts such as objects passing through each other, compromising the integrity of the modeled world.
+Key terminology in collision detection includes objects, which can be rigidmaintaining fixed shape and volume during interactionsor deformable, allowing changes in geometry due to forces. Contact points refer to the specific locations where intersecting objects touch, often forming a contact manifold that describes the full set of such points across the intersection surface. Penetration depth measures the extent of overlap between objects, quantifying how deeply one has entered the other. Normal vectors at these contact points indicate the perpendicular direction to the surface, aiding in determining separation axes. Collision response, which follows detection, typically involves computing forces or displacements to separate objects and resolve the interaction, though details of resolution vary by system. Bounding volumes, such as spheres or boxes, provide simple enclosures for approximating object geometry during initial checks.
+
+Historical Development
+
+The origins of collision detection trace back to the emerging field of computational geometry in the 1970s, where foundational work on proximity queries and distance computations between geometric objects laid the groundwork for later algorithms. Pioneering efforts, such as Michael Shamos' 1978 PhD thesis on computational geometry, including work on nearest-neighbor searching and the closest-pair problem (building on his 1975 paper with Daniel Hoey), introduced efficient methods for determining minimal distances in sets of points, which served as precursors to more advanced techniques like the Gilbert-Johnson-Keerthi (GJK) distance algorithm developed in 1988. These early developments focused on static geometric problems in two and three dimensions, driven by applications in pattern recognition and database queries, rather than real-time dynamics.
+In the 1980s, advancements in computer graphics spurred the integration of hierarchical structures for efficient spatial queries, with bounding volume hierarchies (BVH) introduced by Steven M. Rubin and Turner Whitted in 1980 to accelerate ray-object intersections in rendering complex scenes. This hierarchical approach, using bounding volumes to prune unnecessary tests, was soon adapted for collision detection, enabling faster proximity checks in simulated environments. The decade also saw the formalization of convex optimization techniques, culminating in the GJK algorithm by Elmer G. Gilbert, Daniel W. Johnson, and S. S. Keerthi, which iteratively computes the minimum distance between convex polyhedra using support functions and the Minkowski difference.
+The 1990s marked a boom in real-time collision detection, propelled by the demands of interactive computer games and simulations. The sweep-and-prune (SAP) algorithm, first introduced by Cohen et al. in 1995, was adapted and popularized by Gino van den Bergen in his 1997 publication, a broad-phase method that sorts object bounding intervals along axes to efficiently identify potential colliding pairs, exploiting temporal coherence for performance in dynamic scenes. Concurrently, the separating axis theorem (SAT), rooted in earlier convex separation principles but popularized for narrow-phase tests, enabled robust intersection detection for convex polygons and polyhedra by projecting onto candidate axes. David Baraff's contributions during this period, including his 1992 PhD thesis on non-penetrating rigid body simulation, integrated collision response with dynamics, using impulse-based methods to handle contacts without penetration.
+The 2000s and 2010s shifted focus toward continuous collision detection (CCD) to prevent tunneling artifacts in high-speed simulations, with Erwin Coumans' Bullet Physics engine incorporating CCD features starting in 2005, building on van den Bergen's earlier convex collision libraries like SOLID. This era also saw growing integration with graphics processing units (GPUs) for parallel broad-phase culling, as demonstrated in early GPU-based BVH traversal methods from 2006 onward, which accelerated queries in large-scale virtual environments. Key contributors like van den Bergen and Baraff influenced open-source libraries and industry standards, emphasizing robustness and scalability.
+In the 2020s, collision detection has evolved with AI-assisted methods and advanced representations for deformable and robotic systems. Machine learning models, such as neural networks approximating distance-to-collision fields, have emerged to accelerate self-collision checks in articulated robots, reducing computational overhead while maintaining accuracy. Signed distance field (SDF)-based approaches have gained prominence for real-time detection in robotics, as reviewed in recent literature, enabling efficient collision-free motion planning for complex morphologies via implicit surface queries. These developments, highlighted in 2024 surveys on dynamic environment navigation, underscore a trend toward hybrid geometric-AI pipelines for enhanced precision in autonomous systems. In 2025, further advances include NeuralSVCD for efficient swept volume collision detection in dynamic scenes and improved probabilistic methods using superquadrics for accurate shape approximation in robotic motion planning.
+
+Core Concepts
+
+Discrete versus Continuous Detection
+
+Collision detection algorithms are broadly classified into two paradigms: discrete and continuous, distinguished by how they handle the temporal aspect of object motion in simulations.
+Discrete collision detection, also known as a posteriori detection, evaluates potential overlaps between objects at fixed time intervals, typically corresponding to simulation frames or steps. This approach checks the positions of objects at the beginning and end of each time step to determine if interpenetration has occurred, making it computationally efficient with a typical complexity of O(n) for n objects in naive implementations, though optimizations reduce this in practice. However, it is susceptible to the tunneling problem, where fast-moving objects can pass through each other without detection if their relative speed exceeds the distance covered in a single time step relative to their size.
+In contrast, continuous collision detection, or a priori detection, predicts collisions by analyzing the continuous trajectories of objects over time intervals, ensuring no tunneling occurs. It models motion using swept volumesthe spatial regions traced by moving objectsor ray casting along velocity vectors to find exact contact times. This method computes the time of impact (TOI), the earliest time t within (normalized to the time step) at which objects intersect, allowing the simulation to advance precisely to that moment. For linear motion, the TOI is the scalar parameter t solving the parametric equation position(t)=b+td\mathbf{position}(t) = \mathbf{b} + t \mathbf{d}position(t)=b+td (with $ 0 \leq t \leq 1 $) for intersection with the separating geometry, often using projected distances along relevant axes or normals.
+A representative example is the sphere-line sweep, where a sphere of radius $ R $ moves linearly from center $ \mathbf{B} $ along direction $ \mathbf{D} $ (with $ |\mathbf{D}| $ as the distance traveled). To detect intersection with a static plane defined by normal $ \mathbf{N} $ and constant $ C_p $, the distance from the moving center $ \mathbf{C}(t) = \mathbf{B} + t \mathbf{D} $ to the plane is $ |\mathbf{N} \cdot \mathbf{C}(t) + C_p| $. Setting this equal to $ R $ yields the quadratic equation $ |\mathbf{N} \cdot (\mathbf{B} + t \mathbf{D}) + C_p| = R $, solved for t as:
+t=R(NB+Cp)ND,
+t = \frac{ \pm R - (\mathbf{N} \cdot \mathbf{B} + C_p) }{ \mathbf{N} \cdot \mathbf{D} },
+t=NDR(NB+Cp),
+producing two roots clamped to ; intersection exists if the interval overlaps. This derivation extends to more complex primitives via Minkowski difference, but solving often involves quadratic equations, increasing computational cost.
+The trade-offs between these paradigms are significant: discrete methods are faster and simpler, suitable for low-speed scenarios or when sub-frame accuracy is unnecessary, but they fail at high velocities where tunneling risks simulation instability. Continuous methods provide exactness and robustness, essential for applications like robotics or high-fidelity physics, yet they are more expensive due to root-finding operations and trajectory integrations, often scaling poorly for many objects.
+Hybrid approaches mitigate these issues by combining both paradigms. Conservative advancement, for instance, iteratively advances the simulation to the earliest TOI by estimating relative motion bounds, using discrete checks for coarse filtering and continuous refinement for precision, thus balancing efficiency and accuracy.
+
+Bounding Volumes and Primitives
+
+Bounding volumes are simplified geometric shapes that enclose complex objects to approximate their spatial extent, thereby reducing the computational cost of collision detection by allowing quick rejection of non-intersecting pairs before performing more expensive exact tests. Common types include axis-aligned bounding boxes (AABBs), oriented bounding boxes (OBBs), spheres, capsules, and cylinders, each offering trade-offs in tightness of fit and intersection test efficiency. AABBs align their edges with the world coordinate axes and are defined by minimum and maximum coordinates along each axis, making them the fastest for intersection checks due to simple min-max comparisons. OBBs align with the object's local coordinate system for a tighter enclosure but require more complex tests involving projections onto separating axes. Spheres are defined by a center and radius, ideal for roughly spherical objects, while capsules combine a cylinder with hemispherical caps for better approximation of elongated shapes like limbs, and cylinders suit rotational symmetry.
+The intersection test for two AABBs determines no overlap if, on any axis iii (where i{x,y,z}i \in \{x, y, z\}i{x,y,z}), the maximum extent of one box is less than the minimum extent of the other:
+max(Ai)<min(Bi)ormax(Bi)<min(Ai)
+\max(\mathbf{A}_i) < \min(\mathbf{B}_i) \quad \text{or} \quad \max(\mathbf{B}_i) < \min(\mathbf{A}_i)
+max(Ai)<min(Bi)ormax(Bi)<min(Ai)
+This separability theorem enables rapid culling with minimal arithmetic operations. Tighter volumes like OBBs improve accuracy by reducing false positives but increase test complexity, often involving dot products of edge vectors and cross products for axis alignment. Sphere intersections simply compare the distance between centers against the sum of radii, providing constant-time performance. Capsule and cylinder tests compute distances between their defining line segments, adjusted by radii, balancing enclosure quality and speed.
+Collision primitives serve as the fundamental building blocks for exact narrow-phase tests in mesh-based representations, where complex surfaces are decomposed into simpler elements such as points (vertices), edges (line segments), and faces (typically triangles). In polygonal meshes, these primitives enable precise intersection queries by reducing full mesh tests to combinations of vertex-face, edge-edge, and edge-face checks, which are essential for handling deformable or detailed geometries. Triangles, as the most common face primitive, approximate curved surfaces while allowing efficient barycentric coordinate computations for contact points.
+Selection of bounding volumes depends on balancing enclosure tightness, which minimizes overestimation and false intersections, against computational speed for updates and tests; for instance, spheres are preferred for rounded objects due to their simplicity and rotational invariance, while AABBs suit axis-aligned scenarios despite potential looseness. For dynamic objects undergoing motion or deformation, bounding volumes must be updated frequently, often through refitting processes that recompute extents based on current vertex positions to maintain validity without full reconstruction. These primitives and volumes are applicable in both discrete and continuous detection paradigms to approximate and refine spatial overlaps over time.
+
+Broad-Phase Algorithms
+
+Spatial Partitioning
+
+Spatial partitioning is a broad-phase collision detection technique that divides the three-dimensional space into discrete cells or regions to group objects efficiently, enabling rapid elimination of non-interacting object pairs by limiting intersection tests to objects within the same or adjacent cells. This approach leverages the spatial locality of objects, assigning them to cells based on the positions of their bounding volumes, such as axis-aligned bounding boxes (AABBs), and typically reduces the computational complexity from the brute-force O(n) pairwise checks to near-linear O(n + k) time, where n is the number of objects and k is the number of potential colliding pairs.
+Uniform grids represent one of the simplest forms of spatial partitioning, overlaying the scene with a regular lattice of equal-sized cubic cells whose dimensions are chosen to approximate the average object size. Objects are inserted into cells via hashing their bounding volume centers or extents, and potential collisions are queried only among objects sharing a cell or its 26 immediate neighbors in 3D, making it particularly effective for static scenes or environments with uniformly distributed small objects. This method's simplicity allows for constant-time insertions and queries in the average case, though it requires careful cell sizing to avoid excessive overlaps.
+For scenes with uneven object distributions, adaptive spatial structures like octrees and k-d trees provide more efficient partitioning by recursively subdividing space based on object density or geometric features. Octrees, which divide space into eight equal octants at each level, adaptively refine denser regions, achieving a construction time of O(n log n) for n objects and enabling logarithmic query times for collision candidate retrieval. Similarly, k-d trees perform binary partitioning along alternating coordinate axes, balancing the tree to handle clustered data while supporting efficient nearest-neighbor and overlap queries essential for broad-phase culling. These structures excel in scenarios with varying scales, such as complex environments in interactive simulations, but incur higher preprocessing costs compared to uniform grids.
+The primary advantages of spatial partitioning include its scalability for large numbers of small objects, where it drastically prunes unnecessary tests, and its straightforward parallelization potential on modern hardware. However, it struggles with large objects that span multiple cells, leading to redundant checks across many cells, and performs poorly in highly dynamic scenes without frequent rebuilding, which can be costly. To address these limitations in dynamic contexts, modern variants like optimized hash grids have emerged, employing perfect hashing and lazy updates to handle moving objects efficiently; these are widely adopted in game engines such as Unity for particle simulations and crowd systems, offering near-constant update times even in the 2020s.
+
+Sweep and Prune
+
+The sweep and prune (SAP) algorithm, also known as sort and sweep, is a broad-phase collision detection technique designed to efficiently identify potential colliding pairs among multiple objects by exploiting spatial separation along coordinate axes. It projects the bounding volumes, typically axis-aligned bounding boxes (AABBs), of objects onto one or more axes (x, y, z in 3D), representing each as an interval defined by its min and max endpoints. These endpoints are collected and sorted into separate lists for each axis, allowing the algorithm to "sweep" a virtual line through the sorted order to detect overlapping intervals. Pairs of objects whose projections overlap on all axes are reported as potential colliders, pruning away non-overlapping pairs without full geometric tests. This approach significantly reduces the computational cost from exhaustive O(n) pairwise checks to a more manageable set, making it suitable for dynamic simulations with hundreds or thousands of objects.
+In implementation, the algorithm maintains sorted endpoint lists using data structures like arrays or linked lists to facilitate efficient updates. For each axis, min and max endpoints are tagged and sorted; during the sweep, an active list tracks objects whose intervals currently overlap the sweep position, with enter/exit events triggered at each endpoint to add or remove objects from the active set. Potential collision pairs are accumulated by intersecting active lists across all axes (e.g., via bitwise operations or set intersections for efficiency). To handle dynamic scenes, temporal coherence is exploited: between simulation steps, only moved objects have their endpoints removed and reinserted via insertion sort, minimizing resorting costs. This incremental update keeps the process lightweight, often using flags to toggle pair activity during endpoint swaps in the sorted lists. The algorithm extends naturally to 2D by using only two axes, reducing overhead for planar scenarios.
+The time complexity is O(n log n + k) in the worst case, where n is the number of objects and k is the number of output potential pairs, dominated by initial sorting; however, with temporal coherence in animated scenes where objects move incrementally, it achieves expected O(n + k) performance per frame, as few insertions occur. Empirical results from early implementations demonstrate processing over 1,000 complex polytopes in under 1/20 second on mid-1990s hardware, highlighting its scalability for interactive applications when motion is coherent.
+Variants of SAP address specific challenges, such as projecting intervals onto rotated axes aligned with the principal axes of object bounding volumes (e.g., oriented bounding boxes or OBBs) to improve pruning accuracy and reduce false positives from axis-aligned biases. These rotated projections adapt to object orientation, offering tighter separation for non-axis-aligned motions at the cost of additional computation for axis transformation. Other extensions include bi-dimensional SAP, which simplifies to two axes for approximate culling in large 3D datasets, or kinetic variants that handle continuous motion by prioritizing events in time-parameterized projections.
+Despite its efficiency, SAP has limitations, including sensitivity to axis alignment, where objects moving parallel to projection axes may produce overlapping intervals even if spatially separated, leading to excess pairs. Degenerate cases, such as clusters of objects with synchronized motions or high rotational velocities, increase endpoint swaps and degrade the benefits of temporal coherence, potentially reverting to near-quadratic behavior in dense scenes. The algorithm performs best with small inter-frame displacements and may require hybrid use with other methods for highly rotational or sparse environments.
+
+Bounding Volume Hierarchies
+
+Bounding volume hierarchies (BVHs) are tree structures that organize a set of geometric objects for efficient broad-phase collision detection by enclosing groups of objects in progressively larger bounding volumes, enabling rapid culling of non-intersecting pairs. Each node in the tree represents a bounding volumesuch as an axis-aligned bounding box (AABB), oriented bounding box (OBB), or spherethat approximates the spatial extent of its descendants, with leaf nodes typically containing single primitives or tight bounds around individual objects like triangles or vertices. This hierarchical representation, often binary for simplicity, allows for scalable querying in complex scenes with thousands of objects, as originally adapted from ray tracing techniques to collision detection in the mid-1990s.
+BVHs are constructed either top-down or bottom-up to balance tree depth and tightness of enclosures. Top-down construction begins at the root with all primitives, recursively partitioning them using heuristics like longest axis splits or surface area minimization to create child subsets, ensuring a balanced tree with O(n log n) build time for n objects. Bottom-up construction starts from leaf nodes with individual primitive bounds and iteratively clusters pairs of nearby objects into parent volumes, often guided by proximity metrics to minimize volume overlap. In dynamic scenes, such as those involving deformable models, refitting updates existing hierarchies by recomputing bounding volumes bottom-up along affected paths without full reconstruction, preserving the tree topology for real-time performance.
+Traversal for detecting collisions between two BVHs employs a recursive descent algorithm that prunes unnecessary computations. Beginning at the roots, the process tests for intersection between the current pair of node volumes using separating axis tests or similar checks; if no overlap exists, entire subtrees are culled. Intersecting nodes recurse to their children, terminating at leaves where primitive intersection tests occur only if required. This approach, known as a separating intersection volume check, exploits the hierarchy to avoid exhaustive pairwise evaluations.
+The logarithmic depth of a well-constructed BVH reduces collision queries to O(log n) average time complexity, dramatically lowering the number of testsfrom O(n^2) in naive methods to a fraction involving only potential candidatesmaking it suitable for interactive applications. Originating in 1980s ray tracing with hierarchical bounding slabs, BVHs were extended to collision detection through early systems like OBB-tree-based RAPID, achieving sub-millisecond detection for rigid models with hundreds of thousands of triangles.
+Advanced dynamic BVH variants support efficient updates for moving or deforming objects via techniques like tree rotations to maintain balance or targeted insertion/deletion along paths from root to leaf, each costing O(log n) time by adjusting only ancestor volumes. Refitting in AABB trees, for instance, enables collision detection on deformable meshes by propagating changes upward, often completing in linear time relative to the deformed subset while keeping overall query costs low.
+
+Narrow-Phase Algorithms
+
+Primitive Intersection Tests
+
+Primitive intersection tests form a core component of narrow-phase collision detection, where the focus is on determining exact overlaps between basic geometric shapes such as spheres, axis-aligned bounding boxes (AABBs), rays, triangles, capsules, and edges. These tests are essential for verifying contacts after broad-phase culling has identified potential pairs, enabling efficient and precise simulations in real-time applications. Bounding volumes like spheres and AABBs serve as enclosures for more complex primitives, simplifying initial checks before delving into detailed intersections.
+The sphere-sphere intersection test is one of the simplest and most computationally efficient methods, checking whether two spheres overlap by comparing the Euclidean distance between their centers to the sum of their radii. Specifically, two spheres with centers C1C_1C1 and C2C_2C2 and radii r1r_1r1 and r2r_2r2 intersect if C1C2r1+r2\|C_1 - C_2\| \leq r_1 + r_2C1C2r1+r2, where \|\cdot\| denotes the L2 norm; this can be computed using the squared distance to avoid expensive square roots, yielding C1C22(r1+r2)2\|C_1 - C_2\|^2 \leq (r_1 + r_2)^2C1C22(r1+r2)2. For dynamic scenarios involving moving spheres, the test extends to solving a quadratic equation at2+2bt+c=0at^2 + 2bt + c = 0at2+2bt+c=0, where a=v1v22a = \|v_1 - v_2\|^2a=v1v22, b=(C1C2)(v1v2)b = (C_1 - C_2) \cdot (v_1 - v_2)b=(C1C2)(v1v2), c=C1C22(r1+r2)2c = \|C_1 - C_2\|^2 - (r_1 + r_2)^2c=C1C22(r1+r2)2, and v1,v2v_1, v_2v1,v2 are velocities, to find the earliest collision time t0t \geq 0t0. This approach requires minimal instructions, often 11 in SIMD-optimized implementations, making it suitable for high-frequency queries.
+Axis-aligned bounding box (AABB) intersection tests determine overlap between two boxes by performing independent checks along each principal axis (x, y, z). For AABBs defined by min-max intervals and , no overlap exists if Amaxi<BminiA_{\max_i} < B_{\min_i}Amaxi<Bmini or Amini>BmaxiA_{\min_i} > B_{\max_i}Amini>Bmaxi for any axis iii; intersection occurs only if overlap is confirmed on all axes. In dynamic cases with relative velocity vvv, the test uses the slab method: for each axis iii with vi0v_i \neq 0vi=0, compute t1=AminiBmaxivit_1 = \frac{A_{\min_i} - B_{\max_i}}{v_i}t1=viAminiBmaxi, t2=AmaxiBminivit_2 = \frac{A_{\max_i} - B_{\min_i}}{v_i}t2=viAmaxiBmini; then per-axis tenter,i=min(t1,t2)t_{\text{enter},i} = \min(t_1, t_2)tenter,i=min(t1,t2), texit,i=max(t1,t2)t_{\text{exit},i} = \max(t_1, t_2)texit,i=max(t1,t2). Overall, tenter=max(0,maxitenter,i)t_{\text{enter}} = \max(0, \max_i t_{\text{enter},i})tenter=max(0,maxitenter,i), texit=min(1,minitexit,i)t_{\text{exit}} = \min(1, \min_i t_{\text{exit},i})texit=min(1,minitexit,i), reporting collision if tentertexitt_{\text{enter}} \leq t_{\text{exit}}tentertexit. For vi=0v_i = 0vi=0, check static overlap on that axis; if no overlap for any axis, no collision. This method leverages the orthogonality of axes for rapid evaluation, typically completing in 16-19 CPU cycles with SIMD, while handling division-by-zero via separate static checks.
+Ray-triangle intersection is a fundamental test for ray tracing and raycast queries, with the Mller-Trumbore algorithm providing a fast, storage-efficient solution using barycentric coordinates. Given a ray P(t)=O+tD\mathbf{P}(t) = \mathbf{O} + t\mathbf{D}P(t)=O+tD (origin O\mathbf{O}O, direction D\mathbf{D}D) and triangle vertices V0,V1,V2\mathbf{V_0}, \mathbf{V_1}, \mathbf{V_2}V0,V1,V2, the algorithm solves for intersection parameter ttt and coordinates u,vu, vu,v such that P(t)=(1uv)V0+uV1+vV2\mathbf{P}(t) = (1 - u - v)\mathbf{V_0} + u\mathbf{V_1} + v\mathbf{V_2}P(t)=(1uv)V0+uV1+vV2, with t0t \geq 0t0, u0u \geq 0u0, v0v \geq 0v0, and u+v1u + v \leq 1u+v1. This is achieved by forming edges E1=V1V0\mathbf{E_1} = \mathbf{V_1} - \mathbf{V_0}E1=V1V0, E2=V2V0\mathbf{E_2} = \mathbf{V_2} - \mathbf{V_0}E2=V2V0, computing determinant det=D(E1E2)\det = \mathbf{D} \cdot (\mathbf{E_1} \times \mathbf{E_2})det=D(E1E2), and using Cramer's rule for t=E2/dett = \cdot \mathbf{E_2} / \dett=E2/det, u=E1/detu = \cdot \mathbf{E_1} / \detu=E1/det, v=/detv = / \detv=/det; backface culling can skip if det<0\det < 0det<0. The method avoids explicit plane equations, reducing preprocessing and enabling real-time performance in rendering pipelines.
+Capsule-edge intersection approximates a capsule as a line segment with hemispherical endcaps (or a finite cylinder with radius rrr) and tests against an edge (line segment). The process first finds the closest points between the capsule's axis segment and the edge, then checks if their distance is at most rrr; if the closest points lie outside segments, endpoint sphere tests are performed. For static cases, this reduces to distance queries between segments, while dynamic versions solve quadratics for the earliest intersection along the capsule's cylindrical surface or endcaps, akin to ray-cylinder tests. This method is particularly useful for character limbs or ropes, balancing simplicity and accuracy in skeletal animations.
+Handling edge cases is crucial for robustness in primitive tests, particularly degenerate primitives like zero-length edges or zero-area triangles, which can arise from modeling errors or numerical drift. For zero-length edges in capsule-edge tests, the intersection simplifies to a sphere-point check at the endpoint, while for degenerate triangles in ray-triangle tests, the algorithm may report invalid barycentrics, requiring fallback to edge-ray tests or mesh preprocessing to ensure non-zero areas. Numerical stability is maintained through epsilon tolerances (e.g., =106\epsilon = 10^{-6}=106) in comparisons to absorb floating-point errors, such as adding \epsilon to zero checks for near-parallel rays (ND<|\mathbf{N} \cdot \mathbf{D}| < \epsilonND<) or using squared distances to avoid roots. Additional techniques include vector normalization before cross products to prevent precision loss and interval arithmetic for bounding errors in critical determinants, ensuring reliable results across varying scales and orientations.
+
+Convex Object Collision Detection
+
+Collision detection for convex objects leverages the geometric properties of convexity to efficiently determine intersections or separations between shapes such as polyhedra, capsules, or spheres, which are common in rigid body simulations. Unlike primitive tests that focus on basic geometric elements like edges or faces, methods for convex objects exploit global properties, such as the existence of separating hyperplanes or support mappings, to avoid exhaustive pairwise checks. These techniques are particularly effective because convex sets guarantee that any line segment connecting two points within the set lies entirely inside it, enabling robust algorithms for both discrete and penetrating contacts.
+The Separating Axis Theorem (SAT) provides a foundational approach for detecting collisions between convex polyhedra by identifying potential separating axes where the projections of the two objects do not overlap. According to SAT, two convex objects do not intersect if there exists at least one axistypically derived from the face normals or edge cross-products of the objectsonto which their orthogonal projections are disjoint; otherwise, they intersect. For oriented bounding boxes (OBBs), this involves testing up to 15 axes: the three face normals from each box (six total) and the nine pairwise cross-products of those normals. Projections onto these axes can be computed efficiently using dot products with the vertices or by leveraging primitive intersection tests for bounding boxes. This method is widely used due to its simplicity and exactness for convex shapes, though its efficiency depends on the number of axes tested.
+The Gilbert-Johnson-Keerthi (GJK) algorithm offers an iterative, feature-based method for computing the minimum distance between two convex sets or detecting penetration, relying on the support function to query extreme points without enumerating all vertices. The support function for a convex object AAA in direction vvv is defined as hA(v)=maxxAx,vh_A(v) = \max_{x \in A} \langle x, v \ranglehA(v)=maxxAx,v, where ,\langle \cdot, \cdot \rangle, denotes the dot product, allowing the algorithm to build a simplex (a point, line segment, triangle, or tetrahedron in 3D) that approximates the closest features. GJK operates on the Minkowski difference AB={abaA,bB}A - B = \{a - b \mid a \in A, b \in B\}AB={abaA,bB}, treating relative motion as a translation of one object relative to the other; if the origin lies inside the simplex of this difference set, the objects intersect, and the algorithm terminates early for detection. The process iterates by selecting new support points to expand or shrink the simplex until convergence, typically requiring few iterations for practical shapes. Introduced in 1988, GJK is valued for its sublinear complexity in the number of features and applicability to any convex representation supporting the support function, such as polyhedra or implicit surfaces.
+To resolve penetration depth and contact normals beyond mere intersection, the Expanding Polytope Algorithm (EPA) extends GJK by growing the initial simplex from GJK into a polytope that envelopes the Minkowski difference, yielding the deepest penetration vector. Starting from the intersecting simplex, EPA repeatedly adds support points in the direction toward the origin, forming new boundary facets until the origin lies on the polytope's surface; the vector from the origin to the nearest facet then provides the penetration depth and normal. This algorithm maintains the efficiency of support function queries, with worst-case complexity linear in the number of features but practical performance often constant for simple convexes. EPA is particularly useful for resolving overlaps in dynamic simulations, as it directly computes the minimal translation to separate objects.
+These methods underpin rigid body dynamics in real-time applications, such as the NVIDIA PhysX engine, which employs GJK for proximity queries and EPA for penetration resolution among convex shapes like capsules and boxes to ensure stable, high-performance simulations in games and animations.
+
+Non-Convex and Deformable Object Handling
+
+Handling non-convex objects in collision detection often involves decomposing complex static meshes into simpler convex components, such as through tetrahedralization, which partitions the volume into tetrahedra whose convex hulls can then be tested using established convex intersection methods. This approximate convex decomposition (ACD) iteratively removes non-convex features like notches to generate a set of convex hulls that approximate the original shape, enabling efficient broad- and narrow-phase queries while minimizing the number of primitives. For feature-based tests on triangle meshes, algorithms perform edge-face and vertex-face intersection checks to detect penetrations between non-convex surfaces, with methods such as the fast triangle-triangle intersection test by Mller (1997) providing robust pair evaluations by separating intersecting and non-intersecting cases through signed distances and separating axes.
+Voxel-based approaches represent non-convex volumes as discrete grids, where occupancy queries allow rapid detection of potential overlaps by checking voxel intersections before refining to surface geometry. In deformable models like cloth or soft bodies, continuous collision detection (CCD) is essential to capture inter-frame penetrations, often using distance fields to compute the minimum separation between deforming elements or proxy volumes such as hierarchical bounding spheres to approximate dynamic shapes for culling. Self-collision in these models is managed through cage structures, where nested or hierarchical cages enclose the deforming mesh to detect intra-object contacts by testing cage intersections and propagating to the underlying geometry.
+Recent advances leverage signed distance fields (SDFs) for implicit surface representations, enabling real-time collision queries between general deformable solids in robotics by computing exact distances without explicit meshing, as demonstrated in 2024 frameworks that integrate SDFs with trajectory optimization for safe manipulation. GPU-accelerated voxel hashing further enhances scalability for large-scale deformable scenes, using spatial hash tables to dynamically allocate voxels only where needed, supporting multi-scale representations for efficient volume queries in simulations.
+Key challenges include the high computational cost of updating decompositions or fields during frequent deformations, which can degrade real-time performance, and managing topology changes like tearing in cloth that invalidate precomputed structures and require adaptive rebuilding.
+
+Advanced Techniques
+
+Exploiting Temporal Coherence
+
+In animated scenes, collision detection algorithms can exploit temporal coherencethe observation that object motions are typically smooth and continuous between consecutive framesto reuse computational results from prior time steps, thereby reducing the workload for subsequent detections. This approach caches intersecting object pairs and incrementally updates them based on small velocity changes, avoiding full recomputation of spatial relationships. For instance, in bounding volume hierarchies (BVHs), persistent data structures like the Bounding Volume Test Tree maintain a "front" of potentially colliding nodes from the previous frame, sprouting or pruning branches only where motion warrants it, leading to significant speedups for oriented bounding boxes (OBBs) in cases of small displacements.
+Specific methods leverage this coherence through incremental maintenance of data structures. In sweep and prune algorithms, sorted lists of axis-aligned bounding boxes (AABBs) from the prior frame are rotated or adjusted via local swaps rather than fully resorting, exploiting the fact that relative object orders change minimally with smooth motion; this reduces the average complexity from O(n log n) to near O(n in highly coherent scenarios. Motion bounds provide conservative tests by enclosing an object's swept volume over a time interval within a simple shape, such as a sphere or capsule, allowing quick rejection of non-colliding pairs without exact trajectory integration; the controlled conservative advancement technique advances simulation time by the minimum safe interval bounded by these volumes, ensuring no collisions are missed while minimizing tests.
+To further localize updates, islanding groups objects into connected components based on prior contacts or joints, treating isolated "islands" as independent sub-simulations that only require broad-phase checks within their boundaries, thus scaling efficiency with scene sparsity. These techniques yield significant gains in real-time applications, such as rigid body simulations, where coherent motions dominate, but their effectiveness diminishes with abrupt changes like explosions or teleportations, necessitating hybrid strategies that trigger full rebuilds when coherence thresholds are exceeded.
+
+GPU and Parallel Acceleration
+
+Collision detection in large-scale scenes benefits significantly from GPU acceleration, which exploits the single instruction, multiple data (SIMD) architecture to parallelize computations across thousands of cores. In the broad phase, GPUs enable efficient parallel traversal of bounding volume hierarchies (BVHs), where multiple rays or queries can be processed simultaneously using frameworks like CUDA or OpenCL. This approach distributes the workload by assigning independent traversal tasks to GPU threads, achieving speedups of up to 10x over CPU implementations for scenes with millions of primitives.
+General-purpose computing on GPUs (GPGPU) extends to narrow-phase primitive tests, such as batch ray-triangle intersections, where kernels perform vectorized computations on groups of triangles to detect overlaps. For instance, optimized ray-triangle algorithms on GPUs can process billions of tests per second by leveraging shared memory and warp-level primitives, reducing latency in real-time applications. In handling deformable objects, signed distance field (SDF) volumes computed in shaders provide a continuous representation for collision queries, allowing efficient distance computations between deforming meshes without explicit triangle tests. This technique integrates seamlessly with GPU pipelines, enabling real-time detection for cloth or soft bodies by sampling SDFs in fragment shaders.
+Prominent frameworks like NVIDIA's PhysX have incorporated GPU solvers since the 2010s, offloading rigid body collision detection to CUDA for scenes with thousands of objects, yielding performance gains of 5-20x in broad- and narrow-phase culling.
+On the CPU side, parallelization complements GPU efforts through multi-threading techniques, such as sorting sweep-and-prune (SAP) structures using parallel radix sort algorithms that distribute axis-aligned bounding box (AABB) endpoints across cores. Temporal coherence aids in load balancing for irregular workloads, ensuring scalable broad-phase performance for scenes with millions of objects on multi-core processors. Recent advances as of 2025 include machine learning approaches for robot self-collision detection, integrating positional encoding with neural networks to improve accuracy in cluttered environments.
+Despite these advantages, GPU acceleration faces trade-offs, including memory bandwidth limitations that bottleneck irregular data access patterns during BVH traversal or primitive fetches in non-uniform scenes. Additionally, narrow-phase bottlenecks persist for complex contacts, as GPU efficiency drops for sequential dependency-heavy tasks, often requiring hybrid CPU-GPU pipelines to maintain overall throughput.
+
+Pruning and Optimization Strategies
+
+Pairwise pruning techniques refine the set of candidate object pairs generated by broad-phase algorithms, eliminating those unlikely to collide through additional spatial or distance-based checks. These methods often employ distance thresholds to skip pairs separated by more than a predefined margin, such as the sum of object radii plus a safety buffer, thereby avoiding expensive narrow-phase tests. For instance, in sphere-based representations, a pair is pruned if the distance between centers exceeds the combined radii, a test that can be performed in constant time. Voronoi regions further enhance this by defining boundaries around object features (e.g., vertices, edges, faces) where the closest points on colliding objects must lie, allowing early rejection of pairs whose Voronoi diagrams do not overlap. These approaches are particularly effective in dense scenes, reducing the number of full intersection tests by orders of magnitude.
+A priori pruning predicts non-collisions before detailed geometric tests by analyzing object motions, such as relative velocity vectors between pairs. By projecting the relative velocity onto face normals, faces with negative dot productsindicating motion away from the surfacecan be culled, effectively pruning up to 50% of potential checks in polyhedral scenes. For translational motions between convex polyhedra, applicability constraints limit valid contact types (e.g., vertex-face or edge-edge) based on velocity directions, achieving near-linear complexity with a small constant factor. These predictive culls are especially useful in dynamic simulations where objects exhibit coherent trajectories, minimizing redundant computations without sacrificing accuracy.
+Further optimizations include level-of-detail (LOD) representations, which use simplified geometries for distant or low-priority objects to reduce collision complexity while maintaining accuracy for nearby interactions. Dynamic LOD adjusts hierarchy density based on object proximity or importance, integrating with bounding volume trees to prune subtrees of low-detail models efficiently. Batching groups similar tests (e.g., via SIMD instructions) to exploit cache locality and parallelism, processing multiple pairwise checks in vectorized operations for up to 4x speedup on sphere tests. These techniques ensure cache-efficient traversal in hierarchical structures, minimizing memory accesses during pruning.
+Effective pruning strategies typically reduce candidate pairs to less than 1% of the naive O(n) total, with benchmarks showing broad-phase outputs dropping from 55 potential pairs to 10 for 11 objects, and overall detection times of 2-5 ms per frame in interactive applications. Oriented bounding box trees, for example, outperform axis-aligned variants by processing O(m) tests instead of O(m) for m primitives, while discrete oriented polytopes (DOPs) with 18 facets yield optimal balance in pruning efficiency.
+
+Applications
+
+In Computer Graphics and Simulations
+
+In computer graphics, collision detection plays a crucial role in rendering pipelines, particularly through ray-object intersections that enable accurate computation of shadows and reflections. Rays are traced from the camera or light sources to determine intersections with scene geometry, ensuring realistic light transport effects such as hard and soft shadows or specular reflections on surfaces. Bounding volume hierarchies (BVHs) accelerate these intersections by organizing scene primitives into a spatial tree structure, reducing the number of ray-primitive tests from linear to logarithmic complexity. In offline rendering engines like Blender's Cycles, BVHs are built per frame or scene to support path tracing, where millions of rays per pixel intersect complex models for photorealistic outputs.
+In physics-based simulations, collision detection integrates with rigid and soft body dynamics to prevent interpenetrations and compute realistic responses. For rigid bodies, discrete collision detection checks overlaps at simulation timesteps, while continuous collision detection (CCD) predicts exact contact times during motion, avoiding tunneling artifacts in high-speed scenarios. Soft body simulations, often using finite element methods (FEM), rely on CCD to handle deformable materials like rubber or tissue, where element-wise intersection tests ensure stability across deformation steps. Cloth simulations address self-collisions by detecting and resolving intersections between adjacent or distant triangles in the mesh, using techniques like predictive contacts to maintain fabric integrity without excessive stretching or folding. Narrow-phase algorithms, such as triangle-triangle tests, are employed within these simulation loops to verify contacts after broad-phase culling.
+Open-source physics engines like Bullet and ODE facilitate collision detection in graphics simulations, supporting rigid body stacks, constraints, and deformable extensions for animation workflows. Bullet provides robust broad- and narrow-phase detection with CCD support, enabling stable stacking of thousands of objects in visual effects scenes. ODE offers modular collision geometries and friction models, integrated into tools for simulating jointed mechanisms or particle systems. Commercial software like Houdini employs advanced collision detection in its DOP networks for VFX production, using volume or surface-based methods to handle particle-fluid or rigid-fracture interactions in films.
+Key challenges in these applications include balancing detection accuracy with performance constraints, such as maintaining 60 frames per second (FPS) in interactive previews while processing scenes with millions of primitives. High-fidelity CCD can increase computational cost by orders of magnitude, necessitating hybrid acceleration via spatial partitioning or GPU offloading to prune unnecessary tests. Recent 2025 reviews of deformable model collision detection highlight hybrid discrete-continuous approaches, combining timestep-based checks with motion prediction to improve efficiency in FEM-based soft body simulations without sacrificing robustness.
+
+In Video Games
+
+In video games, collision detection is often implemented using hitboxes, which are simplified geometric shapes such as rectangles in 2D or capsules and boxes in 3D that approximate the visual model of an object for rapid intersection testing. These hitboxes enable fast input handling and response mechanics, like character movement or projectile impacts, by decoupling precise visual rendering from computational geometry; for instance, a character's capsule hitbox detects ground contact without testing every polygon of the mesh. Bounding volumes form the foundation of these hitboxes, providing an efficient proxy for more complex shapes.
+Major game engines integrate collision detection through dedicated physics systems, such as Unity's integration with NVIDIA PhysX, which employs a sweep-and-prune (SAP) algorithm for broad-phase culling of potential collisions and the Gilbert-Johnson-Keerthi (GJK) algorithm for narrow-phase testing of convex shapes. Similarly, Unreal Engine's Chaos Physics uses GJK for distance calculations between convex geometries in the narrow phase, combined with spatial partitioning for broad-phase efficiency to handle dynamic scenes with thousands of objects. These implementations support layered queries, where collision checks are filtered by object categoriessuch as triggers for non-physical events versus full physics simulationsreducing unnecessary computations via layer collision matrices that ignore predefined layer pairs.
+Optimizations extend to multiplayer networking, where synchronization ensures consistent collision outcomes across clients; typically, server-side collision detection resolves disputes to prevent cheating, while client-side prediction simulates immediate responses for low-latency feel, reconciling with server authoritative results. Common issues include tunneling, where fast-moving objects like projectiles pass through thin barriers between frames, mitigated by continuous collision detection (CCD) modes that compute exact time-of-impact along motion paths rather than discrete frame checks. In mobile games, hardware constraints necessitate reduced precision, such as using simpler axis-aligned bounding boxes (AABB) over oriented ones and limiting collision checks via spatial partitioning to maintain frame rates on lower-powered devices.
+The evolution of collision detection in video games traces from 1980s 2D arcade titles using basic AABB for pixel-perfect or rectangular overlaps in platformers, to modern 3D open-world environments leveraging bounding volume hierarchies (BVH) for scalable detection amid vast numbers of dynamic elements, as seen in large-scale simulations requiring real-time performance.
+
+In Robotics and Autonomous Systems
+
+In robotics, proximity sensing plays a crucial role in collision detection, enabling robots to perceive and avoid obstacles in dynamic environments. Light Detection and Ranging (LIDAR) sensors provide high-resolution 3D point clouds for accurate distance measurement, while ultrasonic sensors complement them by detecting soft or low-reflectivity objects that LIDAR might miss, such as those on the ground or at varying heights. For manipulator path planning, octree-based algorithms efficiently represent complex environments by hierarchically partitioning 3D space into voxels, facilitating rapid collision checks during motion planning. The MoveIt! framework, integrated with the Robot Operating System (ROS), leverages these octrees to generate collision-free trajectories for robotic arms, optimizing for real-time performance in tasks like assembly and manipulation.
+In autonomous vehicles, real-time obstacle detection relies on processing LIDAR-generated point clouds to identify and track dynamic objects, such as pedestrians or other vehicles, with algorithms clustering points and estimating velocities for immediate response. Vehicle-to-Everything (V2X) communication enhances predictive avoidance by sharing intent and position data between vehicles and infrastructure, allowing preemptive maneuvers to prevent collisions beyond line-of-sight. Signed Distance Fields (SDFs) serve as a key method for environment mapping in robotics, representing surfaces implicitly to enable efficient collision queries and navigation; recent frameworks, such as online learning of continuous SDFs from depth images, support dynamic updates for mobile robots. Reviews of human-robot collaboration highlight integrated sensor fusion for collision avoidance, emphasizing power- and force-limiting strategies to ensure safe coexistence in shared workspaces.
+Safety standards like ISO/TS 15066 guide collaborative robot design by specifying limits on force, pressure, and speed during human interactions, mandating collision detection mechanisms to halt operations upon impact. Handling uncertainty in sensor data is essential, with probabilistic models accounting for noise in LIDAR or ultrasonic readings to maintain robust detection, often using Bayesian filtering to predict potential collisions under partial observability. Advances include machine learning approaches for anomaly detection in collisions, such as unsupervised algorithms that identify deviations in joint torques or vibrations, enabling proactive safety responses in manipulators. In fusion robotics applications, novel collision detection algorithms estimate fast ion losses in tokamak devices by simulating particle trajectories against wall geometries, improving predictive maintenance for high-energy environments.
+
+References
+
+ Real-Time_Rendering_4th-Collision_Detection.pdf
+
+ Collision Detection: Algorithms and Applications - GAMMA
+
+Collision Detection and Proximity Queries - GAMMA UNC
+
+ Collision Detection for Interactive Graphics Applications - Brown CS
+
+Real-Time Triangle-SDF Continuous Collision Detection
+
+https://ieeexplore.ieee.org/document/4414258
+
+Introduction | SpringerLink
+
+Collision Detection and Response for Computer Animation
+
+ Collision Detection for Deformable Objects - Hal-Inria
+
+Interval Methods for Multi-Point Collisions between Time-Dependent ...
+
+ Proximity Queries and Penetration Depth Computation on 3D Game ...
+
+The IMA Volumes in Mathematics and its Applications
+
+A 3-dimensional representation for fast rendering of complex scenes
+
+ An Introduction to Physically Based Modeling: Rigid Body ...
+
+ Physically Based Modeling Rigid Body Simulation
+
+Review on Motion Planning of Robotic Manipulator in Dynamic ...
+
+ Fast Continuous Collision Detection between Rigid Bodies - Hal-Inria
+
+ Continuous Collision Detection and Physics | GameDevs.org
+
+ Collision Detection with Swept Spheres and Ellipsoids - Jorrit Rouw
+
+ Continuous Collision - Box2D
+
+ Geometric Primitives & Proximity Detection | GameDevs.org
+
+ Fast Collision Detection for Deformable Models using ...
+
+ Bounding Volume Hierarchies for Collision Detection - IntechOpen
+
+ Fast Collision Detection for Skeletally Deformable Models
+
+ Collision detection between geometric models: a survey - GAMMA
+
+ Collision Detection in Interactive 3D Environments
+
+ Collision Detection: A Survey - Rose-Hulman
+
+ Optimized Spatial Hashing for Collision Detection of Deformable ...
+
+ An Interactive and Exact Collision Detection System for Large-Scale ...
+
+ Collision Detection for Continuously Deforming Bodies
+
+Efficient collision culling by a succinct bi-dimensional sweep and ...
+
+ OBB-Tree: A Hierarchical Structure for Rapid Interference Detection
+
+Efficient Collision Detection of Complex Deformable Models using ...
+
+ Efficient Collision Detection Using Bounding Volume Hierarchies of ...
+
+None
+
+ Dynamic Bounding Volume Hierarchies - Box2D
+
+ Real-Time Collision Detection
+
+None
+
+ A fast procedure for computing the distance between complex ...
+
+Advanced Collision Detection NVIDIA PhysX SDK 3.4.0 ...
+
+ COMPUTATIONAL GEOMETRY
+
+ Approximate Convex Decomposition and Its Applications
+
+ A Fast Triangle-Triangle Intersection Test 1 Introduction 2 ...
+
+A voxel-based parallel collision detection algorithm
+
+ Nested Cages - CS@Columbia
+
+Real-time collision detection between general SDFs
+
+ Real-time 3D Reconstruction at Scale using Voxel Hashing
+
+ A-Fast-Culling-Scheme-For-Deformable-Object-Collision-Detection ...
+
+https://www.worldscientific.com/doi/10.1142/S0218654306000883
+
+ C A: Controlled Conservative Advancement for Continuous Collision ...
+
+Simulation Islands - Box2D
+
+Bulk-synchronous parallel simultaneous BVH traversal for collision ...
+
+ Fast GPU-based Collision Detection for Deformable Models - GAMMA
+
+ GPU-Based Ray-Triangle Intersection Testing 1 Introduction
+
+ Performance Analysis for GPU-based Ray-triangle Algorithms
+
+ Neural Collision Detection for Deformable Objects - arXiv
+
+ Real-time Collision Detection between General SDFs
+
+GPU Simulation physx 5.4.1 documentation
+
+Particles NVIDIA PhysX SDK 3.3.4 Documentation
+
+(PDF) Virtual Assembly Collision Detection Algorithm Using ...
+
+ Adaptive Collision Culling for Large-Scale Simulations by a Parallel ...
+
+How can I exploit multithreading in collision resolution?
+
+ Practical Collision Detection on the GPU
+
+ Collision Detection Algorithms for Motion Planning
+
+Improvement of Collision Detection Performance of Hierarchies by ...
+
+ Collision Detection and Proximity Queries SIGGRAPH 2004 Course
+
+BVH - Blender Developer Documentation
+
+ Interactive Simulation of Rigid Body Dynamics in Computer Graphics
+
+ Efficient Geometrically Exact Continuous Collision Detection
+
+ Chapter 9 Collision Detection in Cloth Modeling
+
+bulletphysics/bullet3: Bullet Physics SDK - GitHub
+
+Manual - ODE - Open Dynamics Engine
+
+POP Collision Detect dynamics node - SideFX
+
+(PDF) Collision Detection Algorithms for Deformable Models
+
+Hitboxes: A Survey About Collision Detection in Video Games
+
+3D collision detection - Game development - MDN Web Docs
+
+Unity - Manual: Choose a collision detection mode
+
+Chaos::GJKDistance | Unreal Engine 5.6 Documentation
+
+Use the layer collision matrix to reduce overlaps - Unity - Manual
+
+how to do client side prediction with server side collision detection?
+
+Continuous Collision Detection (Background Information)
+
+10 Strategies to Optimize Physics in Mobile Games - Daily.dev
+
+Collision Detection in 2D and 3D: Concepts and Techniques
+
+ Near-Optimal Path Planning Using Octree Leafs for Industrial ...
+
+MoveIt Motion Planning Framework
+
+3D LiDAR-based obstacle detection and tracking for autonomous ...
+
+Collision Avoidance System at Urban Intersections Using V2X ...
+
+ISO/TS 15066:2016 - Robots and robotic devices
+
+A review of the ISO 15066 standard for collaborative robot systems
+
+Human-robot collision detection under modeling uncertainty using ...
+
+Collision Detection for Robot Manipulators Using Unsupervised ...
+
+Development of novel collision detection algorithms for the ...
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

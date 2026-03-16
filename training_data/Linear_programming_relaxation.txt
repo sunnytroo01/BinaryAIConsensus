@@ -1,0 +1,294 @@
+Linear programming relaxation Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Linear programming relaxation
+ Ara Eve Leo Sal 
+1x
+ Linear programming relaxation is a fundamental technique in mathematical optimization that involves relaxing the integrality constraints of an integer linear program (ILP)where variables must take integer valuesby replacing them with continuous constraints, typically allowing variables to range over the non-negative reals or the interval for binary variables, thereby transforming the problem into a solvable linear program (LP). This relaxation enlarges the feasible region to a convex polytope, enabling polynomial-time algorithms to find an optimal fractional solution that provides a lower bound on the original ILP's optimum.
+The primary purpose of LP relaxation is to approximate NP-hard combinatorial optimization problems, such as those reducible to ILPs, by leveraging the efficiency of LP solvers to obtain bounds and guide the construction of near-optimal integer solutions through rounding techniques. For instance, in the vertex cover problem, the LP relaxation yields a 2-approximation algorithm by rounding fractional values greater than or equal to 1/2 to 1, ensuring the solution's cost is at most twice the optimal integer value. Similarly, for the set cover problem, randomized rounding of the LP solution achieves an O(log n)-approximation ratio, where n is the universe size, bounding the expected cost by (4 ln n + 2) times the ILP optimum with high probability.
+A key measure of an LP relaxation's quality is the integrality gap, defined as the supremum ratio of the ILP optimum to the LP optimum over all instances, which quantifies the approximation limitation; for vertex cover, this gap is asymptotically 2, preventing better than 4/3 approximations in certain cases. LP relaxations also facilitate advanced methods like Lagrangian relaxation for bounding and duality for deriving valid inequalities that tighten the formulation. These properties make LP relaxation a cornerstone of approximation algorithms in computer science and operations research, widely applied in areas including network design, scheduling, and machine learning.
+
+Fundamentals of Integer Programming
+
+Linear Programming Basics
+
+Linear programming (LP) is a method in mathematical optimization for maximizing or minimizing a linear objective function subject to a finite number of linear equality and inequality constraints. The variables in LP are typically required to be non-negative, representing quantities such as resources or production levels in applications like resource allocation and scheduling.
+The standard form of an LP problem is to minimize (or equivalently, maximize by negating the objective) $ \mathbf{c}^T \mathbf{x} $ subject to $ A \mathbf{x} \leq \mathbf{b} $ and $ \mathbf{x} \geq \mathbf{0} $, where $ \mathbf{c} \in \mathbb{R}^n $ is the coefficient vector for the objective, $ A \in \mathbb{R}^{m \times n} $ is the constraint matrix, $ \mathbf{b} \in \mathbb{R}^m $ is the right-hand side vector, and $ \mathbf{x} \in \mathbb{R}^n $ is the vector of decision variables. LP problems possess key properties including convexity, as both the objective function and the feasible region defined by the constraints form convex sets, ensuring that local optima are global optima. LP is solvable in polynomial time using algorithms such as the simplex method, introduced by George Dantzig in 1947, or interior-point methods, pioneered by Narendra Karmarkar in 1984.
+Geometrically, the feasible region of an LP is a convex polyhedron (or polytope if bounded), formed as the intersection of half-spaces defined by the linear constraints. Due to the linearity of the objective function, the optimal solution, if it exists, occurs at a vertex (extreme point) of this polyhedron.
+Every LP has a dual formulation: for the primal problem of maximizing $ \mathbf{c}^T \mathbf{x} $ subject to $ A \mathbf{x} \leq \mathbf{b} $ and $ \mathbf{x} \geq \mathbf{0} $, the dual is to minimize $ \mathbf{b}^T \mathbf{y} $ subject to $ A^T \mathbf{y} \geq \mathbf{c} $ and $ \mathbf{y} \geq \mathbf{0} $. The strong duality theorem states that if both the primal and dual problems are feasible and bounded, then they attain the same optimal objective value.
+
+Integer Linear Programming Formulation
+
+Integer linear programming (ILP) extends the framework of linear programming by imposing integrality constraints on some or all decision variables, requiring them to take integer values rather than any real numbers. This discreteness captures problems where solutions must be whole units, such as selecting indivisible items or routes. In the special case of 0-1 ILP, variables are restricted to binary values (0 or 1), which models selection decisions like including or excluding an option.
+The standard formulation of an ILP is to minimize the objective function $ \mathbf{c}^T \mathbf{x} $ subject to linear constraints $ A \mathbf{x} \leq \mathbf{b} $, non-negativity $ \mathbf{x} \geq \mathbf{0} $, and integrality $ \mathbf{x} \in \mathbb{Z}^n $, where $ \mathbf{c} \in \mathbb{R}^n $, $ A \in \mathbb{R}^{m \times n} $, $ \mathbf{b} \in \mathbb{R}^m $, and $ n $ and $ m $ denote the number of variables and constraints, respectively. This form allows for mixed-integer variants where only a subset of variables are integer-valued. Solving general ILPs is NP-hard, as established by Karp in 1972, who demonstrated the NP-completeness of 0-1 integer programming through reductions from known NP-complete problems like satisfiability.
+ILPs arise in numerous combinatorial optimization applications. For instance, the 0-1 knapsack problem involves selecting a subset of items, each with a weight and value, to maximize total value without exceeding a knapsack capacity; binary variables indicate item inclusion, with constraints on total weight and the objective maximizing summed values. Similarly, the traveling salesman problem (TSP) requires finding a minimum-cost tour visiting each city exactly once and returning to the start; it is modeled using binary variables for edges in a complete graph, with degree constraints ensuring a single entry and exit per city and subtour elimination to form a connected cycle.
+The feasible region of an ILP comprises the integer lattice points lying within the polyhedron defined by the continuous linear constraints, contrasting with the full polyhedron of standard linear programming. This sparsity of feasible solutions underscores the computational intractability of ILPs compared to their continuous counterparts.
+
+The Relaxation Process
+
+Defining LP Relaxation
+
+In integer linear programming (ILP), the linear programming (LP) relaxation is constructed by eliminating the integrality requirements on the decision variables while preserving all other constraints, resulting in a surrogate problem that is computationally tractable via standard LP solvers. This transformation expands the feasible region to include fractional solutions, allowing the application of efficient polynomial-time algorithms like the simplex method or interior-point methods to obtain bounds on the original ILP's optimal value.
+Formally, consider a minimization ILP given by
+min{cTxAxb,x0,xZn},
+\min \{ c^T x \mid A x \leq b, \, x \geq 0, \, x \in \mathbb{Z}^n \},
+min{cTxAxb,x0,xZn},
+where $ c \in \mathbb{R}^n $, $ A \in \mathbb{R}^{m \times n} $, $ b \in \mathbb{R}^m $, and $ x \in \mathbb{R}^n $. The corresponding LP relaxation is
+min{cTxAxb,x0},
+\min \{ c^T x \mid A x \leq b, \, x \geq 0 \},
+min{cTxAxb,x0},
+which removes the integer constraint $ x \in \mathbb{Z}^n $.
+The LP relaxation yields a lower bound on the optimal value of the minimization ILP (and an upper bound for maximization problems) because the feasible set of the ILP is a subset of the LP feasible set, while the objective function remains unchanged. To see this, let $ z_{ILP}^* $ and $ z_{LP}^* $ denote the optimal values; any feasible ILP solution $ x_{ILP} $ satisfies $ c^T x_{ILP} \geq z_{LP}^* $ since it is also feasible for the LP, implying $ z_{ILP}^* \geq z_{LP}^* $. This relationship embodies weak duality between the ILP and its relaxation, where the expanded feasible region ensures the LP optimum is no larger than the ILP optimum for minimization.
+A notable exception arises when the constraint matrix $ A $ is totally unimodulardefined as a matrix where every square submatrix has a determinant of 0, 1, or -1provided that the right-hand side $ b $ is integer-valued. In this case, all vertices of the LP feasible polytope are integer points, ensuring that the optimal LP solution is integral and thus exactly solves the ILP. For instance, the incidence matrix of a bipartite graphwhere rows correspond to all vertices and columns to edges, with a 1 if the vertex is incident to the edgeis totally unimodular, enabling exact ILP solutions via LP relaxation for problems like bipartite matching.
+
+Construction of the Relaxed Problem
+
+To construct the linear programming (LP) relaxation of an integer linear program (ILP), the process begins by identifying the integer-constrained variables in the original formulation. An ILP is typically expressed as minimizing $ \mathbf{c}^T \mathbf{x} $ subject to $ A \mathbf{x} \leq \mathbf{b} $, $ \mathbf{x} \geq 0 $, $ \mathbf{x} \in \mathbb{Z}^n $, where $ \mathbf{x} $ includes variables required to take integer values. The integer constraints, such as $ x_j \in \mathbb{Z} $ for each integer variable $ x_j $, are the key elements targeted for relaxation.
+The next step replaces these integrality requirements with continuous bounds that encompass the possible integer values. For binary variables, where $ x_i \in {0, 1} $, the constraint is relaxed to $ 0 \leq x_i \leq 1 $. For general integer variables bounded by integers $ l_j \leq x_j \leq u_j $, the relaxation uses $ l_j \leq x_j \leq u_j $ with $ x_j $ continuous. This substitution transforms the feasible region from a discrete set of lattice points to a polyhedron, preserving the linear objective and constraints while expanding the solution space. The resulting formulation is a standard LP: minimize $ \mathbf{c}^T \mathbf{x} $ subject to $ A \mathbf{x} \leq \mathbf{b} $, $ l \leq \mathbf{x} \leq u $.
+In mixed-integer linear programs (MIPs), which include both integer and continuous variables, only the integer variables are relaxed to continuous bounds, while the originally continuous variables retain their constraints. This selective relaxation ensures the MIP's LP version remains a convex polyhedral feasible set, solvable via efficient algorithms. For instance, in a MIP with binary decisions and continuous flows, the binaries become $ $-bounded reals, and flows stay unbounded or as specified.
+This construction yields equivalent reformulations such as bounding box relaxations, where the polyhedron is simply the box product of individual variable intervals intersected with the linear inequalities, or broader continuous extensions that embed the integer hull into a larger continuous domain. These views highlight the relaxation as a natural continuous analog of the discrete problem, facilitating analysis without altering the linear structure.
+The relaxed LP is solved using specialized solvers like IBM CPLEX or Gurobi Optimizer, which employ interior-point methods or revised simplex algorithms to achieve polynomial-time efficiency, often scaling to millions of variables due to the convexity. A common pitfall arises if the original formulation includes nonlinearities, potentially yielding a nonconvex relaxation, though standard ILP assumes linearity, ensuring the output remains a tractable LP.
+
+Illustrative Example
+
+Problem Setup
+
+To illustrate the application of linear programming relaxation, consider the 0-1 knapsack problem, a canonical example of an integer linear programming (ILP) formulation where decision variables represent binary choices. In this problem, there are nnn items available, each characterized by a positive weight wi>0w_i > 0wi>0 and a positive value vi>0v_i > 0vi>0 for i=1,,ni = 1, \dots, ni=1,,n, along with a knapsack of fixed capacity W>0W > 0W>0. The goal is to select a subset of these items that maximizes the total value while ensuring the total weight does not exceed the capacity.
+The ILP formulation of the 0-1 knapsack problem is given by
+maxi=1nvixi
+\max \sum_{i=1}^n v_i x_i
+maxi=1nvixi
+subject to
+i=1nwixiW,
+\sum_{i=1}^n w_i x_i \leq W,
+i=1nwixiW,
+xi{0,1}i=1,,n,
+x_i \in \{0, 1\} \quad \forall i = 1, \dots, n,
+xi{0,1}i=1,,n,
+where the binary variable xix_ixi indicates whether item iii is included in the knapsack (xi=1x_i = 1xi=1) or not (xi=0x_i = 0xi=0).
+Exact solution of this ILP is computationally challenging because it requires evaluating up to 2n2^n2n possible subsets of items to identify the optimal feasible one, an exponential number that grows rapidly with nnn and makes brute-force enumeration impractical for even moderate-sized instances. The 0-1 knapsack problem is NP-hard, underscoring the need for specialized optimization techniques.
+For clarity, examine a small instance with three items and capacity W=4W = 4W=4: Item 1 has weight w1=3w_1 = 3w1=3 and value v1=300v_1 = 300v1=300; Item 2 has w2=2w_2 = 2w2=2, v2=180v_2 = 180v2=180; Item 3 has w3=2w_3 = 2w3=2, v3=170v_3 = 170v3=170. The feasible solutions, which satisfy the weight constraint, are the empty subset (total weight 0, total value 0), the singleton {1} (weight 3, value 300), {2} (2, 180), {3} (2, 170), and the pair {2, 3} (4, 350). All other subsets violate the capacity.
+
+Solving the Original and Relaxed Versions
+
+To solve the original integer linear programming (ILP) formulation of the illustrative 0-1 knapsack problem, enumeration of all feasible binary solutions is straightforward given the small number of variables. The feasible subsets are the empty set (value 0), item 1 alone (weight 3 4, value 300), item 2 alone (weight 2 4, value 180), item 3 alone (weight 2 4, value 170), and items 2 and 3 together (weight 4 4, value 350); combinations including item 1 with either 2 or 3 exceed the capacity. Thus, the optimal integer solution is $ x_1 = 0 $, $ x_2 = 1 $, $ x_3 = 1 $, with objective value 350.
+The LP relaxation replaces the binary constraints $ x_i \in {0,1} $ with continuous bounds $ 0 \leq x_i \leq 1 $, yielding the problem:
+max300x1+180x2+170x3s.t.3x1+2x2+2x34,0x1,x2,x31.
+\begin{align*}
+\max &\quad 300x_1 + 180x_2 + 170x_3 \\
+\text{s.t.} &\quad 3x_1 + 2x_2 + 2x_3 \leq 4, \\
+&\quad 0 \leq x_1, x_2, x_3 \leq 1.
+\end{align*}
+maxs.t.300x1+180x2+170x33x1+2x2+2x34,0x1,x2,x31.
+This can be solved manually by evaluating the greedy fractional knapsack heuristic, which prioritizes items by value-to-weight ratio (100 for item 1, 90 for item 2, 85 for item 3): assign $ x_1 = 1 $ (using 3 units of capacity, value 300), then fill the remaining 1 unit with $ x_2 = 0.5 $ (value 90), setting $ x_3 = 0 $, for a total value of 390. Alternatively, the simplex method confirms this vertex optimum by pivoting from the origin through binding constraints to the point where the objective gradient aligns with the feasible polytope boundary.
+The LP solution $ (1, 0.5, 0) $ is infeasible for the original ILP due to the non-integer $ x_2 $, yet it establishes an upper bound of 390 on the integer optimum, illustrating the relaxation's bounding property.
+The feasible region of the LP relaxation forms a polyhedron in three-dimensional space, bounded by the knapsack inequality and box constraints, which contains a continuum of points including the five integer-feasible vertices identified earlier. In contrast, the ILP restricts attention to the discrete lattice points within this polyhedronspecifically, the origin and the three single-item and one two-item combinationshighlighting how the relaxation enlarges the solution space to provide a solvable continuous approximation.
+
+Theoretical Properties
+
+Optimality and Feasibility Bounds
+
+In linear programming relaxation of an integer linear program (ILP), the optimal value of the relaxed linear program (LP) provides a bound on the optimal value of the original ILP. For a maximization problem, the LP optimum $ z^{LP} $ satisfies $ z^{LP} \geq z^{ILP} $, where $ z^{ILP} $ is the ILP optimum. For a minimization problem, the inequality reverses: $ z^{LP} \leq z^{ILP} $. This follows from the inclusion of feasible sets: the ILP feasible set $ S^{ILP} $, consisting of points satisfying the linear constraints and integrality requirements, is a subset of the LP feasible set $ S^{LP} $, which relaxes the integrality constraints. Since the objective is linear, the optimum over the larger set provides an upper bound for maximization or a lower bound for minimization compared to the smaller set. The proof relies solely on this feasible set containment and the linearity of the objective, holding regardless of whether the LP solution is integer-valued.
+Regarding feasibility, every solution feasible to the ILP is also feasible to its LP relaxation, as the relaxation imposes the same linear constraints but omits the requirement that variables be integers. The converse does not hold: the LP may admit fractional solutions outside the ILP feasible set. The collection of ILP feasible points defines the integer polyhedron, or integer hull, which is the convex hull of these integer points, $ P_I = \conv{ x \in \mathbb{Z}^n \mid Ax \leq b } $. This polyhedron captures the structure of integer solutions and serves as the target for exact reformulations, though computing it fully is generally intractable.
+When the LP solution is fractional, it can be used to derive valid inequalities, known as cuts, that tighten the relaxation by excluding the fractional point while preserving all integer feasible solutions. These inequalities are valid for the integer polyhedron and are generated directly from the LP solution, such as through the simplex tableau. For instance, Gomory cuts, introduced in the seminal work on cutting planes, provide a systematic way to obtain such inequalities from the current LP basis.
+In algorithmic contexts like branch and bound, the LP relaxation plays a central role in providing bounds to guide the search. For maximization problems, the LP optimum at each node of the branch and bound tree yields an upper bound on the best possible ILP solution in the corresponding subproblem, enabling the pruning (fathoming) of suboptimal branches when this bound falls below the value of a known integer solution. For minimization problems, the LP provides a lower bound for pruning. This bounding mechanism, combined with branching on fractional variables, efficiently explores the solution space. In the illustrative example, the LP relaxation solution similarly furnishes an upper bound that exceeds the integer optimum, demonstrating the bound's role in assessing solution quality.
+
+Duality in Relaxations
+
+In the context of linear programming (LP) relaxation for integer linear programming (ILP), the dual formulation provides a complementary perspective for bounding and analyzing the problem. Consider the standard ILP primal formulated as maximizing $ \mathbf{c}^T \mathbf{x} $ subject to $ A \mathbf{x} \leq \mathbf{b} $, $ \mathbf{x} \geq \mathbf{0} $, and $ \mathbf{x} $ integer-valued (for minimization, the roles and inequalities adjust accordingly). The LP relaxation drops the integrality constraint, yielding the same objective and constraints with $ \mathbf{x} \geq \mathbf{0} $ continuous. The dual of this LP relaxation is then minimizing $ \mathbf{b}^T \mathbf{y} $ subject to $ A^T \mathbf{y} \geq \mathbf{c} $, $ \mathbf{y} \geq \mathbf{0} $.
+By strong duality in LP, the optimal value of the primal LP relaxation equals the optimal value of its dual, assuming both attain optima. This equality holds because the LP feasible sets are polyhedral and bounded appropriately for the problem instance. For the original ILP, weak duality applies: the optimal dual value (a minimum) provides an upper bound on the ILP optimal value (a maximum), since any feasible ILP solution $ \mathbf{x} $ satisfies $ \mathbf{c}^T \mathbf{x} \leq \mathbf{b}^T \mathbf{y} $ for any dual feasible $ \mathbf{y} $. For minimization ILPs, the dual provides a lower bound. Thus, solving the dual LP relaxation yields the same bound as the primal but from the minimization side, often computationally equivalent.
+The optimal dual variables $ \mathbf{y}^* $ serve as shadow prices, representing the marginal increase in the LP relaxation's optimal value per unit increase in the right-hand-side vector $ \mathbf{b} $. In ILP contexts, these shadow prices offer insights into resource allocation sensitivity, helping identify which constraints most impact the integer solution's quality, even though the prices are derived from the relaxation rather than the ILP directly. For instance, a high shadow price on a capacity constraint signals that tightening it would significantly degrade the bound, guiding practical adjustments in problem formulation.
+To illustrate, consider the 0-1 knapsack example from the previous section, with profits $ c_1 = 10 $, $ c_2 = 6 $, weights $ a_1 = 4 $, $ a_2 = 3 $, and capacity $ b = 5 $. The LP relaxation optimal value is 12, achieved at $ x_1 = 1 $, $ x_2 = 1/3 $. The dual is minimizing $ 5y + z_1 + z_2 $ subject to $ 4y + z_1 \geq 10 $, $ 3y + z_2 \geq 6 $, $ y, z_1, z_2 \geq 0 $, with optimal solution $ y = 2 $, $ z_1 = 2 $, $ z_2 = 0 $, yielding the same value 12. Here, the shadow price $ y = 2 $ indicates that increasing capacity by one unit raises the LP bound by 2, while the ILP optimal of 10 (selecting only the first item) respects the weak duality bound $ 12 \geq 10 $.
+
+Quality Measures
+
+Approximation Guarantees
+
+Linear programming relaxations play a central role in developing approximation algorithms for NP-hard integer linear programs, particularly by providing a tractable fractional lower bound that guides the construction of near-optimal integer solutions. A key measure of an approximation algorithm's performance is its approximation ratio , where for a minimization problem, the algorithm guarantees a solution with cost at most times the optimal integer solution cost, with 1; for maximization problems, the ratio is defined analogously with the solution value at least 1/ times the optimum. This ratio quantifies the worst-case deviation from optimality, enabling rigorous performance analysis even when exact solutions are computationally infeasible.
+Rounding techniques transform the optimal fractional solution of an LP relaxation into a feasible integer solution, often with provable approximation guarantees. In randomized rounding, variables are independently set to 1 with probability equal to their fractional values, while deterministic rounding applies thresholds or other rules to ensure feasibility. For the minimum vertex cover problem, a simple deterministic rounding selects all vertices with LP value at least 1/2, producing a cover whose size is at most twice the optimal, yielding a 2-approximation algorithm; this bound is tight, as the LP integrality gap approaches 2 on certain graphs. Similarly, for the set cover problem, LP-based rounding combined with greedy selection achieves an approximation ratio of ln n + 1, as established by Lovsz in his analysis of the ratio between optimal integral and fractional covers.
+The quality of these approximations is closely tied to the integrality gap of the LP relaxation, which bounds the possible loss in optimality. When the integrality gap is constant or polylogarithmic, rounding procedures can leverage this to deliver matching approximation guarantees in polynomial time, often via primal-dual or dual-fitting analyses that align the fractional and integer objectives. For example, bounded gaps enable constant-factor approximations for problems like facility location or feedback vertex set, where the LP solution directly informs scalable heuristics.
+Despite these successes, LP relaxations have inherent limitations for certain NP-hard problems, where large integrality gaps preclude constant-factor approximations unless P=NP. In such cases, the gap grows with input size, as seen in set cover where no o(ln n)-approximation exists under standard complexity assumptions, or in problems like 3-SAT maximization where arbitrary constant factors are impossible without collapsing P and NP. These hardness results underscore that while LP rounding provides robust guarantees when gaps are controlled, strengthening the relaxation or hybrid methods may be necessary for tighter bounds.
+
+Integrality Gap Analysis
+
+The integrality gap serves as a fundamental measure of the quality of a linear programming (LP) relaxation for an integer linear program (ILP), quantifying the worst-case discrepancy between their optimal solutions. For a minimization ILP, it is defined as the supremum, over all feasible instances, of the ratio of the optimal ILP value to the optimal LP value:
+supOPTILPOPTLP,
+\sup \frac{\mathrm{OPT_{ILP}}}{\mathrm{OPT_{LP}}},
+supOPTLPOPTILP,
+where OPTILPOPTLP\mathrm{OPT_{ILP}} \geq \mathrm{OPT_{LP}}OPTILPOPTLP since the LP relaxation enlarges the feasible region by dropping integrality constraints. For a maximization ILP, it is defined as the supremum of the ratio of the optimal LP value to the optimal ILP value:
+supOPTLPOPTILP,
+\sup \frac{\mathrm{OPT_{LP}}}{\mathrm{OPT_{ILP}}},
+supOPTILPOPTLP,
+where OPTLPOPTILP\mathrm{OPT_{LP}} \geq \mathrm{OPT_{ILP}}OPTLPOPTILP. In both cases, this ratio, always at least 1, highlights the inherent approximation limit imposed by the relaxation; an integrality gap of \rho implies no algorithm using this LP can guarantee better than \rho-approximation without additional techniques.
+Computing the integrality gap for specific problems often involves constructing adversarial instances that maximize the ratio. For the vertex cover problem, the standard LP relaxation exhibits an integrality gap of 2, achieved in the limit by complete bipartite graphs Kn,nK_{n,n}Kn,n where the fractional solution assigns 1/2 to each vertex on one side, yielding half the integer optimum. In contrast, some ILPs suffer from unbounded integrality gaps, meaning the ratio can grow arbitrarily large. For instance, the natural LP relaxation for the knapsack median problem (a variant combining facility location with knapsack constraints) has an unbounded gap, even when facility costs are bounded, as instances with exponentially increasing client distances force the fractional solution to spread costs inefficiently while the integer solution clusters tightly.
+The magnitude of the integrality gap depends on structural properties of the problem, including the constraint matrix and objective coefficients. Sparse or totally unimodular matrices tend to yield small gaps (sometimes 1, ensuring integrality), whereas dense or irregular structures amplify discrepancies by allowing fractional solutions to exploit non-integer combinations unavailable to integer ones. Objective coefficients that emphasize high-variance terms can further widen the gap by favoring fractional averaging over integer selections.
+Despite these challenges, certain problem classes admit constant-factor integrality gaps, enabling strong approximation guarantees. For the metric traveling salesman problem (TSP), Christofides' 1976 algorithm leverages a minimum spanning tree and matching to achieve a 1.5-approximation, which matches the previously known upper bound on the integrality gap of the subtour elimination LP relaxation in metric instances (recently improved to less than 1.5 as of 2023). More recent analyses confirm constant gaps for restricted metrics, such as unit-weight graphical TSP, where advanced LP hierarchies bound the ratio below 1.6.
+
+Algorithmic Applications
+
+Branch and Bound Integration
+
+Branch and bound is a recursive algorithmic framework for solving integer linear programming (ILP) problems exactly by systematically partitioning the domain of integer variables and using bounding mechanisms to prune unproductive search paths. Introduced by Land and Doig in 1960, the method constructs a search tree where each node represents a subproblem with additional constraints from branching decisions, and relaxations provide bounds to evaluate the potential of unexplored branches.
+In the context of ILP, linear programming (LP) relaxations play a central role by furnishing tight lower or upper bounds at each node of the branch and bound tree, depending on whether the problem is minimization or maximization. At the root node, the LP relaxation of the original ILP is solved to obtain an initial bound; if the solution is integer-feasible, it provides an incumbent solution, otherwise, fractional variables are selected for branching. Branching typically involves fixing a fractional variable xix_ixi to 0 or 1, creating two child nodes with tightened constraints, and the LP relaxation is re-solved at each child to compute updated bounds.
+LP-based bounding enables efficient pruning: if the bound at a node is worse than the current best integer solution (incumbent), the entire subtree rooted at that node can be discarded, as it cannot yield a better feasible solution. Re-optimization after branching exploits the structure of the previous LP solution, often using warm starts to reduce computational effort, and the resulting bounds reflect the tightened feasible region. This process continues depth-first or via node selection heuristics until all nodes are processed or pruned, guaranteeing optimality upon termination.
+The efficiency of LP-based branch and bound stems from the polynomial-time solvability of LPs, yielding pseudopolynomial time complexity for certain structured problems like the knapsack, where the number of nodes explored grows manageably with instance size. Modern implementations, such as the SCIP optimization suite, integrate advanced LP solvers like SoPlex for rapid relaxations and incorporate presolving, cutting planes, and heuristics to enhance bounding and reduce tree size in practice. SCIP has demonstrated scalability on large-scale mixed-integer programs, solving instances with thousands of variables through effective LP re-optimization across the search tree.
+A representative extension to the 0-1 knapsack problem illustrates this integration: consider maximizing 8x1+11x2+6x3+4x48x_1 + 11x_2 + 6x_3 + 4x_48x1+11x2+6x3+4x4 subject to 5x1+7x2+4x3+3x4145x_1 + 7x_2 + 4x_3 + 3x_4 \leq 145x1+7x2+4x3+3x414 and xi{0,1}x_i \in \{0,1\}xi{0,1}. The root LP relaxation yields a bound of 22 with fractional solution x=(1,1,0.5,0)x = (1, 1, 0.5, 0)x=(1,1,0.5,0); branching on x3=1x_3 = 1x3=1 gives an integer solution of 21 at (0,1,1,1) (providing an incumbent), while x3=0x_3 = 0x3=0 leads to a bound less than or equal to 21 (e.g., integer solution of 19 at (1,1,0,0)), which is pruned, exploring a shallow tree to confirm the optimal value of 21 at x=(0,1,1,1)x = (0, 1, 1, 1)x=(0,1,1,1). This example highlights how LP bounds guide the search, pruning infeasible or suboptimal branches early.
+
+Cutting Plane Methods
+
+Cutting plane methods enhance the linear programming (LP) relaxation of integer linear programs by iteratively adding valid inequalities, known as cuts, that eliminate fractional solutions while preserving all integer feasible points. These cuts tighten the relaxation, reducing the integrality gap and improving the lower bound on the optimal integer solution. The process begins by solving the current LP relaxation; if the solution is fractional, a cut is derived from the simplex tableau and added to the formulation, with the procedure repeating until an integer solution is obtained or combined with other techniques.
+Gomory's cutting plane method, introduced in 1958, provides a systematic way to generate such cuts for pure integer programs from the optimal simplex tableau. Consider a basic feasible solution where a tableau row takes the form jajxj=b\sum_j \bar{a}_j x_j = \bar{b}jajxj=b, with b\bar{b}b fractional, b=b+f0\bar{b} = \lfloor \bar{b} \rfloor + f_0b=b+f0 where 0<f0<10 < f_0 < 10<f0<1, and aj=aj+fj\bar{a}_j = \lfloor \bar{a}_j \rfloor + f_jaj=aj+fj with 0fj<10 \leq f_j < 10fj<1. The Gomory fractional cut, assuming non-negative coefficients in the row, is then jfjxjf0\sum_j f_j x_j \geq f_0jfjxjf0. For the mixed-integer case, where some variables are continuous, the Gomory mixed-integer cut (GMIC) extends this by deriving valid inequalities that account for continuous variables, using disjunctive programming to adjust coefficients based on fractional parts relative to f0f_0f0, ensuring the cut is violated by the current fractional solution but valid for the integer hull.
+The Chvtal-Gomory procedure, developed by Chvtal in 1973, extends this idea to generate cuts through iterative rounding for pure integer programs. Starting from the LP relaxation inequalities jaijxjbi\sum_j a_{ij} x_j \leq b_ijaijxjbi, non-negative multipliers i0\lambda_i \geq 0i0 are chosen such that iiaij\sum_i \lambda_i a_{ij}iiaij is integer for all jjj, yielding jiiaijxjiibi\sum_j \lfloor \sum_i \lambda_i a_{ij} \rfloor x_j \leq \lfloor \sum_i \lambda_i b_i \rfloorjiiaijxjiibi. This produces a family of valid cuts, with repeated application defining the Chvtal-Gomory closure, which strengthens the polyhedron iteratively. The procedure converges to the integer hull in finitely many steps for rational data.
+Modern variants build on these foundations to generate stronger cuts efficiently. Mixed-integer rounding (MIR) cuts, popularized in the late 1990s, derive from aggregating constraints and applying rounding to mixed-integer rows, often yielding tighter inequalities than basic Gomory cuts; for instance, from a simple mixed row jajxj+kdkyk\sum_j a_j x_j + \sum_k d_k y_k \leq \deltajajxj+kdkyk, the MIR cut is j:f(aj)f()f(aj)1f()xj+k:f(dk)<f()f(dk)f()yk1\sum_{j: f(a_j) \geq f(\delta)} \frac{f(a_j)}{1 - f(\delta)} x_j + \sum_{k: f(d_k) < f(\delta)} \frac{f(d_k)}{f(\delta)} y_k \geq 1j:f(aj)f()1f()f(aj)xj+k:f(dk)<f()f()f(dk)yk1, where fff denotes the fractional part and xjx_jxj are integers, yky_kyk continuous. Lift-and-project methods, originating from Balas's 1979 disjunctive programming framework, project the polyhedron onto disjunctions induced by integer constraints (e.g., xj{0,1}x_j \in \{0,1\}xj{0,1} implies xj(1xj)=0x_j (1 - x_j) = 0xj(1xj)=0), lifting inequalities to higher dimensions before projecting back to obtain valid cuts for the relaxation. These cuts can be computed via linear programming and often close more of the gap in fewer iterations.
+For rational input data, cutting plane methods guarantee finite convergence to an optimal integer solution, as each cut strictly improves the bound and the process terminates when the polyhedron stabilizes. In practice, they are combined with branch-and-bound in branch-and-cut algorithms, where cuts are added at nodes to refine relaxations throughout the search tree, significantly enhancing performance on large-scale problems.
+
+References
+
+ Lecture 7 1 Linear Programming Relaxations - Stanford CS Theory
+
+ 10.1 Integer Programming and LP relaxation - cs.wisc.edu
+
+ Lecture 20: LP Relaxation and Approximation Algorithms - Yuan Zhou
+
+ Linear Programming - Stanford CS Theory
+
+ Origins of the Simplex Method - DTIC
+
+ Duality in Linear Programming - MIT
+
+ Integer Programming - MIT
+
+ REDUCIBILITY AMONG COMBINATORIAL PROBLEMS
+
+ A Tutorial on Integer Programming
+
+Traveling salesman problem - Optimization Wiki
+
+https://theory.stanford.edu/~trevisan/cs261/lecture07.pdf
+
+ 1 Linear programming relaxation - Cornell: Computer Science
+
+ 1 Totally Unimodular Matrices - Stanford CS Theory
+
+ Lecture 6: Totally Unimodular Matrices - NC State ISE
+
+ Applications of Totally Unimodular Matrices 11.1 Bipartite Graphs
+
+ 1 Bipartite matching and vertex covers - Princeton University
+
+Integer and Combinatorial Optimization | Wiley Online Books
+
+ LP Relaxation and Rounding 1 Linear programs and linear integer ...
+
+ Duality for Mixed Integer Linear Programs
+
+ Integer Programming Formulation 1
+
+ Parallel Solvers for Mixed Integer Linear Optimization
+
+ The Knapsack Problem
+
+0-1 Knapsack Problem - an overview | ScienceDirect Topics
+
+ 1. Introduction The 0/1 knapsack problem has been studied ... - NJIT
+
+ Integer Linear Programming - MAT3007 Optimization
+
+ Integer programming techniques 1: branch and bound
+
+Cutting planes in integer and mixed integer programming
+
+ Integer Programming Duality
+
+ Integer Programming Duality - John Hooker
+
+ Integer programming and pricing revisited
+
+How to derive the dual problem of Knapsack problem
+
+ Lecture 12: Knapsack Problems - University of Connecticut
+
+ Approximation Algorithms - Cornell: Computer Science
+
+ Using Linear Programming in the Design and Analysis of ...
+
+ LP RELAXATIONS AND INTEGRALITY GAP
+
+ Approximation algorithms based on LP relaxation 1 Linear programs ...
+
+cc.complexity theory - The importance of Integrality Gap
+
+ Constant Factor Approximation Algorithm for the Knapsack Median ...
+
+ Worst-Case Analysis of a New Heuristic for the Travelling Salesman ...
+
+ Improving Christofides' Algorithm for the st Path TSP - arXiv
+
+An Automatic Method of Solving Discrete Programming Problems
+
+Branch-and-bound algorithms: A survey of recent advances in ...
+
+How to add branching rules - SCIP Doxygen Documentation
+
+LP Solver Interface - SCIP Doxygen Documentation
+
+SCIP: FAQ - Zuse-Institut Berlin
+
+ Relaxations and Bounds: Applications to Knapsack Problems
+
+The SCIP Optimization Suite 9.0 - arXiv
+
+ A Branch and Bound Algorithm for the Knapsack Problem
+
+Edmonds polytopes and a hierarchy of combinatorial problems
+
+Aggregation and Mixed Integer Rounding to Solve MIPs - PubsOnLine
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

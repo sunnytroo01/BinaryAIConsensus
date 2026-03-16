@@ -1,0 +1,211 @@
+Authenticated Received Chain Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+Authenticated Received Chain
+ Ara Eve Leo Sal 
+1x
+ The Authenticated Received Chain (ARC) is an email authentication protocol developed by the Internet Engineering Task Force (IETF) to establish an authenticated "chain of custody" for messages as they pass through intermediate handlers, such as mailing lists or forwarding services, thereby preserving and verifying prior authentication assessments to mitigate failures in established mechanisms like SPF, DKIM, and DMARC. Published as RFC 8617 in July 2019, ARC enables Internet Mail Handlers to attach cryptographic assertions of message authentication results directly to the email, ensuring that modifications by legitimate intermediaries do not break the overall authentication chain.
+ARC addresses a key limitation in email authentication ecosystems: when messages are altered or forwarded by third-party servicessuch as security scanners, mailing list managers, or gatewaysthese changes can invalidate SPF (Sender Policy Framework) alignments, DKIM (DomainKeys Identified Mail) signatures, or DMARC (Domain-based Message Authentication, Reporting, and Conformance) policies, leading to false positives in spam detection or delivery rejections. By contrast, ARC creates an ordered set of handling results, allowing each handler to contribute evidence of its authentication assessment without disrupting the message's integrity. This protocol complements rather than replaces SPF, DKIM, and DMARC; it specifically supports DMARC by providing data for policy decisions and reporting, such as overriding a "reject" policy if the chain validates successfully.
+At its core, ARC operates through three specialized header fields added in sequential "ARC Sets": the ARC-Authentication-Results (AAR) field records the handler's authentication findings, the ARC-Message-Signature (AMS) field applies a DKIM-like signature to protect the message body and prior headers from tampering, and the ARC-Seal (AS) field cryptographically seals the entire chain to detect alterations in the ARC Sets themselves. When validating a message, a receiving system processes these sets in reverse order (from newest to oldest), verifying signatures and seals to determine an overall status of "pass," "fail," or "none," with a maximum of 50 sets permitted to prevent header bloat. ARC-Sealers (entities adding sets) and ARC-Validators (entities checking them) must be explicitly configured and trusted, often via DNS records, to ensure secure deployment across email infrastructures.
+Notable for its experimental status at publication, ARC has gained adoption among major email providers to enhance deliverability for forwarded or list-based communications, reducing the incidence of authentication-related bounces while maintaining robust anti-phishing protections. It introduces specific SMTP status codes, such as 5.7.29 for ARC validation failures, to facilitate troubleshooting and error reporting in mail transfer agents. Overall, ARC represents a targeted evolution in email security, focusing on intermediary trust without requiring wholesale changes to existing authentication standards.
+
+History and Development
+
+Origins and Motivation
+
+During the 2010s, email authentication protocols evolved significantly in response to escalating concerns over spam and phishing attacks, which had become pervasive threats to email security. The Sender Policy Framework (SPF), proposed in 2003 and published as RFC 4408 in 2006, and DomainKeys Identified Mail (DKIM), published in 2007, provided foundational mechanisms for verifying sender identities and message integrity, but their limitations in combating sophisticated spoofing prompted the development of Domain-based Message Authentication, Reporting, and Conformance (DMARC) in 2012. DMARC, formalized in RFC 7489 in March 2015, built upon SPF and DKIM by enabling domain owners to specify handling policies for authentication failures and receive reports on email activity, addressing the rising incidence of phishing that affected billions of messages annually. Major email providers accelerated DMARC adoption; for example, Yahoo announced a stricter p=reject policy in October 2015, while Google planned to implement it in June 2016 to enhance user protection against fraudulent emails.
+A critical challenge emerged with email forwarding, where intermediate serverssuch as those operated by mailing lists, third-party forwarders, or security gatewaysoften modified the message envelope or headers to facilitate relay. These modifications invalidated SPF checks, as the forwarding server's IP address replaced the original sender's, breaking DMARC's alignment requirements between the From header domain and the authenticating domains. Consequently, legitimately forwarded emails, including those from subscribed mailing lists or automated notifications, frequently failed DMARC validation at the final recipient, risking rejection or quarantine despite passing initial authentication. This issue was particularly acute for high-volume intermediaries, where unaltered forwarding was impractical due to technical and privacy constraints.
+The primary motivation for developing ARC was to preserve the original authentication chain for messages handled by legitimate intermediaries, ensuring that DMARC policies did not inadvertently block valid forwarded content while maintaining defenses against abuse. By allowing trusted handlers to attest to their role without altering core message identifiers, ARC aimed to restore visibility into prior authentication results, such as SPF, DKIM, and DMARC outcomes from the originating server. This approach supported ecosystems reliant on forwarding, like collaborative mailing lists and enterprise gateways, without compromising the security gains from stricter DMARC enforcement.
+Early proposals for ARC emerged from discussions within the DMARC community, with the protocol first publicly announced by DMARC.org in October 2015 to address these forwarding-induced failures. Initial drafts, such as draft-andersen-arc-00, were circulated on IETF mailing lists starting in late 2015, highlighting the need for a chain-of-custody mechanism. In June 2016, ARC became an official work item of the IETF DMARC Working Group, with contributions from organizations including Google, which provided technical input through participants like Brandon Long, and Yahoo, which engaged in parallel DMARC enhancement efforts that underscored the forwarding problem. These discussions, documented in the IETF datatracker, focused on cryptographic attestation methods to enable verifiable intermediary actions.
+
+Standardization Process
+
+The development of the Authenticated Received Chain (ARC) protocol originated with an initial individual Internet-Draft submission, draft-andersen-arc-00, published on October 16, 2015, and authored primarily by Kurt Andersen to address email authentication challenges in forwarding scenarios. This draft laid the foundational concepts and was later revised through versions up to -05 by May 23, 2016. In June 2016, the IETF DMARC Working Group formally adopted the proposal as a work item, renumbering it as draft-ietf-dmarc-arc-protocol-00 on June 25, 2016, with expanded authorship including Seth Blank, Murray Kucherawy as editor, Brandon Long, and Andersen. The working group, focused on enhancing Domain-based Message Authentication, Reporting, and Conformance (DMARC), coordinated the effort to integrate ARC as a complementary mechanism for preserving authentication across intermediaries. From 2016 to 2018, the draft iterated rapidly through 24 versions (from -00 to -23), incorporating feedback on cryptographic signing, header structures, and validation processes, with key revisions addressing security considerations and interoperability.
+Key milestones in the standardization process included the initiation of the Working Group Last Call on July 17, 2018, which concluded on August 3, 2018, allowing for community review and revisions to version 16. Following this, the document advanced to the Internet Engineering Steering Group (IESG) for evaluation, with an IESG last call announced on October 23, 2018, ending November 6, 2018, during which versions 17 through 21 were released to resolve ballot comments and technical issues. The IESG approved the final version 23 on December 19, 2018, placing it in the RFC Editor's queue. After editorial reviews and author authentication stages from April to July 2019, the protocol was published as RFC 8617 on July 9, 2019, designated as an Experimental RFC with 35 pages, authored by Murray Kucherawy, Brandon Long, Kurt Andersen, and Seth Blank, reflecting contributions from the DMARC Working Group chairs and broader IETF community. This three-year process from working group adoption to publication emphasized consensus-building and rigorous peer review within the IETF framework.
+Since its publication, RFC 8617 has received post-RFC updates through the IETF errata system to clarify ambiguities. Notable errata include ID 7910, reported on April 26, 2024, which addresses formatting inconsistencies in ARC header fields such as arc-ams-info and arc-message-signature by replacing CFWS with FWS, directly impacting the handling of instance tags that group headers within an ARC set. Another erratum, ID 8357 from March 30, 2025, provides clarification on referencing SMTP standards for validation failure reporting in Section 5.2.2. These updates ensure ongoing accuracy without altering the core protocol specification.
+
+Technical Background
+
+Email Authentication Challenges
+
+Email authentication faces significant challenges due to the decentralized nature of the Simple Mail Transfer Protocol (SMTP), which allows intermediaries like forwarders and mailing lists to modify messages in ways that disrupt validation mechanisms. The Sender Policy Framework (SPF) is a domain-based protocol that enables domain owners to specify authorized IP addresses or hostnames in DNS TXT records to send email on their behalf, thereby preventing unauthorized use of the domain in the envelope sender address. However, SPF validation fails when messages are forwarded, as the forwarding server's IP address does not match the original domain's authorized list, leading to mismatches even for legitimate emails.
+DomainKeys Identified Mail (DKIM) addresses integrity and origin by attaching a cryptographic signature to the email headers and body, generated using a private key and verifiable against a public key published in the sender's DNS. This signature ensures the message has not been altered in transit, but intermediaries such as mailing lists often modify headers (e.g., adding list identifiers) or the body, invalidating the signature and causing DKIM failures.
+Domain-based Message Authentication, Reporting, and Conformance (DMARC) builds on SPF and DKIM by allowing domain owners to publish policies in DNS that dictate actions (e.g., quarantine or reject) for messages failing authentication, while requiring alignment between the domain in the From header and the authenticating identities from SPF or DKIM. Strict alignment modes exacerbate forwarding issues, as changes in the envelope sender or header modifications break this match, resulting in DMARC policy enforcement against legitimate forwarded emails.
+A significant portion of internet email involves indirect flows like forwarding through mailing lists or user agents, which commonly disrupt these protocols and contribute to false positives in spam filtering. Analysis of DMARC reports from 2019 revealed that, on average, 55.1% of legitimate emails failed DMARC authentication (ranging from 37.0% to 86.8%), with false positives totaling around 119,405 emails per day across monitored domains, largely due to intermediary modifications in forwarded messages. These failures not only increase the risk of legitimate emails being rejected or marked as spam but also complicate the balance between security and deliverability in email ecosystems.
+
+Relation to SPF, DKIM, and DMARC
+
+The Authenticated Received Chain (ARC) protocol integrates with Sender Policy Framework (SPF), DomainKeys Identified Mail (DKIM), and Domain-based Message Authentication, Reporting, and Conformance (DMARC) by preserving the original authentication results from these mechanisms across email intermediaries, such as forwarders or mailing lists. Specifically, ARC employs chained Authentication-Results headers within its ARC-Authentication-Results (AAR) fields to capture and relay prior SPF and DKIM evaluations, ensuring that subsequent handlers can access the initial assessments without recomputing them. This preservation mechanism allows ARC to extend trust without altering the core validations performed by SPF, which checks the sending IP against domain records, or DKIM, which verifies cryptographic signatures on message content.
+ARC enhances DMARC compatibility, particularly in forwarding scenarios where traditional DMARC policies like "reject" or "quarantine" often fail due to broken authentication chains. By maintaining a verifiable sequence of ARC-Sealscryptographic attestations over the chainARC enables DMARC evaluators to trust prior results, allowing messages to pass even under "none" or "quarantine" policies if the chain remains intact. This addresses a key limitation in DMARC, which relies on aligned SPF or DKIM results at the final receiver but does not inherently account for legitimate intermediaries.
+In terms of scope, ARC differs from SPF, DKIM, and DMARC by emphasizing intermediary trust chains rather than initial sender validation; SPF and DKIM focus on the originating domain's authorization and integrity, while DMARC aggregates those for policy enforcement, but ARC specifically attests to the handling sequence post-origin to prevent spoofing in forwarded paths. Furthermore, ARC-Seals contribute to reporting enhancements by providing DMARC aggregate reports with details on chain validation status and intermediary domains, improving visibility into forwarding paths and aiding domain owners in monitoring authentication propagation.
+
+Protocol Components
+
+ARC Headers
+
+The Authenticated Received Chain (ARC) protocol introduces three specialized email headers to maintain a verifiable record of authentication across message hops: ARC-Authentication-Results, ARC-Message-Signature, and ARC-Seal. These headers form an "ARC Set" for each participating hop, enabling intermediate servers to attest to prior authentication states without altering the original message's cryptographic integrity.
+The ARC-Authentication-Results header records the results of SPF, DKIM, and DMARC authentications performed at a specific hop. It follows a structured syntax of i=<instance>; <authres-payload>, where the instance tag identifies the hop number, and the authres-payload details the authentication outcomes, such as pass/fail statuses for each mechanism using Authentication-Results syntax, ensuring that subsequent hops can review the chain's historical assessments. Only one AAR is permitted per ARC Set.
+The ARC-Message-Signature header provides a per-hop cryptographic signature analogous to DKIM, attesting to the message body and all preceding ARC headers up to that point. It requires key tags including b= for the digital signature value and bh= for the hash of the canonicalized body, along with the instance tag to link it to the corresponding ARC-Authentication-Results. This signature excludes the current and future ARC headers from its scope, preserving the ability for later hops to add their own attestations without invalidating prior ones. The signatures typically employ algorithms like RSA-SHA256 for robustness.
+The ARC-Seal header is added by each ARC Sealer to validate the chain up to the current hop, serving as the validation of the entire ARC chain at that point. It cryptographically signs the sequence of all ARC-Authentication-Results, ARC-Message-Signature, and prior ARC-Seal headers up to and including the current instance, incorporating the instance numbers and a cv= tag indicating the chain validation status (none, fail, or pass). This header does not cover the message body, focusing solely on ensuring the integrity and continuity of the authentication records across hops.
+Header ordering and instance numbering are critical to ARC's chronological integrity, with each ARC Set assigned a sequential instance tag starting from i=1 at the first participating hop and incrementing (e.g., i=2, i=3) for each subsequent one, up to a maximum of 50. Within a message, ARC headers from different sets must appear in reverse chronological ordernewest on topto facilitate verification, while the instance numbers enforce a unbroken sequence that detects tampering or gaps in the chain.
+
+Cryptographic Elements
+
+The Authenticated Received Chain (ARC) protocol relies on digital signatures to establish a verifiable chain of custody for email messages handled by multiple intermediaries. The signing algorithm for both the ARC-Message-Signature and ARC-Seal is RSA-SHA256, which combines the RSA public-key cryptosystem with the SHA-256 hash function to produce signatures that ensure authenticity and integrity. This choice aligns with the DomainKeys Identified Mail (DKIM) standard, providing robust protection against tampering.
+Key management in ARC leverages the established DKIM infrastructure, where domains publish public keys via DNS TXT records tied to specific selectors. These records contain the public key material, hashing algorithm, and service type (e.g., "a=rsa-sha256; h=sha256; p="), allowing verifiers to fetch and confirm the keys used for signing ARC components. Selectors enable domains to manage multiple keys for different purposes or rotation, with ARC verifiers querying the DNS for the selector specified in the signature (e.g., "s=arcselector"). This decentralized approach ensures scalability and trust anchoring without requiring centralized key distribution.
+Hashing and canonicalization processes in ARC address common email transmission artifacts, such as line wrapping or header folding, to prevent invalidation of signatures due to benign changes. The protocol mandates the "relaxed" canonicalization algorithm for ARC-Seal header fields, which normalizes whitespace, converts internal newlines to spaces, and lowercases certain header names while preserving semantic content. The "simple" mode is optionally supported for stricter environments. Body hashing, using SHA-256, is captured in the ARC-Message-Signature's "bh" tag to verify the original message payload, tolerating no modifications beyond those permitted in canonicalization.
+These cryptographic mechanisms deliver essential security properties, including non-repudiation of the chain of custody, as each ARC-Seal cryptographically attests to the validity of prior authentication results without alteration. Signatures are embedded in ARC-specific headers to preserve this chain integrity.
+
+Operational Mechanics
+
+Signing Process
+
+The signing process in the Authenticated Received Chain (ARC) protocol enables an intermediate mail server, acting as an ARC sealer, to authenticate and preserve the email's authentication status across forwarding hops without breaking existing signatures. Before initiating the signing procedure, the intermediate server must first validate the incoming message's SPF, DKIM, and DMARC results to assess its authenticity as received. The server then determines whether to participate as an ARC sealer, typically if it supports ARC and the message warrants forwarding with preserved authenticationsuch as in mailing lists or gatewayswhile ensuring all message modifications, like adding any new DKIM signatures, are completed prior to sealing. Additionally, if an existing ARC chain is present and its chain validation status is "fail" as indicated in the latest ARC-Seal header, the server halts the sealing process to avoid propagating invalid chains.
+The process begins with calculating the ARC instance number, denoted as "i=N", where N is 1 if no prior ARC headers exist on the message, or the highest existing instance value plus one (capped at 50 to prevent excessive chain length). In Step 1, the server generates the ARC-Authentication-Results header (AAR), which records the authentication outcomessuch as SPF, DKIM, and DMARC resultsperformed on the incoming message at this hop, including the instance tag "i=N" and the server's domain identifier. This header captures the current hop's view of the message's authenticity without referencing prior ARC data.
+In Step 2, the server creates the ARC-Message-Signature header (AMS), a DKIM-like signature that attests to the integrity of the message body and non-ARC headers as received, excluding all ARC headers to ensure independence from chain-specific additions. The AMS includes the instance tag "i=N" and is computed by hashing the message body (using SHA-256) and selected headers listed in its "h=" field, then signing the result with the server's private key, typically via RSA-SHA256 with relaxed canonicalization. This step effectively "freezes" the message content for this hop, allowing subsequent verifiers to confirm no unauthorized changes occurred before this point, while prior ARC headers remain part of the message but are not covered by the AMS signature itself. The cryptographic algorithms employed mirror those in DKIM, ensuring compatibility and security.
+Following the AMS generation, in Step 3, the server appends the three ARC headers in strict orderfirst the AAR, then the AMS, and finally the ARC-Seal header (AS)all tagged with "i=N", directly to the message's header section without modifying any existing content, including the original body or prior headers. The AS provides the chain linkage by signing a sequence of all previous AAR and AMS headers (from instances 1 to N-1), followed by the current AAR and AMS, using a similar DKIM-style signature to bind the chain and include the chain validation status (cv=pass, fail, or none) based on the incoming message's assessment.
+If the signing process encounters errors, such as failure to generate a valid signature due to key issues or computational limits, the intermediate server falls back to forwarding the message without adding any new ARC headers, preserving the original content but forgoing additional authentication chaining. This error handling ensures reliable delivery while minimizing security risks from incomplete or invalid seals.
+
+Verification Process
+
+The verification process for an Authenticated Received Chain (ARC) begins at the final receiving server, which first collects all ARC sets attached to the email message. If no ARC sets are present, the chain validation status is set to "none," and no further ARC-specific checks are performed. The server then verifies the ARC-Seal header from the highest instance (i=N), ensuring it cryptographically covers all preceding ARC-Message-Signature (AMS) and ARC-Authentication-Results (AAR) headers in sequence, using the same validation rules as DomainKeys Identified Mail (DKIM). This initial check confirms the integrity of the chain's structure and prevents tampering with the sequence of authentication records.
+Following the initial seal validation, the server traverses the ARC chain in reverse order, starting from the most recent instance. For each instance i from N down to 1, the server validates the corresponding AMS header against the message body and all headers added prior to that instance's signing, again applying DKIM verification procedures. If the AMS validates, the server then examines the associated AAR header to assess the original authentication results (such as SPF, DKIM, or DMARC outcomes) reported by the signing entity at that hop. The instance numbers must form a continuous sequence from 1 to N without gaps or duplicates, and the chain validation (cv) value in the ARC-Seal for the highest instance must be "none" for i=1 or "pass" for i>1; any "fail" in the highest instance's ARC-Seal immediately results in a chain status of "fail."
+To ensure compliance with Domain-based Message Authentication, Reporting, and Conformance (DMARC), the verification process includes alignment checks across the chain, where the domain in each AMS must align with the domains in the preserved AAR authentication results, using either relaxed or simple canonicalization methods as specified in the signatures. This alignment preserves the original sender's DMARC policy applicability through intermediaries, allowing the final receiver to evaluate the message as if it had arrived directly from the origin. Header instance ordering is strictly sequential, with each set inserted before the prior ones to maintain the chain's logical flow.
+If the entire chain validates successfullyincluding all AMS signatures, AAR contents, and the final ARC-Sealthe overall ARC status is "pass," and the message may be accepted based on the cumulative authentication results. Conversely, any failure in the traversal or seal verification sets the status to "fail," prompting the server to reject, quarantine, or apply other handling actions as per local policy, while logging the results in a new Authentication-Results header for reporting and debugging purposes. The maximum chain length is limited to 50 instances to prevent abuse, with excess sets resulting in a "fail" status.
+
+Implementation and Use Cases
+
+Deployment in Mail Servers
+
+Server-side requirements for deploying ARC in mail servers include compatible software that supports ARC signing and verification as an intermediary or final recipient. For open-source setups, Postfix can integrate ARC using the OpenARC milter, an open-source implementation that extends DKIM functionality to handle ARC headers and signatures. OpenARC requires OpenDKIM for underlying cryptographic operations and is configured as a milter in Postfix's main.cf file. For proprietary environments, Microsoft Exchange Online with Defender for Office 365 supports ARC natively, allowing administrators to designate trusted sealers without custom milters.
+Configuration steps begin with publishing ARC selectors in DNS to enable verification of signatures. ARC uses DKIM-style selectors, where public keys for ARC-Seal and ARC-Message-Signature are stored as TXT records in the DNS subdomain, such as selector._domainkey.example.com, following the format specified in RFC 8617. Next, enable ARC sealing in MTA settings by configuring the milter chain in Postfix; for example, add smtpd_milters = inet:localhost:8891 inet:localhost:10225 to invoke OpenDMARC and OpenARC sequentially after OpenDKIM. Thresholds for participation can be set via policy files, such as in OpenARC's policy configuration, to seal only messages meeting certain authentication criteria like passing DMARC.
+Verifier setup involves integrating ARC checks into spam filters and DMARC evaluators to assess chain validity upon receipt. SpamAssassin supports native ARC evaluation through its parsing methods, allowing custom rules in local.cf to score messages based on ARC status. OpenDMARC processes ARC headers and, in versions supporting ARC (e.g., 1.4.0+), can use ARC pass results in conjunction with policy to influence DMARC evaluation outcomes. In Microsoft Defender for Office 365, verification occurs automatically for trusted sealers configured via the admin portal.
+Monitoring tools for ARC deployment leverage ARC-aware reporting to track aggregate data on chain success rates. Administrators can analyze DMARC aggregate reports (rua=) from receivers, which may include ARC status to quantify successful chains versus breaks in forwarded messages. Tools like the Microsoft Message Header Analyzer parse headers to report ARC pass/fail rates, helping identify deployment issues. This relates briefly to DMARC policies, where successful ARC chains can inform adjustments to p=reject thresholds for forwarded traffic.
+
+Practical Examples and Limitations
+
+Authenticated Received Chain (ARC) finds primary application in scenarios involving email forwarding, where traditional authentication protocols like SPF, DKIM, and DMARC often fail due to changes in the message path. A key use case is mailing list forwarding, where subscribers receive messages from lists that preserve the original authentication results, preventing legitimate emails from being rejected by the recipient's DMARC policy. Third-party gateways, such as customer relationship management (CRM) tools, utilize ARC to maintain trust chains during relaying, ensuring that emails routed through these services retain verifiable authenticity. Aggregated inboxes, common in multi-tenant mail transfer agent (MTA) environments, benefit from ARC by documenting intermediary handling, which aids in debugging delivery issues and supports informed policy decisions.
+Consider an example where an email originates from domain A (e.g., ), is forwarded by a mailing list at domain B (lists.example.org), and delivered to recipient C at domain gmail.example. The originating MTA at domain A performs initial SPF, DKIM, and DMARC checks, recording results in an ARC-Authentication-Results header. Upon forwarding by domain B, it adds an ARC-Seal header cryptographically attesting to the prior results without modification, forming ARC set i=1. If domain gmail.example (as the final verifier) validates the chain intact up to its own ARC set i=2, it can override a potential DMARC failure, allowing delivery despite the forwarding breaks in alignment. This chain ensures the recipient's server trusts the intermediaries' attestations, reducing false positives in spam filtering.
+Despite its benefits, ARC has notable limitations that constrain its effectiveness. It requires participation from all intermediaries in the forwarding path; if any link lacks ARC support, the chain breaks, reverting to standard DMARC evaluation and potential failures. The addition of multiple ARC headers (up to 50 sets per message) increases overall header size, which can exceed limits in legacy MTAs and cause processing errors or rejections in systems not optimized for extended fields. Furthermore, ARC provides no inherent safeguards against malicious signers, as it relies on the trustworthiness of participating entities; an untrusted intermediary could forge seals, potentially enabling spoofing attacks that bypass DMARC protections.
+As of 2025, ARC enjoys widespread adoption among major email providers, including Google and Microsoft, which integrate it into their MTAs to handle forwarding securely and automatically trust valid seals from known sealers. However, implementation remains uneven in smaller or open-source MTAs, where resource constraints and configuration complexities hinder full deployment. In forwarding scenarios, ARC has demonstrated a significant reduction in DMARC failures for legitimate emails, with studies indicating improvements in authentication pass rates for preserved chains, though exact metrics vary by provider and setup.
+
+References
+
+RFC 8617 - The Authenticated Received Chain (ARC) Protocol
+
+Global Mailbox Providers Deploying DMARC to Protect Users
+
+https://datatracker.ietf.org/doc/html/rfc8617#section-1
+
+ARC Protocol Published as RFC 8617 - DMARC.org
+
+RFC 8617 The Authenticated Received Chain Published
+
+https://datatracker.ietf.org/doc/html/rfc8617#acknowledgments
+
+draft-andersen-arc-00 - IETF Datatracker
+
+https://datatracker.ietf.org/doc/draft-ietf-dmarc-arc-protocol/history/
+
+RFC 8617: The Authenticated Received Chain (ARC) Protocol
+
+History for rfc8617 - IETF Datatracker
+
+https://www.rfc-editor.org/errata/eid7910
+
+https://www.rfc-editor.org/errata/eid8357
+
+RFC 7208 - Sender Policy Framework (SPF) for Authorizing Use of ...
+
+https://datatracker.ietf.org/doc/html/rfc7208#section-5.4
+
+RFC 6376 - DomainKeys Identified Mail (DKIM) Signatures
+
+https://datatracker.ietf.org/doc/html/rfc6376#section-3.5
+
+RFC 7489 - Domain-based Message Authentication, Reporting, and ...
+
+https://datatracker.ietf.org/doc/html/rfc7489#section-3.4
+
+RFC 7960: Interoperability Issues between Domain-based Message Authentication, Reporting, and Conformance (DMARC) and Indirect Email Flows
+
+ False Positive Detection in Sender Domain Authentication by ... - UPV
+
+Information on RFC 8617 - RFC Editor
+
+trusteddomainproject/OpenARC: Open source ARC implementation
+
+Configure trusted ARC sealers - Microsoft Defender for Office 365
+
+OpenARC - ArchWiki
+
+Mail - Apache SpamAssassin
+
+DKIM and ARC: Setup MTA: Using OpenDMARC - Sympa
+
+How to implement ARC (Authenticated Received Chain ... - Suped
+
+Understand Authenticated Received Chain and Why You Need It
+
+Authenticated Received Chain (ARC) all you need to know | Proton
+
+https://datatracker.ietf.org/doc/html/rfc8617#appendix-b
+
+https://datatracker.ietf.org/doc/html/rfc8617#section-9.1
+
+What is ARC (Authenticated Received Chain) in Email? - Validity
+
+ Revisiting Email Forwarding Security under the Authenticated ...
+
+What is email ARC (Authenticated Received Chain) - Valimail
+
+Authenticated Received Chain (ARC) in Email - Sendmarc
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

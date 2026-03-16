@@ -1,0 +1,247 @@
+.pkg Grokipedia
+ 
+
+ Fact-checked by Grok 1 month ago 
+.pkg
+ Ara Eve Leo Sal 
+1x
+ The .pkg filename extension is used for several distinct package file formats designed for software installation and distribution, most prominently as installer packages in macOS, as encrypted content packages for Sony PlayStation systems, SVR4 packages in Unix-like systems such as Solaris, and with additional uses in legacy mobile platforms like Symbian OS.
+In the context of macOS, .pkg files serve as flat installer packages that bundle application files, metadata, scripts, and resources to facilitate secure software deployment and updates on Apple computers. These packages are typically created using the productbuild command-line tool, which assembles a distribution description file (often in XML format) with the necessary components and applies code signing to ensure integrity and authenticity against tampering. Signing requires an installer identity stored in the user's keychain, and post-signing modifications invalidate the package, enforcing security through tools like spctl for validation. Introduced in Mac OS X 10.5 Leopard in 2007, .pkg files support both single-component "flat" packages and multi-component "bundled" ones (with .mpkg extensions), enabling features such as customizable installation choices, localization, and integration with the macOS Installer application. They are essential for enterprise distribution, App Store submissions, and notarization processes to meet Gatekeeper requirements.
+For Sony PlayStation consoles, including the PS3, PS4, PS5, and PS Vita, .pkg files represent encrypted archive formats that package games, downloadable content (DLC), patches, themes, and system updates for secure delivery via the PlayStation Network (PSN) or external media. The structure includes a signed header, an encrypted PlayStation File System (PFS) image using XTS-AES encryption with a 0x1000 block size, and metadata like content IDs, version numbers, and license requirements derived from HMAC-SHA1 keys. These files are installed directly on the console using built-in package managers, often requiring activation or relicensing for licensed content, and support features like NPDRM (Sony's digital rights management system) for protected media. Originating with the PS3 era around 2006, the format evolved across generations to handle larger payloads and enhanced security, though official specifications remain proprietary to Sony.
+Other notable applications of the .pkg extension include configuration files for Symbian OS installers, where they define parameters in plain text for building .SIS (Symbian Installation System) files used on Nokia and other mobile devices in the early 2000s. This usage has largely been superseded by modern mobile ecosystems but highlights the extension's versatility in embedding installation metadata. Across all contexts, .pkg files emphasize modularity and security to streamline deployment while minimizing user intervention, with compression used in some formats such as macOS packages.
+
+macOS Installer Packages
+
+Types and Structure
+
+The .pkg files serve as installer packages for distributing software on macOS, employing the .pkg extension for both bundle and flat variants.
+Distribution bundle packages utilize a directory-based structure that the Finder treats as a single file, enabling hierarchical organization of components. At the root level, they include a Distribution.xml file that defines the installation workflow, including guided interfaces and choices for users. The Contents subdirectory houses essential elements, such as the Resources folder containing localizable strings, images (e.g., background graphics and welcome screens), and other assets for multilingual support. Additionally, the Scripts directory holds executable files like shell scripts or AppleScripts for pre-installation, post-installation, and other lifecycle actions. Distribution bundle packages can also embed component packages as subdirectories, allowing modular assembly of multiple installers into a single metapackage (often with a .mpkg extension). Note that bundle-style component packages are legacy and flat packages are recommended for new installations.
+In contrast, flat packages represent a single-file format introduced in macOS 10.5 Leopard to streamline distribution by consolidating all contents into a compressed archive. They are structured as an XAR (eXtensible ARchive) file, which encapsulates various sections without a visible directory hierarchy. The Payload section comprises a cPIO (compressed POSIX I/O) archivetypically gzippedholding the files and directories to be installed on the target system. The Resources section stores localizable content, such as strings and images, in a flat manner akin to bundle equivalents. The Scripts section is a dedicated cPIO archive containing pre- and post-installation scripts, supporting both shell scripts and AppleScript for custom logic. The Bom (Bill of Materials) file provides metadata about the payload, including file permissions, ownership, and modification times, generated via tools like mkbom for integrity tracking.
+Both formats share key structural elements to ensure compatibility and security. The package version, specified in metadata files like PackageInfo.xml for flat packages (e.g., version 2.0 in modern implementations), indicates the format and supported features. Signing information, embedded via Developer ID certificates, enables Gatekeeper validation to confirm the package's authenticity and absence of malware before installation. While bundle formats originated in early Mac OS X releases (version 10.0 and later) for flexible, editable structures, the flat format's adoption from macOS 10.5 onward prioritized compactness and ease of online sharing, though it imposes constraints like an 8 GB limit per individual file in the uncompressed payload in standard configurations (extendable with the --large-payload option).
+
+Creation and Installation
+
+.pkg files for macOS installer packages are created using Apple's command-line tools, primarily pkgbuild for building component packages and productbuild for assembling distribution packages. The pkgbuild tool constructs a component package from a source directory, specifying an identifier and version to ensure uniqueness and versioning; for instance, the command pkgbuild --root <source_directory> --identifier com.example.app --version 1.0 output.pkg generates a flat .pkg file containing the payload from the specified root. Distribution packages, which may bundle multiple components, are created with productbuild, such as productbuild --component output.pkg /Applications --identifier com.example.distribution final.mpkg, allowing for metapackage creation that installs components to designated locations like the Applications folder. pkgbuild creates flat component packages, while productbuild can assemble distribution packages in either flat (.pkg) or bundle (.mpkg) formats, with flat being the modern standard.
+After creation, .pkg files must be signed and notarized to comply with macOS security requirements, particularly for distribution outside the App Store. Signing uses the productsign command with a Developer ID Installer certificate, as in productsign --sign "Developer ID Installer: Your Name (TEAMID)" input.pkg signed.pkg, which embeds the signature to verify the package's integrity and origin. For macOS 10.15 and later, notarization is required to bypass Gatekeeper restrictions; this involves submitting the signed package to Apple's notary service using notarytool (preferred since altool's deprecation in November 2023), for example: notarytool submit signed.pkg --keychain-profile "MyProfile" --wait, ensuring the package is scanned for malware and staples a ticket for offline verification.
+Installation of .pkg files can occur via graphical or command-line methods. Users typically double-click the file in Finder to launch the Installer.app, which presents a guided interface for authentication and progression through installation steps. For scripted or automated deployment, the installer command handles installation, requiring administrator privileges: sudo installer -pkg file.pkg -target /, where the target specifies the volume or domain (e.g., / for the startup disk). The pkgutil utility aids in package management, such as expanding a .pkg for inspection with pkgutil --expand file.pkg temp_dir or querying installed packages.
+Upon successful installation, macOS records package receipts in /var/db/receipts, storing .bom (Bill of Materials) files detailing installed files and .plist metadata for tracking versions and identifiers, enabling queries via pkgutil for verification or uninstallation. Packages can include scripting hooks for custom actions: preflight and postflight scripts, placed in the package's root or Scripts directory, execute before and after payload installation, respectively, to perform tasks like system checks or cleanup (e.g., a postflight script might register additional services).
+Best practices for .pkg creation emphasize security and efficiency: use xar compression (the native archive format) via pkgbuild's default settings or explicit options to reduce file size without loss, particularly beneficial for large payloads. For large distributions, multiple component packages can be bundled into a single distribution package using productbuild. Flat .pkg formats ensure compatibility from macOS 10.5 Leopard onward, supporting modern features while maintaining backward compatibility for older systems where bundle formats may be necessary.
+
+PlayStation Digital Packages
+
+PS3 and Vita Formats
+
+The .pkg format for the PlayStation 3 (PS3) and PlayStation Vita was developed by Sony Computer Entertainment as part of the Napster Digital Rights Management (NPDRM) system to facilitate secure digital distribution of games, updates, and other content via the PlayStation Network (PSN). This format was introduced with the PS3's launch on November 11, 2006, in Japan, and later adopted for the Vita starting with its release on December 17, 2011, in the same region, enabling standardized packaging for console-specific media delivery. Both platforms share a binary structure optimized for encrypted content bundling, with PS3 .pkg files supporting NPDRM-protected executables and assets, while Vita extends this for portable hardware constraints.
+The PS3 .pkg file begins with a fixed basic header identified by the magic bytes 0x7F504B47, followed by a 2-byte revision field (typically 0x8000 for finalized packages), 2-byte type flags (0x0001 for PS3 content), and a 4-byte offset to metadata (usually at 0xC0). The basic header also includes a 36-byte content ID (e.g., "UP0001-NPUB30162_00-SCOTTPILGRIM0002") at offset 0x30 and a 16-byte initialization vector (IV) for encryption at offset 0x70. An extended header follows at offset 0x80, providing offsets to key sections, SHA-1 digests for integrity, and ECDSA signatures. Metadata is stored in SFO (System File Object) format within param.sfo, embedding details such as the package title, version number, and NPDRM configuration including DRM type and content category. The file table enumerates package entries with their offsets, sizes, flags, and SHA-1 hashes for verification, preceding the main body where files are encrypted using AES-128-CTR mode with a platform-derived key and the header IV. A footer concludes the structure with a 20-byte SHA-1 digest computed over the entire package excluding the final 32 bytes, ensuring tamper detection.
+Vita .pkg files adhere to a nearly identical layout but incorporate platform-specific enhancements in the extended header, such as offsets for HMAC-SHA1 hashes (three in total for header sections) to support license validation unique to Vita's account-based system. Type flags are adjusted to 0x0002 for Vita, and encryption employs a derived session key (generated from the first 16 bytes post-header using a Vita-specific AES key) applied in AES-128-CTR mode, differing from PS3's direct platform key usage. Vita metadata mirrors PS3's SFO structure but includes additional fields for portable features, with content types designated as 0x04 for full games; these packages also enable extraction to .vpk (Vita Package) format via tools like VitaShell, facilitating homebrew development and sideloading.
+Security in both PS3 and Vita .pkg files relies on ECDSA (Elliptic Curve Digital Signature Algorithm) signatures applied to the header and file entry table, verifying authenticity against Sony's public keys embedded in console firmware. Activation requires RAP (Rights Activation Package) license files, which contain encrypted entitlement data tied to the user's PSN account, while decryption keys are derived from the console's unique ID and NPDRM klicensee values stored in act.dat or rif files. Supported package categories include full games (0x02 on PS3, aligned with Vita's game handling), patches (0x03 for updates), and themes (0x08 for custom interfaces), all protected under NPDRM to prevent unauthorized extraction or execution.
+These .pkg files are capped at 4 GB in size to align with PSN download limits and storage constraints of the era, with PS3 installations occurring via USB drives (in /packages/ on FAT32-formatted media), internal HDD paths like /dev_hdd0/game/, or Blu-ray discs in /PS3_GAME/PKGDIR/. On Vita, delivery and installation leverage PC tools such as Content Manager Assistant (QCMA) for USB transfers or on-device utilities like VitaShell for direct handling from memory cards (e.g., to ux0:app/), promoting seamless integration with the console's LiveArea interface.
+
+PS4 and PS5 Formats
+
+The .pkg format for PlayStation 4 (PS4) was introduced alongside the console's launch in November 2013, serving as the primary container for digital downloads from the PlayStation Network (PSN), including full games, downloadable content (DLC), system updates, and media assets. This format evolved to support the PlayStation 5 (PS5), released in November 2020, with backward compatibility enabling PS4 .pkg titles to run on PS5 hardware through adapted installation and execution processes.
+The structure of a PS4 .pkg begins with a 0x1000-byte big-endian header containing a magic identifier (0x7F434E54), version information (starting from 01.06), file and entry counts, offsets, sizes, a 36-byte content ID, DRM type, SHA-256 digests for integrity, and details on the embedded PlayStation File System (PFS) image. Following the header is a binary metadata section detailing the package's content ID, total size, version, and other attributes, succeeded by an entries table listing virtual file metadata such as IDs, offsets, sizes, and flags (e.g., for files like param.sfo or playgo-chunk.dat). The core of the .pkg is the PFS image, an encrypted archive of the package's files using XTS-AES-128 encryption with a 0x1000-byte block size; the encryption key is derived via HMAC-SHA256 from the Encrypted Key Package File System (EKPFS) and a crypt seed located at header offset 0x370. File entries within the PFS include hashes for verification, and the entire structure concludes with RSA-2048 signatures to ensure authenticity and prevent tampering.
+PS5 .pkg files build on this foundation with enhancements for the console's hardware capabilities, including support for packages exceeding 100 GB through multi-chunk segmentation, where large files are divided and reassembled during download or installation. Extended metadata accommodates PS5-specific features, such as optimizations for the console's custom SSD to enable faster loading times and reduced decompression overhead, alongside compatibility flags for PS4 titles. Installation on PS5 integrates these via USB drives or network transfers, leveraging the system's I/O architecture for quicker processing compared to PS4 methods.
+Security in PS4 and PS5 .pkg formats relies on the PFS encryption and signatures to protect content, with packages limited to 4 GB per file and split into chunks (each with SHA-1 hashes) for larger deliveries over PSN. Installation occurs through the system's Package Installer application for retail users or the orbis-pub-cmd tool on developer kits, both requiring entitlement verification against PSN servers to confirm user ownership before decryption and mounting. On PS5, keyset version 3 updates the encryption scheme while maintaining compatibility.
+Community-developed tools facilitate handling of these .pkg files, such as PS4 PKG Tool for viewing, extracting, and injecting content, including background images and icons. Fake PKG generation tools enable homebrew creation by repackaging content with modified keys, often used in custom firmware environments, while utilities like NoPayStation support acquisition and processing of PSN-derived packages for testing purposes. For PS5, tools like pkgdec5 allow decryption and extraction of enhanced formats.
+
+Symbian OS Configuration Files
+
+File Format
+
+The .pkg files are UTF-8 or ASCII-encoded plain-text files that function as configuration scripts for building .sis installers in the Symbian OS ecosystem; unlike the resulting .sis files, .pkg files are not executable packages but rather declarative instructions processed by tools like MakeSIS.
+These files follow a structured syntax beginning with a package header directive in the form #{"Package name"},(UID),major_version,minor_version,build_version,options, where the UID is a unique 32-bit identifier (e.g., (0x2002A95F) for a sample secure ID), followed by optional sections for supported languages (e.g., &EN,FR or implied English-only with no explicit list), localized vendor information using %{"Vendor name in language 1","Vendor name in language 2"}, and a non-localized vendor string with :"Global vendor name". The core content consists of a file installation list, where each entry maps a source path to a destination using operators like - for direct copy (e.g., "$(EPOCROOT)epoc32/data/MyApp.exe" - "!:\System\Apps\MyApp\MyApp.exe", with !: denoting the user-selectable installation drive and $(EPOCROOT) as a build variable).
+Key directives govern the script's behavior, including ; to denote comments (e.g., ; This is a comment line), = for renaming files during installation (e.g., "source.txt" = "renamed.txt"), and conditional blocks for device-specific logic such as #ifdef FEATURE_X followed by enclosed statements and terminated by #endif to include or exclude content based on platform capabilities like hardware features or OS variants. Additional directives handle dependencies (e.g., (0x10000003),2,0,0,{"Dependency name"} for required packages) and properties (e.g., +(capability1=1,capability2=0) for access rights).
+Variants of .pkg files support self-signed .sis generation for basic, low-privilege installations without certificates, or integration with signing tools and certificates (e.g., via deprecated *"private.key","cert.cer" directives in pre-v9.1 formats) for secure, capability-granting packages; UID values in the header (e.g., 0x2002A95F) uniquely identify applications and enforce security zones for protected resources.
+Due to their design as static configuration files, .pkg scripts rely on fixed file lists without dynamic scripting or runtime evaluation, limiting flexibility but ensuring simplicity;
+
+Usage in SIS Creation
+
+In the Symbian development pipeline, the .pkg file serves as the primary configuration for generating installable software packages, integrating with SDK tools to produce .sis files for device deployment. The makesis.exe utility parses the .pkg file to assemble an unsigned .sis file containing the specified binaries, resources, and installation directives, enabling structured packaging of applications and components. For signed outputs compliant with the Symbian Signed program, the process often involves subsequent signing with SignSIS.exe or the automated CreateSIS tool, which embeds developer certificates to authorize installation on secured devices.
+The workflow begins with defining source files, destinations, and dependencies in the .pkg file, which lists paths relative to the build output (e.g., epoc32/release/armv5/urel for release binaries). Developers first compile the application using bldmake to generate makefiles from bld.inf and abld to build variants (e.g., urel for release) across targets like ARM or emulator, producing the necessary executables and resources. The makesis tool then bundles these outputs into a .sis file based on the .pkg directives, with options like -v for verbose logging to monitor the process; a basic command is makesis -d%EPOCROOT% myapp.pkg, where %EPOCROOT% resolves SDK paths, and the output defaults to myapp.sis. For preinstallation in factory ROMs, the -s flag generates a stub .sis with a fixed timestamp (2004-01-01 00:00:00) and non-removable attributes, ensuring the software is embedded and protected from user uninstallation.
+Generated .sis files support multiple installation methods tailored to Symbian's ecosystem, including connection via Nokia PC Suite for USB-based transfers and automated setup on connected devices, over-the-air (OTA) downloads initiated from a web browser or server, and direct management through the device's built-in Application Manager for local file installation. These approaches facilitate both user-initiated and enterprise deployments, with signed .sis files required for production to pass device security checks.
+The .pkg-to-.sis workflow was integral to Symbian OS from its inception through version 9.4 (circa 2010), forming the standard for C++ application packaging in S60 platforms. It was gradually replaced by Qt-integrated tools starting with Qt for Symbian in 2009, which streamlined cross-platform development and deployment for S60 5th Edition and later; by Nokia Belle (an update to Symbian^3, 2011), Qt tools handled most packaging, though legacy makesis support remained for compatibility. Full deprecation followed Nokia's platform shift, with Symbian support ending in 2014.
+Error handling in .pkg processing often arises from configuration issues, such as missing or duplicate UIDs, which invalidate package identification and trigger failures during .sis generation or installationresolved by obtaining unique UIDs from Symbian Signed and updating the .pkg accordingly. Unsupported languages specified in language directives (e.g., invalid locale codes) can also cause parsing errors, addressed through .pkg edits to align with device-supported formats like English or regional variants. Verbose mode (-v) in makesis aids diagnosis by logging directive violations.
+
+SVR4 Package Administration
+
+Solaris Implementation
+
+The SVR4 package system was introduced in Solaris 2.0 in 1992 as the standard mechanism for software installation and management, forming the basis for Oracle Solaris packaging until the transition to the Image Packaging System (IPS) in Solaris 11. In this implementation, packages are primarily organized as spooled directories under /var/spool/pkg, where each package resides in a subdirectory named after the package instance (e.g., /var/spool/pkg/PKGNAME), containing the necessary control and object files for installation. The .pkg extension is conventionally used for datastream-format packages, which consolidate the spooled directory contents into a single transportable file via the pkgtrans utility, facilitating easier distribution over media or networks.
+Core package structure includes essential control files such as pkginfo, an ASCII metadata file specifying parameters like NAME, VERSION, ARCH, and BASEDIR (e.g., PKG=SUNWexample NAME=Example Package VERSION=1.0 ARCH=sparc BASEDIR=/opt), and the prototype file, which enumerates all objects with details on type, pathname, mode, owner, and group (e.g., f none usr/bin/example=usr/bin/example 0555 root bin for a standard executable). Optional components include a copyright file for licensing information, as well as procedure scripts like preinstall, postinstall, preremove, and postremove for custom actions during lifecycle events; these files reside within the package directory alongside the objects to be installed. Packages support both relocatable installations, where BASEDIR allows flexible base paths, and absolute installations fixed to specific locations.
+Packages are built using the pkgmk command, which reads the prototype file and assembles the spooled directory from a source tree, ensuring all objects and controls are properly formatted (e.g., pkgmk -o -d /var/spool/pkg -f prototype). Administration involves pkgadd for installation from a spooled directory or datastream (e.g., pkgadd -d /tmp/mypkg all, where /tmp/mypkg could be a .pkg file), pkgrm for removal, and pkginfo for querying installed packages or datastream contents. The checkinstall script, if provided in the package, performs pre-installation validations such as available space checks on target filesystems. Datastream conversion for transport is handled by pkgtrans (e.g., pkgtrans -s /var/spool/pkg /tmp/package.pkg PKGNAME), producing a single .pkg file from the directory format.
+Prior to Solaris 11 in 2011, the SVR4 system was the primary method for distributing and managing third-party software, with package sizes constrained by the underlying filesystem limits of the era, such as UFS partitions. In Oracle Solaris environments, SVR4 tools include zone-aware options, such as the -G flag in pkgadd for global zone installations, enhancing compatibility in virtualized setups. This implementation persisted for legacy support even after IPS adoption, allowing seamless handling of pre-existing SVR4 packages.
+
+SCO OpenServer Implementation
+
+SCO OpenServer 5.0, released in 1995, adopted SVR4 packaging tools for software distribution, utilizing .pkg files for datastream-format packages containing installable components, while spooled packages are represented as directories. This implementation drew from System V Release 4 standards while incorporating extensions suited for enterprise Unix environments, with subsequent evolution influenced by UnixWare 7 following the 2001 acquisition of SCO's Unix business by Caldera International, which later became the SCO Group.
+The structure of .pkg files in SCO OpenServer mirrors core SVR4 elements, including mandatory files such as pkginfo for metadata (e.g., package name, version, and architecture like ARCH="i386"), prototype for listing deliverable objects, and space for estimating disk usage. The pkgmap file details file attributes including paths, modes, owners, groups, and checksums for each object, enabling precise tracking during installation. Optional components like copyright, depend for prerequisites, and scripts (e.g., preinstall, postinstall) further customize behavior, with the entire package optionally compressed into a datastream via tools like pkgtrans. Alongside standard SVR4 creation via pkgmk, SCO OpenServer supports the Custom Device Management Tool (CDMT) for building distribution media, accommodating both custom and SVR4 formats.
+Key tools for managing .pkg packages align with SVR4 conventions, featuring pkgadd for installationwhich transfers contents from a .pkg datastream or directory, performs dependency checks, and executes scriptsand pkgrm for removal, which reverses these actions while preserving system integrity. For graphical administration, SCO provides scoinstall, a GUI interface integrated into the system's software manager for selecting and applying packages. Package creation relies on pkgmk, as in the command pkgmk -o -a (/page/I386) -d /tmp -f prototype, which builds from a prototype file into a directory or stream, optionally optimizing for the i386 architecture. Advanced scripting is facilitated by mkpkg from SCO Skunkware, allowing automated generation of complex packages with embedded dependencies and relocatable paths. The package database resides in /var/sadm/pkg/ and /var/sadm/install/contents, supporting queries via pkginfo.
+In practice, .pkg files serve primarily for distributing server software in enterprise settings, such as network drivers or database components, with maintenance packs delivered as incremental .pkg updates to apply patches without full reinstalls. They handle relocatable installations by specifying base directories in pkginfo (e.g., BASEDIR="/opt"), and manage dependencies through the depend file to ensure prerequisites like shared libraries are met before proceeding. Architecture specification, such as ARCH="i386", restricts packages to 32-bit Intel systems, aligning with OpenServer's target hardware for compatibility in multi-user server deployments.
+Support for .pkg packaging persisted through SCO OpenServer 6, released in 2005, which integrated UnixWare 7 elements while retaining SVR4 tools for backward compatibility. Post-2005, maintenance and patches transitioned to Xinuos (formerly UnXis), the current steward, providing updates via .pkg-formatted supplements for security and stability on legacy installations. The format remains limited to 32-bit environments, with practical package sizes constrained around 2 GB due to filesystem limits on individual files in earlier releases.
+
+References
+
+PKG File Extension - FileInfo.com
+
+Code Signing Tasks - Apple Developer
+
+Notarizing macOS software before distribution - Apple Developer
+
+PKG files - PS4 Developer wiki - PSDevWiki
+
+PKG files - PS3 Developer wiki
+
+Apple IT Essentials: PKGs and Software Deployment | The Sequence
+
+Distribution XML Reference - Apple Developer
+
+The Flat Package - MacTech
+
+Flat Package Format - The missing documentation - WhiteBox
+
+Developer ID - Signing Your Apps for Gatekeeper
+
+productbuild(1) - manp.gs man pages
+
+Packaging Mac software for distribution - Apple Developer
+
+pkgutil Man Page - macOS - SS64.com
+
+What got installed? How to learn exactly what a package contains/ed
+
+https://s.sudre.free.fr/Software/Packages/Q&A_5.html
+
+Save up to 25% pkg file size with this weird Monterey trick!
+
+NPDRM - PS3 Developer wiki
+
+ playstationvita, playstation3 - Sony
+
+Packages - Vita Development Wiki
+
+PlayStation4 (PS4) Launches November 15 in North America ...
+
+PlayStation 5 launches in November, starting at $399 for PS5 Digital ...
+
+Backward compatibility: PS4 games playable on PS5 consoles
+
+PKG files - PS5 Developer wiki
+
+How to Install PKG Files - ConsoleMods Wiki
+
+pearlxcore/PS4-PKG-Tool: Manage and perform various ... - GitHub
+
+CyB1K/PS4-Fake-PKG-Tools-3.87 - GitHub
+
+Symbian 6.0 S80 1st Edition Crystal smartphones - PhoneMore
+
+Package file format in Software Installation Toolkit - reference
+
+Building, debugging and deploying an application - Huihoo
+
+MakeSIS - Installation file generator syntax
+
+Secure Software Install SIS Tools Overview - Huihoo
+
+Signing SIS Files - Huihoo
+
+MakeSIS
+
+https://www.skyscape.com/support/symbian_installation.pdf
+
+Support for Symbian - Qt Wiki
+
+A Look Back On Symbian On The Eve Of Its Demise - TechCrunch
+
+Symbian OS Error Codes - CSDN
+
+https://www.sunhelp.org/history/pdf/packaging-for-solaris2.pdf
+
+How to Add Software Packages to a Spool Directory (pkgadd ...
+
+pkgtrans - man pages section 1: User Commands - Oracle Help Center
+
+The pkginfo File (Application Packaging Developer's Guide)
+
+Creating a prototype File - Application Packaging Developer's Guide
+
+pkgmake Manual Page - Lighterra
+
+Appendix C Additional SvR4 Packaging Requirements (Reference)
+
+pkgmk - man pages section 1: User Commands - Oracle Help Center
+
+Installing an SVR4 Package - Installing Oracle Solaris 11.2 Systems
+
+Creating Installation Scripts (Application Packaging Developer's ...
+
+Oracle Solaris 10 SVR4 and IPS Package Comparison
+
+ Packaging Tools for OpenServer & UnixWare - | Skunkware
+
+CALDERA COMPLETES ACQUISITION OF TWO SCO DIVISIONS
+
+pkgmap(F) - DocView: Access to SCO OpenServer 5 Documentation
+
+Packaging your software applications - SCO
+
+pkgadd(ADM)
+
+Xinuos Inc. | Support | Docs | Documentation - SCO
+
+Xinuos Inc. | Products | Openserver6 | SCO OpenServer 6
+
+OpenServer 6 - Xinuos
+
+ SCO OpenServer 5 Definitive 2018 Getting Started Guide - Xinuos
+
+SCO Unix Filesystems - A.P. Lawrence
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

@@ -1,0 +1,262 @@
+fsck Grokipedia
+ 
+
+ Fact-checked by Grok 2 months ago 
+fsck
+ Ara Eve Leo Sal 
+1x
+ fsck (short for file system check) is a command-line utility in Unix and Unix-like operating systems designed to examine file system structures for errors and inconsistencies, and to repair them when instructed. It serves as a front-end program that invokes filesystem-specific checkers, such as e2fsck for ext2/ext3/ext4 filesystems or fsck_ufs for UFS, allowing it to support various filesystem types including those on Linux, BSD, and other POSIX-compliant systems.
+Introduced in the addendum to the 7th Edition of Unix (V7) released by Bell Laboratories in 1980, fsck consolidated earlier separate checking programs into a unified tool, marking a significant advancement in filesystem maintenance for early Unix distributions. Over time, it evolved to include features like parallel checking of multiple filesystems, progress reporting, and integration with boot processes to automatically verify and repair filesystems after unclean shutdowns. In modern implementations, such as those in the util-linux package for Linux, fsck can operate on devices, mount points, or UUIDs/labels, and it skips already-mounted filesystems by default to avoid data corruption risks.
+The utility performs detailed consistency checks on critical file system components, including superblocks, inodes, directories, and free space allocation, detecting issues like orphaned inodes, duplicate blocks, or linkage errors that may arise from power failures, crashes, or hardware faults. When repairs are needed, fsck operates interactively by defaultprompting the user for actionsor non-interactively with options like -y for automatic yes responses or -n for read-only checks. It returns specific exit codes to indicate outcomes, such as 0 for no errors, 1 for corrected errors, or 4 for uncorrectable issues, which boot loaders and system scripts use to determine if a reboot or manual intervention is required.
+In practice, fsck is typically run on unmounted filesystems to prevent ongoing modifications from interfering with checks, and it is often invoked automatically during system boot if the filesystem journal indicates inconsistencies. While effective for traditional filesystems, its use with journaling filesystems like ext4 or XFS is optimized through underlying tools that replay journals first, reducing full scans; however, periodic full checks are still recommended to catch latent corruption. Administrators are advised to back up data before repairs, as fsck may relocate corrupted files to a lost+found directory or, in rare cases, result in data loss.
+
+Introduction
+
+Purpose and Functionality
+
+fsck, short for file system check, is a standard utility in Unix-like operating systems used to check the structural consistency of file systems and optionally repair any inconsistencies. It acts as a front-end program that facilitates the examination and maintenance of file system integrity across various supported types.
+The core functions of fsck involve detecting common errors such as bad blocks, lost files from orphaned inodes, and metadata corruption like damaged superblocks or directory inconsistencies. When repairs are enabled, it addresses these issues by marking bad blocks to avoid future use, fixing metadata structures, and recovering lost files by relocating them to a lost+found directory for later identification and restoration. For safe execution, the file system must be unmounted or mounted in read-only mode to avoid conflicts from ongoing writes.
+In a high-level process, fsck first determines the file system typeoften by probing the device or consulting configuration files like /etc/fstaband then invokes the corresponding backend checker, such as fsck.ext4 for ext4 file systems. This modular approach allows specialized tools to handle the detailed verification and correction tailored to each file system. Analogous utilities in other systems include CHKDSK in Windows, which similarly scans and repairs file system errors on volumes like NTFS.
+
+Etymology and Naming
+
+The term "fsck" is an acronym for "file system check," a deliberate abbreviation designed to create a short, memorable command name for the utility that verifies and repairs file system integrity in Unix-like operating systems.
+This naming choice aligns with longstanding Unix conventions, which emphasize concise, lowercase command names consisting of 2 to 9 characters, typically using only lowercase letters and digits to promote simplicity and ease of typing on early terminals. Such conventions, codified in POSIX standards, reflect the philosophy of minimalism in Unix tool design, where brevity facilitates scripting and command-line efficiency without sacrificing clarity.
+Pronunciation of "fsck" varies among users but is most commonly rendered as the spelled-out initials /f s si ke/ (eff ess see kay) in professional and technical contexts, or approximated as "fisk" in informal speech; regional differences include "f-suck" or "f-sock," though the command is never officially tied to profane interpretations.
+
+Technical Details
+
+Supported File Systems
+
+The fsck utility in Unix-like systems supports a range of file systems through specialized backend programs, with core compatibility centered on traditional journaling and non-journaling types prevalent in Linux and Unix environments. In Linux distributions, fsck handles the ext2, ext3, and ext4 file systems via the e2fsck binary, where fsck.ext2, fsck.ext3, and fsck.ext4 serve as hard links to the same executable provided by the e2fsprogs package; these perform full checks on ext2 (non-journaled) and metadata-journaled scans on ext3 and ext4 when journaling is present. For the Unix File System (UFS), also known as Fast File System (FFS), fsck invokes fsck_ffs in BSD variants like FreeBSD, which verifies and repairs UFS volumes by checking inodes, blocks, and directory structures. The Journaled File System (JFS), originally developed by IBM, is supported through fsck.jfs (or jfs_fsck), which replays the transaction log and repairs inconsistencies in this 64-bit journaling system. Similarly, ReiserFS uses fsck.reiserfs (part of reiserfsprogs) to replay journals and check the tree structure for errors in this balanced-tree-based journaling file system.
+Modern file systems have seen partial or adapted integration with fsck, often relying on dedicated tools rather than full traditional checks. For Btrfs, fsck.btrfs is a compatibility stub that does nothing and exits successfully, as Btrfs integrity is verified using btrfs check for structural checks and btrfs scrub for data integrity, with limited repair capabilities via btrfs check --repair. XFS uses xfs_repair as the primary repair tool; fsck.xfs normally does nothing and exits successfully due to XFS's mount-time journal recovery, but can be forced to invoke xfs_repair for metadata-only checks via kernel parameters or a /forcefsck file, avoiding full data scans. As of Linux 6.18 (2025), XFS supports online fsck for metadata repairs without unmounting the filesystem. ZFS uses a dummy fsck.zfs script that performs no actual checking and always exits successfully, as integrity is maintained via zpool scrub for checksum-based scrubbing rather than traditional fsck operations.
+Platform-specific variations extend fsck support to proprietary or legacy systems. In BSD and macOS environments, fsck_hfs handles HFS+ volumes by verifying the catalog file, extents, and bitmap structures, while macOS has evolved to fsck_apfs for the Apple File System (APFS), focusing on container and volume integrity. Linux kernels facilitate auto-detection of supported file systems by querying /proc/filesystems, allowing fsck to invoke the appropriate backend during boot-time operations.
+Despite broad compatibility, fsck has notable limitations, particularly with journaling file systems where full checks are often unnecessary; for instance, XFS and similar systems perform metadata-only validations to minimize downtime, skipping exhaustive data scans. Support is incomplete for encrypted file systems (e.g., those layered over LUKS) or networked ones like NFS, as fsck targets local block devices and cannot directly inspect remote or wrapped structures.
+The fsck wrapper detects file system types by scanning superblocks for magic numbers or leveraging the libblkid library, which probes devices via the blkid utility to identify types, UUIDs, and labels for automatic backend selection.
+
+Checking and Repair Mechanisms
+
+The fsck utility performs a multi-phase scan to detect and repair inconsistencies in file system structures, ensuring metadata integrity after unclean shutdowns or hardware issues. In the initial Phase 1, fsck checks blocks and sizes by verifying inode types, scanning for duplicate or bad blocks, and ensuring file sizes align with allocated blocks. Phase 1b follows as a rescan specifically for additional duplicate blocks identified in the first pass. Phase 2 examines pathnames by removing invalid directory entries and checking directory integrity, such as ensuring no entries point to non-existent inodes. Phase 3 assesses connectivity by linking orphaned directories back into the file system hierarchy. Phase 4 verifies reference counts by adjusting link counts for inodes and clearing unreferenced files. Finally, Phase 5 rebuilds cylinder group summaries, including free-block and used-inode maps, to restore accurate allocation tracking.
+Common error types addressed during these phases include orphaned inodes, which lack directory references but contain valid data; duplicate blocks, where multiple inodes claim the same disk block; and bad directories, such as those with incorrect sizes or invalid entries. For journaling file systems like ext3 and ext4, the journal replay mechanism during mount time applies committed transactions from the log, often skipping most fsck phases as it restores consistency without a full disk scan.
+fsck operates in distinct repair modes to balance thoroughness with safety. Interactive mode prompts the user for decisions on each detected inconsistency, allowing manual oversight for complex repairs. Automatic mode, intended for minor corruptions expected after abrupt halts, applies fixes without intervention but halts on severe issues to prevent escalation. Read-only mode performs verification only, reporting errors without any modifications to the file system.
+For data recovery, fsck relocates inconsistent or orphaned files to a lost+found directory, preserving contents for manual restoration while removing them from the main hierarchy. It also manages bad sectors by maintaining bad block lists and clearing associated inodes after confirmation, preventing further allocation to faulty areas.
+Security considerations in fsck include risks of unintended data loss, particularly in automatic repair where unprompted fixes might clear valid inodes if errors are misdiagnosed. Modern file systems mitigate these risks through built-in checksums; for instance, ext4's metadata checksums verify superblocks, inodes, and extent trees on access, detecting corruption early and reducing reliance on full fsck runs. Similarly, Btrfs employs checksums on both data and metadata blocks, enabling automatic verification and repair during reads, which minimizes exposure to repair-induced losses.
+
+Usage
+
+Command-Line Interface
+
+The fsck utility is invoked from the command line using the basic syntax fsck , where <filesystem> denotes the target device (e.g., /dev/sda1) or mount point (e.g., /home) to be checked. This frontend command delegates the actual checking to filesystem-specific tools like e2fsck for ext filesystems, passing options as appropriate. If no filesystem is specified, fsck defaults to checking the root filesystem or behaves according to other options like -A.
+Key options control the behavior of the check and repair process. The -a flag enables automatic repair of detected discrepancies without prompting the user, though it is advised against for critical filesystems due to the risk of unintended changes. For safer automation, -p performs all non-interactive repairs possible without user intervention where supported (e.g., by e2fsck), while -y assumes a "yes" response to all repair prompts. Interactive mode, where the user is prompted for decisions on repairs, is the default behavior unless automatic options are specified. To inspect without altering the filesystem, -n opens it read-only and reports errors without fixes. The -t <fstype> option specifies the filesystem type (e.g., ext4 or ufs) to override auto-detection from the superblock. Additionally, -f forces a thorough check even if the filesystem's clean flag indicates no prior issues.
+Advanced flags provide finer control over specific operations. For ext2/ext3/ext4 filesystems, the -l <filename> option in e2fsck adds block numbers from the specified file to the bad blocks list; -L <filename> replaces the list with blocks from the file. The -V flag increases verbosity to show detailed progress during the check. The -c option, when used with e2fsck for ext filesystems, checks for bad blocks using badblocks(8).
+Error handling is communicated through standardized exit codes: 0 indicates no errors were found; 1 means errors were detected and automatically fixed; 2 signifies errors that could not be repaired; and 4 denotes severe damage, such as issues with the superblock or group descriptors.
+Best practices emphasize running fsck on unmounted filesystems to prevent data corruption from concurrent access. For batch operations across multiple filesystems defined in /etc/fstab, the -A option checks all eligible entries in the order specified by their fs_passno field, excluding the root filesystem unless explicitly included.
+
+Boot-Time Operation
+
+During system boot, fsck is triggered under specific conditions to ensure filesystem integrity before mounting. An unclean shutdown, such as a power failure or abrupt halt, sets a dirty bit or inconsistent state in the filesystem superblock, forcing fsck to run on the affected partition to repair potential inconsistencies. Additionally, fsck checks are scheduled via the sixth field (fs_passno) in /etc/fstab, where a value of 1 prioritizes the root filesystem, 2 schedules others sequentially on the same drive or in parallel across different drives, and 0 skips the check entirely. Kernel command-line parameters, such as rootflags for mounting options or fsck.mode=force, can also invoke or override these checks during initialization. In some Linux distributions, such as Ubuntu, users can force fsck on the root filesystem during the next boot by creating an empty file named /forcefsck in the root directory with the command sudo touch /forcefsck followed by rebooting the system. Alternatively, to manually invoke fsck, one can boot into recovery mode by holding the Shift key during boot to access the GRUB menu, selecting Advanced options, and then choosing the recovery mode entry, from which fsck can be run via the root shell prompt after remounting the filesystem as read-write if necessary.
+In non-interactive boot environments, fsck operates in preen mode (-p) to automatically fix minor errors without user input, suitable for boot scripts that aim to repair common issues from unclean shutdowns while exiting with a code indicating if manual intervention is needed. For journaling filesystems like ext4, fsck skips full scans if the superblock marks the filesystem as clean, relying instead on journal replay during mount to handle recovery.
+Modern Linux distributions integrate fsck into the boot process via initramfs, where hooks like the fsck hook in mkinitcpio or dracut check the root filesystem before mounting it read-write. Under systemd, the fsck.service and related units (e.g., systemd-fsck-root.service) handle checks for filesystems with fs_passno > 0, executing type-specific tools in parallel where possible and defaulting to preen mode unless overridden by fsck.repair=yes for automatic fixes. For self-checking journaling filesystems such as XFS or ZFS, a dummy fsck binary is invoked, which performs no scan and exits immediately to avoid redundant operations, as recovery occurs at mount time.
+Users can interrupt fsck during boot by pressing Ctrl-C, which terminates the process (e.g., e2fsck) and may leave the filesystem mounted read-only, prompting a maintenance mode that requires the root password to proceed or skip. Recent versions of e2fsprogs (1.47 and later) support progress bars during checks via the -C option (e.g., -C 0 for console display), providing visual feedback on scan completion.
+Boot-time fsck can introduce delays of several minutes on large filesystems, potentially extending overall startup time, though optimizations like parallel checks across drives via fstab configuration mitigate this by allowing concurrent execution on multi-disk systems.
+
+History and Development
+
+Origins in Unix
+
+The file system check utility, known as fsck, first appeared in the Bell Labs Version 7 Unix addendum tape, distributed on December 2, 1980. This release included a new directory containing the fsck program and its manual section, described as a stringent file system checker superior to prior tools like icheck. It was developed by the Bell Labs research team during the era dominated by pioneers such as Ken Thompson and Dennis Ritchie, who had shaped the core Unix file system structures in Research Unix editions.
+In its early design, fsck served as a basic consistency checker focused on inodes, directory blocks, and free space allocation within the Version 7 file system, without the wrapper interfaces seen in later variants. It was closely integrated with the mkfs utility used for initial file system formatting, enabling verification of structural integrity shortly after creation or following potential corruption from power failures or hardware issues. This tool checked data elements not fully maintained by the Version 7 kernel, such as indirect block linkages, providing a more comprehensive audit than predecessors.
+Prior to fsck, file system integrity in 1970s Unix versions relied on informal scripts and simpler programs like icheck (for inode checks) and dcheck (for directory validation), which were limited in scope and required manual intervention. These tools evolved from broader influences, including Multics concepts of hierarchical file structures and integrity verification, which informed Unix's tree-based file organization and the need for periodic consistency audits.
+Initially targeted at PDP-11 minicomputers running Research Unix Version 7, fsck was ported to the VAX architecture in 4.1BSD, released in June 1981, adapting to the larger addressing spaces and evolving file system needs of that platform.
+
+Evolution and Modern Implementations
+
+The modern implementation of fsck emerged as a file system-independent frontend or wrapper in NetBSD 1.3, released in 1998, which dispatches checks to specific backend binaries like fsck_ffs for UFS or fsck_ext2 for ext2 file systems. This design allowed for modular support across multiple file systems without monolithic code, influencing subsequent Unix-like systems.
+Standardization efforts positioned fsck within the X/Open Common Applications Environment (CAE) through the 1995 draft of Systems Management: File System and Scheduling Utilities, which specified its interface for portability across compliant systems. However, fsck was not incorporated into the POSIX.1 standard, leading to implementation variations; in Linux, it relies on the e2fsprogs package since its initial release in 1993 for ext2 support, while BSD variants integrate it directly into the base system.
+Key milestones include the addition of enhanced UFS support in 4.4BSD (1993), which improved consistency checks for the Fast File System through better handling of cylinder groups and allocation bitmaps. In Linux, kernel 2.6 (2003) integrated journaling awareness into fsck tools, enabling e2fsck to perform replay of journal logs for ext3 during recovery without full scans. More recently, e2fsprogs 1.46 (2021) refined the fsck wrapper's type detection and invocation logic, improving compatibility with non-ext file systems like Btrfs and XFS by better routing to their respective checkers (btrfs check and xfs_repair).
+As of 2025, fsck is integrated into systemd on Linux distributions via services like , which automates boot-time checks with progress reporting and failure handling. In macOS, APFS volumes are verified and repaired using diskutil commands, such as diskutil verifyVolume and diskutil repairVolume, supplanting traditional fsck_apfs for container-based structures. The rise of resilient file systems has reduced reliance on offline fsck; for instance, Btrfs supports online checks via btrfs scrub and btrfs check --readonly, verifying checksums and metadata without unmounting.
+Future trends point toward metadata-only checks to minimize I/O overhead and exploratory AI-assisted repairs for complex corruptions, as seen in research on machine learning for anomaly detection in file system metadata. Open-source development continues actively through repositories like the e2fsprogs Git tree, fostering contributions for emerging features and bug fixes.
+
+Cultural Impact
+
+As a Minced Oath
+
+In Unix and hacker culture, "fsck" and phrases like "fscked up" serve as minced oaths, euphemistic substitutes for the profanity "fuck" or "fucked," allowing system administrators and programmers to express frustration over technical mishaps without using explicit language. This adaptation leverages the command's four-letter structure and phonetic similarity, turning a routine filesystem utility into a subtle stand-in for stronger expletives during moments of exasperation, such as when dealing with corrupted data or system failures.
+The usage emerged within Unix hacker communities in the late 1980s and early 1990s, capitalizing on the acronym's resemblance to the taboo word to create a form of in-group humor and circumlocution. It gained documentation and popularity through the Jargon File, a key compendium of hacker slang, where it is described as originating in online forums like the Scary Devil Monastery newsgroup and bofh.net, and spreading widely on Usenet following the 1996 Communications Decency Act, which heightened concerns over online profanity.
+Common examples include utterances like "the server's fscked" or "this setup is totally fscked up," employed by sysadmins to vent about broken hardware or software glitches in professional yet irreverent tones. These expressions highlight the oath's role in diffusing tension during high-stakes troubleshooting, where invoking the actual command might even underscore the irony of a "bad day" requiring filesystem repairs.
+Over time, this minced oath has normalized within tech subculture, appearing frequently in informal discussions on Usenet, tech forums, and programmer memes as a nod to shared experiences of digital chaos, though it is deliberately avoided in formal documentation and corporate communications to maintain professionalism. Variations include capitalizing it as "FSCK" for emphatic effect, akin to acronyms like "WTF" (what the fuck), which similarly blend technical jargon with profane undertones in hacker lexicon.
+
+Usage in Popular Culture
+
+In geek culture, the term fsck has inspired a variety of merchandise, including t-shirts emblazoned with playful phrases like "fsck around and find out," reflecting its dual role as a technical utility and a stand-in for profanity. These items, often sold through Linux-focused retailers, appeal to enthusiasts who appreciate the command's origins in Unix systems while embracing its humorous undertones in everyday expression.
+Online communities frequently incorporate fsck into memes and pseudo-profanity, particularly in lists of Unix commands that evoke suggestive language, such as sequences beginning with "unzip; strip; touch" and culminating in "fsck," which circulate as copypasta for comedic effect among programmers. This usage extends its reach beyond technical documentation into broader digital humor, where it serves as a clever minced oath in technology-related discussions.
+The podcast #Fsck 'Em All!, hosted by attorney T. Greg Doucette from 2017 to 2021, exemplifies fsck's adoption in non-technical media, employing the term as a recurring minced oath in episodes analyzing American politics, criminal justice failures, and legal controversies. With 108 episodes available on platforms like Spotify and Apple Podcasts, the show leveraged the command's connotation to title its "weekly consistency check" on societal issues, attracting listeners interested in satirical commentary.
+In educational settings, fsck appears in cybersecurity training, such as sessions at the SANS Institute, where it is presented as a core Linux utility for recovering damaged EXT file systems, often with hands-on labs exploring its limitations and advanced recovery techniques. These programs highlight its practical value while noting its cultural resonance among trainees familiar with tech jargon.
+
+Practical Examples
+
+Basic Filesystem Check
+
+To check a specific filesystem for errors without making changes, use the read-only mode:
+fsck -n /dev/sda1
+This examines the filesystem on /dev/sda1 and reports issues without prompting for repairs. It is safe to run on unmounted filesystems.
+
+Automatic Repair
+
+For automatic correction of detected errors, specify the -a (or -y) option:
+fsck -a /dev/sdb1
+This attempts to fix inconsistencies like bad blocks or orphaned inodes without user intervention. Use with caution on critical data, and ensure the filesystem is unmounted.
+
+Checking Multiple Filesystems
+
+To check all filesystems listed in /etc/(/page/Fstab) in parallel:
+fsck -A -T
+The -A option processes filesystems in order of fs_passno from fstab, starting with the root filesystem. The -T option provides a progress bar for better visibility during long operations. Avoid combining -A with -P on the root filesystem to prevent potential corruption.
+
+Boot-Time Invocation
+
+During system boot, fsck is often run automatically on filesystems marked for checking in /etc/(/page/Fstab) (e.g., with fsck options 1 or 2). If errors are found, it may prompt for repairs or use default behaviors based on the init system configuration. For manual simulation:
+fsck -f -y /
+The -f forces a check even if the filesystem appears clean, and -y auto-answers yes to repairs. Always boot into single-user mode or from live media for root filesystem checks.
+
+References
+
+fsck: check and repair a Linux filesystem - Linux Manuals (8)
+
+What the fsck Command Checks and Tries to Repair
+
+https://www.kernel.org/pub/linux/utils/util-linux/
+
+How do you use FSCK (File System Consistency check)? - IBM
+
+12.2. File System-Specific Information for fsck
+
+fsck(8) - Linux manual page - man7.org
+
+e2fsck(8) - Linux manual page
+
+chkdsk - Microsoft Learn
+
+The 2006 Linux Filesystems Workshop (Part II)
+
+Chapter 15. Checking and repairing a file system
+
+12. Utility Conventions
+
+fsck.jfs(8) - Arch manual pages
+
+fsck.reiserfs (8) - Linux Manuals
+
+fsck.btrfs(8) - Linux manual page - man7.org
+
+fsck.xfs(8) - Linux manual page - man7.org
+
+Manpage of fsck.zfs
+
+https://man.freebsd.org/cgi/man.cgi?query=fsck_hfs&sektion=8
+
+Importance of fsck at boot with Journalled filesystems?
+
+libblkid(3) - Linux man page - Die.net
+
+ Fsck The UNIX File System Check Program
+
+ Crash Consistency: FSCK and Journaling - cs.wisc.edu
+
+Improving ext4: bigalloc, inline data, and metadata checksums
+
+Checksumming - BTRFS documentation!
+
+fstab(5) - Linux manual page
+
+fsck - ArchWiki
+
+fsck.ext4(8) e2fsprogs Debian testing
+
+Details of the PUPS Archive - Minnie.tuhs.org
+
+V7addenda/README - Minnie.tuhs.org
+
+Repairing early UNIX file systems - Computer History Wiki
+
+fsck_ffs(8) - NetBSD Manual Pages
+
+Unix: An Oral History - GitHub Pages
+
+The Berkeley Software Distribution - Abort, Retry, Fail
+
+fsck(8) - NetBSD Manual Pages
+
+ Preliminary Specification Systems Management: File System and ...
+
+Design and Implementation of the Second Extended Filesystem - MIT
+
+E2fsprogs Release Notes - SourceForge
+
+APFS: Command tools - The Eclectic Light Company
+
+Btrfs - ArchWiki
+
+fscking - catb. Org
+
+Situation Normal, All Fscked Up Linux Magazine
+
+"fsck around and find out" T-Shirt - Learn Linux TV
+
+Damn, That's Good: Pseudo-Profanity as SFF Worldbuilding - Reactor
+
+#FSCK 'Em All! | Your weekly consistency check on America's ...
+
+ Program Guide - SANS Institute
+
+FilesystemTroubleshooting - Community Help Wiki
+
+RecoveryMode - Ubuntu Wiki
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion

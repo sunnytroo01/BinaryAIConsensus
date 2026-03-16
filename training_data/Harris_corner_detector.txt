@@ -1,0 +1,217 @@
+Harris corner detector Grokipedia
+ 
+
+ Fact-checked by Grok 1 month ago 
+Harris corner detector
+ Ara Eve Leo Sal 
+1x
+ The Harris corner detector is a fundamental algorithm in computer vision for identifying corners in digital images, defined as local regions where the image intensity exhibits significant changes in all directions, achieved by analyzing the eigenvalues of the second-moment matrix (also known as the structure tensor or autocorrelation matrix) computed from spatial gradients within a Gaussian-weighted neighborhood.
+Introduced by Chris Harris and Mike Stephens in their 1988 paper "A Combined Corner and Edge Detector", the method was developed as part of the Alvey Vision Conference proceedings to enable consistent feature tracking for 3D scene interpretation from image sequences, addressing the limitations of prior detectors like Moravec's by integrating corner and edge responses into a unified framework based on the local auto-correlation function. The core process involves computing image derivatives IxI_xIx and IyI_yIy, forming the covariance matrix MMM with elements A=Ix2wA = I_x^2 \otimes wA=Ix2w, B=Iy2wB = I_y^2 \otimes wB=Iy2w, and C=IxIywC = I_x I_y \otimes wC=IxIyw (where www is a Gaussian window), and deriving a corner response measure R=det(M)ktrace(M)2R = \det(M) - k \cdot \operatorname{trace}(M)^2R=det(M)ktrace(M)2 (with k0.04k \approx 0.04k0.04 to 0.060.060.06) to classify regions: corners yield high positive RRR (both eigenvalues large), edges yield near-zero RRR (one eigenvalue dominant), and flat areas yield low RRR. Corners are then selected as local maxima of RRR exceeding a threshold, often followed by non-maximum suppression and sub-pixel refinement via quadratic interpolation.
+The detector's key strengths include rotational invariancedue to the eigenvalue-based measure remaining unchanged under image rotationand robustness to moderate illumination variations and noise when using appropriate Gaussian smoothing (d1\sigma_d \approx 1d1, i2.5\sigma_i \approx 2.5i2.5), making it effective for real-time applications like camera calibration, image stitching, and motion estimation in unconstrained natural scenes. However, it lacks scale invariance, performing poorly under zooming or affine transformations, and can be sensitive to parameter choices like the threshold \tau (typically 10130) or kkk, which affect the number and quality of detected features. These limitations spurred variants, such as the Shi-Tomasi improvement (1994) that prioritizes the minimum eigenvalue for better stability in tracking, and integrations with scale-space methods like Harris-Laplace for multi-scale detection.
+Since its publication, the Harris corner detector has profoundly influenced feature extraction techniques, garnering over 22,000 citations and serving as a benchmark in libraries such as OpenCV (via cv.cornerHarris()) and MATLAB (via detectHarrisFeatures), with ongoing adaptations for event-based vision, FPGA acceleration, and deep learning hybrids in domains including autonomous navigation and augmented reality.
+
+Overview
+
+Definition and Purpose
+
+The Harris corner detector is a feature detection algorithm in computer vision that identifies corners, or interest points, in an image where the local intensity exhibits significant variations in all directions. These corners are distinguished from edges, which show variation primarily in one direction, and flat regions, which lack substantial change in any direction, by analyzing local image structure to locate discrete, reliable feature points suitable for further processing.
+The primary purpose of the Harris corner detector is to enable robust extraction of stable image features for applications such as feature matching, object tracking, and motion estimation across image sequences. It supports tasks like object recognition by providing points that remain consistent under transformations, including rotational invariancedue to its reliance on eigenvalues of the local structure tensor that are unaffected by orientation changesand invariance to additive illumination shifts, as the method uses image derivatives insensitive to uniform brightness adjustments. This makes it particularly valuable for analyzing natural scenes in monocular video from mobile cameras, facilitating the construction of 3D representations through feature tracking.
+The algorithm outputs a collection of detected corner points, each accompanied by a corner strength score that quantifies the quality of the detection, allowing for prioritization or thresholding in subsequent steps. These keypoints serve as foundational elements in broader computer vision pipelines, such as ORB, where Harris scores refine initial corner candidates for efficient descriptor computation.
+
+Historical Development
+
+The Harris corner detector was introduced in 1988 by Chris Harris and Mike Stephens in their seminal paper titled "A Combined Corner and Edge Detector," presented at the Fourth Alvey Vision Conference in Manchester, UK. This work emerged within the broader context of early computer vision research on interest point detection, particularly for applications in 3D scene reconstruction from image sequences. It built directly upon Hans Moravec's foundational 1977 corner detection method, which identified interest points based on intensity variations in local windows but suffered from sensitivity to noise and lack of rotational invariance. Harris and Stephens addressed these limitations by developing a more robust approach that improved reliability under rotation, enabling better performance in dynamic scenarios.
+The primary motivation for the detector stemmed from the need for stable, trackable features in tasks such as stereo matching and motion analysis across monocular image sequences captured by mobile cameras. At the time, existing edge detectors like the Canny operator excelled at linear features but struggled with junctions and connectivity issues in complex scenes, while pure corner detectors lacked the ability to distinguish edges effectively. The combined detector aimed to extract both corners and edges consistently, facilitating 3D interpretation of unconstrained environments by providing richer structural information from natural imagery.
+In the original publication, the algorithm's implementation included key parameters such as a sensitivity factor k typically set between 0.04 and 0.06 to balance edge and corner responses. Empirical validation was conducted on real-world images, including outdoor sequences, demonstrating superior consistency in detecting corners compared to prior methods such as Beaudet and Kitchen-Rosenfeld operators. These tests highlighted the detector's practical utility in handling noise and varying lighting, laying the groundwork for its widespread adoption in feature tracking applications.
+
+Mathematical Foundations
+
+Image Gradients and Derivatives
+
+Image gradients quantify the rate of change in pixel intensity across an image, serving as a fundamental measure of local variations that distinguish edges, textures, and corners from uniform regions. In the context of corner detection, these gradients capture how intensity evolves in different directions, enabling the identification of points where changes occur abruptly in multiple orientations. The Harris corner detector specifically relies on the first-order partial derivatives of the image intensity function I(x,y)I(x, y)I(x,y), denoted as IxI_xIx (horizontal component) and IyI_yIy (vertical component), which approximate the directional intensity shifts at each pixel.
+To understand why these derivatives highlight edges and corners, consider a first-order Taylor series expansion of the intensity around a point (x,y)(x, y)(x,y):
+I(x+x,y+y)I(x,y)+Ix(x,y)x+Iy(x,y)y.
+I(x + \Delta x, y + \Delta y) \approx I(x, y) + I_x(x, y) \Delta x + I_y(x, y) \Delta y.
+I(x+x,y+y)I(x,y)+Ix(x,y)x+Iy(x,y)y.
+This approximation models small displacements (x,y)(\Delta x, \Delta y)(x,y) and their impact on intensity; along edges, the change is large in one direction but minimal perpendicular to it, whereas at corners, significant variations occur in all directions due to intersecting edges. The detector assumes a grayscale input image, where I(x,y)I(x, y)I(x,y) represents the scalar intensity value at each pixel, simplifying the analysis to two-dimensional spatial changes without color channel complications.
+Since digital images are discrete grids, continuous derivatives cannot be computed directly and must be approximated using finite difference methods or convolution with discrete kernels. A basic finite difference for the horizontal gradient is achieved by convolving the image with the kernel , which estimates IxI_xIx as the central difference between neighboring pixels. For improved accuracy and noise robustness, the Sobel operator is commonly employed as an alternative, using a 33 kernel that combines differentiation with averaging:
+Ix=I18,Iy=I18.
+I_x = I \ast \frac{1}{8} \begin{bmatrix} -1 & 0 & 1 \\ -2 & 0 & 2 \\ -1 & 0 & 1 \end{bmatrix}, \quad I_y = I \ast \frac{1}{8} \begin{bmatrix} -1 & -2 & -1 \\ 0 & 0 & 0 \\ 1 & 2 & 1 \end{bmatrix}.
+Ix=I81121000121,Iy=I81101202101.
+The division by 8 normalizes the smoothing effect from the kernel weights. These operators provide a balance between edge localization and suppression of isolated noise pixels.
+To further mitigate sensitivity to image noise, which can amplify spurious gradients, a Gaussian low-pass filter is often applied as preprocessing before derivative computation in practical implementations. This blurring step, with a typical standard deviation d1\sigma_d \approx 1d1 pixel, reduces high-frequency artifacts while preserving the broader intensity structures essential for detecting meaningful features. The Gaussian kernel G(x,y)=12d2exp(x2+y22d2)G(x, y) = \frac{1}{2\pi\sigma_d^2} \exp\left(-\frac{x^2 + y^2}{2\sigma_d^2}\right)G(x,y)=2d21exp(2d2x2+y2) is convolved with the image to yield a smoothed version, upon which the derivative kernels are then applied. This pre-filtering enhances the reliability of IxI_xIx and IyI_yIy for subsequent corner analysis.
+
+Structure Tensor
+
+The structure tensor, also known as the autocorrelation matrix, is a fundamental 22 symmetric matrix that quantifies the local intensity variations in an image around a given point (x,y)(x, y)(x,y). It is defined as
+M(x,y)=,
+M(x,y) = \begin{bmatrix}
+\langle I_x^2 \rangle & \langle I_x I_y \rangle \\
+\langle I_x I_y \rangle & \langle I_y^2 \rangle
+\end{bmatrix},
+M(x,y)=,
+where IxI_xIx and IyI_yIy denote the partial derivatives of the image intensity with respect to the xxx and yyy directions, respectively, and the angle brackets \langle \cdot \rangle represent averaging over a local neighborhood using a Gaussian window function w(u,v)=exp(u2+v22i2)w(u,v) = \exp\left(-\frac{u^2 + v^2}{2\sigma_i^2}\right)w(u,v)=exp(2i2u2+v2) with typical i2.5\sigma_i \approx 2.5i2.5. This matrix captures the second-moment information of the image gradients, providing a compact representation of the local image structure.
+The elements of the structure tensor are computed element-wise by convolving the squared and cross-product gradient images with the Gaussian window. Specifically, the components are given by
+Mxx=Ix2w,Mxy=IxIyw,Myy=Iy2w,
+M_{xx} = I_x^2 \ast w, \quad M_{xy} = I_x I_y \ast w, \quad M_{yy} = I_y^2 \ast w,
+Mxx=Ix2w,Mxy=IxIyw,Myy=Iy2w,
+where \ast denotes convolution, and the integration is performed over a small window radius, typically 3 to 5 pixels (e.g., radius 2i\approx 2\sigma_i2i), to ensure computational efficiency while capturing relevant local variations. This smoothing with the Gaussian window reduces noise sensitivity and emphasizes the dominant gradient directions within the neighborhood.
+The eigenvalues 1\lambda_11 and 2\lambda_22 (with 12\lambda_1 \geq \lambda_212) of the structure tensor correspond to the principal curvatures of the local intensity surface, offering insight into the geometric nature of the image patch. Regions where both eigenvalues are large indicate significant variation in all directions, characteristic of a corner, whereas one large and one small eigenvalue suggests an edge, and both small values point to a flat area.
+As a covariance matrix of the gradients, the structure tensor is symmetric and positive semi-definite, ensuring non-negative eigenvalues that reflect the variance in principal directions. Its reliance on second moments confers rotation invariance, as the eigenvalues remain unchanged under image rotation, making it robust for feature detection across orientations.
+
+Algorithm Implementation
+
+Preprocessing Steps
+
+The Harris corner detector typically operates on grayscale images, requiring conversion from color inputs such as RGB to a single-channel intensity representation. This is achieved using a weighted sum formula that accounts for human visual perception, given by $ I = 0.299R + 0.587G + 0.114B $, where $ R $, $ G $, and $ B $ are the red, green, and blue channel values, respectively. This luminance-based conversion preserves perceptual brightness while simplifying subsequent gradient computations.
+To mitigate the impact of noise in the input image, an optional Gaussian smoothing step is applied prior to derivative estimation. This involves convolving the grayscale image with a Gaussian kernel of standard deviation $ \sigma $ typically in the range 0.5 to 1.5, which suppresses high-frequency noise while minimizing edge blurring. The original formulation recommends this smoothing to enhance the reliability of local autocorrelation measures without significantly altering corner structures.
+Image gradients IxI_xIx and IyI_yIy are computed using finite difference approximations, such as 33 Sobel kernels.
+Preprocessing also includes defining the Gaussian window for the structure tensor computation, commonly set to a size of 77 pixels with $ \sigma = 1 $, to capture local intensity variations effectively. These parameters are tuned empirically based on image characteristics to optimize detection performance.
+The original Harris detector is designed for single-scale analysis, applying preprocessing to the full-resolution image. However, for robustness to scale variations, extensions of the method may prepare an image pyramid by downsampling and smoothing at multiple levels, enabling multi-scale corner detection.
+
+Corner Response Function
+
+The corner response function serves as the key metric in the Harris corner detector for evaluating the likelihood of a pixel being a corner, based on the eigenvalues of the structure tensor MMM. It is defined as
+R=det(M)k2,
+R = \det(M) - k \, ^2,
+R=det(M)k2,
+where det(M)=12\det(M) = \lambda_1 \lambda_2det(M)=12 is the determinant (product of the eigenvalues 1\lambda_11 and 2\lambda_22), trace(M)=1+2\operatorname{trace}(M) = \lambda_1 + \lambda_2trace(M)=1+2 is the trace (sum of the eigenvalues), and kkk is an empirical constant typically set to approximately 0.05 (ranging from 0.04 to 0.06).
+This response RRR distinguishes different local image structures by analyzing variations in intensity. At corners, both eigenvalues are large, indicating significant change in all directions, which produces a large positive R>0R > 0R>0. Along edges, one eigenvalue dominates while the other is small, resulting in a negative R<0R < 0R<0. In flat or uniform regions, both eigenvalues are small, yielding R0R \approx 0R0.
+In practice, corners are identified by applying a threshold to RRR, typically in the range of 10 to 130 depending on the implementation and image characteristics, to retain only strong responses while suppressing noise. The formulation enables efficient computation, as det(M)\det(M)det(M) and trace(M)\operatorname{trace}(M)trace(M) can be calculated directly from the elements of MMM without performing a full eigendecomposition.
+
+Feature Selection
+
+The feature selection phase in the Harris corner detector identifies robust corner candidates from the computed response map by applying non-maximum suppression to retain only local maxima, thereby preventing the selection of clustered or redundant points. This suppression is typically performed within a small neighborhood, such as an 8-connected (3x3) window around each pixel, where a point is retained if its response value $ R $ exceeds that of all its immediate neighbors; larger or adaptive windows, with radii on the order of $ 2\sigma $ (where $ \sigma $ relates to the Gaussian smoothing scale used earlier), may be employed to handle varying image resolutions or noise levels.
+Following suppression, a threshold is applied to the response values to discard weak candidates, ensuring only significant corners are selected; the original formulation uses $ R > 0 $ as the baseline, but practical implementations often employ a higher empirical threshold (e.g., around 10-130 depending on image scale and noise) to filter out flat or edge-like regions effectively. Optionally, sub-pixel refinement can enhance localization accuracy by interpolating the response function around candidate points, commonly via quadratic fitting to estimate offsets from integer pixel coordinates, which improves precision in applications requiring fine-grained feature matching.
+The output of this stage is a list of selected corner coordinates (x,y)(x, y)(x,y) paired with their corresponding response strengths $ R $, often sorted in descending order of $ R $ to facilitate top-$ N $ selection for downstream tasks like feature tracking. Computationally, the suppression and thresholding are ideally applied to a Gaussian-smoothed version of the response map to enhance stability against minor noise perturbations, with provisions for anisotropic windows in cases of directional image variations, though isotropic processing suffices for most standard scenarios.
+
+Variants and Enhancements
+
+Shi-Tomasi Improvement
+
+The Shi-Tomasi improvement, introduced by Jianbo Shi and Carlo Tomasi in their 1994 paper "Good Features to Track," refines the Harris corner detector specifically for applications in feature tracking across image sequences. Rather than relying on the Harris cornerness response R=det(M)ktr(M)2R = \det(M) - k \operatorname{tr}(M)^2R=det(M)ktr(M)2, where MMM is the structure tensor and kkk is an empirically tuned parameter, the method evaluates corner quality using the eigenvalues 1\lambda_11 and 2\lambda_22 of MMM directly. A candidate window is selected as a good feature if min(1,2)>\min(\lambda_1, \lambda_2) > \lambdamin(1,2)>, with the threshold \lambda chosen empirically to balance sensitivity to noise and retention of prominent features. This approach stems from analyzing the tracking error in affine motion models, ensuring selected corners correspond to stable, real-world points that minimize displacement under small transformations.
+A key advantage of the Shi-Tomasi method is the elimination of the kkk parameter, which in the original Harris detector requires manual adjustment and can lead to inconsistent results across different images or scales. By focusing on the smaller eigenvalue, the method prioritizes corners with more isotropic strengthbalanced 1\lambda_11 and 2\lambda_22which are inherently more robust for tracking, as they exhibit lower sensitivity to small perturbations in motion estimation. This results in features that better support algorithms like the Lucas-Kanade tracker, enhancing overall stability in dynamic scenes without ad hoc tuning.
+In terms of implementation, the Shi-Tomasi variant retains the Harris detector's preprocessing steps, including Gaussian smoothing of image gradients to form the structure tensor MMM, and computes its eigenvalues at each window location. The primary difference lies in the response function and selection: eigenvalues are extracted explicitly, and the minimum value serves as the score, with corners ranked and selected by exceeding a relative threshold, such as 1% of the maximum minimum-eigenvalue in the image, to yield a fixed number of top features. This eigenvalue-based criterion simplifies deployment while aligning detection more closely with tracking performance metrics.
+Empirical evaluations in the original work demonstrate the Shi-Tomasi method's superior repeatability in motion sequences compared to the Harris detector. For instance, in a 26-frame real sequence simulating forward camera translation (2 mm per frame), the approach using affine motion dissimilarity effectively identified and tracked 102 stable features while discarding ambiguous ones affected by occlusions or reflections, achieving lower tracking errors than translation-only measures or prior interest operators. These benchmarks highlight its effectiveness in real-world video analysis, where consistent feature correspondence is critical.
+
+Modern Adaptations
+
+To achieve scale invariance, the Harris corner detector has been extended by computing the response across multiple scales, often using Gaussian image pyramids or scale-space representations. In these approaches, the structure tensor is evaluated at different pyramid levels, and keypoints are selected based on maximum response across scales to ensure repeatability under resizing. A seminal method, the Harris-Laplace detector, combines the Harris operator for precise corner localization with the Laplacian of Gaussian for scale selection, approximating the latter via difference-of-Gaussians for efficiency; this yields robust multi-scale features that served as a precursor to more advanced descriptors like SIFT.
+For accelerated implementations, binary approximations such as the FAST detector (2006) draw inspiration from the Harris window-based intensity change checks but replace the full eigenvalue analysis with a rapid segment test around a candidate pixel, achieving up to 4-5 times faster detection while maintaining comparable corner quality on standard benchmarks. GPU optimizations further enable real-time processing; for instance, CUDA-based parallelization of gradient computation and structure tensor assembly on modern GPUs processes VGA-resolution images at over 100 frames per second, making Harris viable for embedded and video applications.
+Learning-based hybrids integrate Harris as an initialization or prior for deep feature detectors, where classical Harris responses generate pseudo-ground-truth labels or guide initial keypoint proposals during training, enhancing convergence and robustness. Machine learning has also enabled adaptive tuning of the Harris response parameter kkk, optimizing it per image via regression models trained on diverse datasets to balance edge and corner sensitivity. Recent trends up to 2025 emphasize Harris's role in SLAM systems, such as ORB-SLAM3, where it scores FAST candidates for feature selection, supporting real-time mapping in dynamic environments.
+
+Applications and Limitations
+
+Key Applications
+
+The Harris corner detector plays a pivotal role in feature tracking for optical flow estimation, particularly when integrated with methods like the Lucas-Kanade algorithm to analyze motion in video sequences. By identifying robust corner points that exhibit significant intensity changes in multiple directions, these features serve as reliable keypoints for tracking frame-to-frame displacements, enabling accurate estimation of pixel motion patterns. This approach is widely applied in video stabilization systems, where detected corners are tracked across frames to compute global motion models and compensate for unwanted camera shake, resulting in smoother footage for applications such as handheld videography.
+In image matching and registration tasks, the Harris corner detector facilitates the extraction of distinctive keypoints essential for aligning images from different viewpoints. These corners are used to establish correspondences between images, supporting processes like panorama stitching where multiple overlapping photographs are seamlessly blended into a wide-field composite. Furthermore, in structure-from-motion pipelines for 3D reconstruction, Harris-detected corners provide initial feature points that are matched across a sequence of images to estimate camera poses and recover scene geometry, forming the basis for building scalable 3D models from 2D inputs.
+For object recognition, Harris corners contribute as local feature detectors in bag-of-words models, where detected points are clustered and quantized into visual vocabularies to represent image content invariantly to scale and viewpoint changes. This method treats corner descriptors as "words" to index and match objects within large databases, enabling efficient search and localization of query objects in complex scenes. In mobile augmented reality systems, Harris corners are often paired with compact binary descriptors like BRIEF to form lightweight feature sets that support real-time object detection and overlay rendering on resource-constrained devices.
+In robotics and autonomous systems, the Harris corner detector underpins visual simultaneous localization and mapping (SLAM) frameworks by providing stable landmarks for real-time pose estimation and environment mapping. These corners are tracked in monocular or stereo camera feeds to build incremental maps while localizing the robot or drone, as demonstrated in early visual SLAM implementations for indoor navigation and outdoor exploration. Such applications enhance autonomy in unmanned vehicles by enabling robust feature-based odometry in dynamic environments.
+
+Limitations and Comparisons
+
+The Harris corner detector exhibits several key limitations that constrain its applicability in diverse computer vision scenarios. Primarily, it is not inherently scale-invariant, as its fixed window size leads to degraded performance when image features are zoomed or resized; experimental evaluations show repeatability rates peaking near 100% at a scale factor of 1 but dropping to below 50% for factors as low as 0.5 or as high as 2. Additionally, the detector relies on an empirical parameter kkk (typically set between 0.04 and 0.06) in the corner response function, which requires manual tuning based on image content to balance edge rejection and corner detection, potentially leading to suboptimal results without domain-specific adjustment. Computationally, it operates at O(1) complexity per pixel (O(N) for the entire image) due to Gaussian smoothing and eigenvalue computations, making it intensive for high-resolution images; for instance, autocorrelation matrix calculation alone consumes about 50 ms on a 16001200 image using optimized implementations.
+Further shortcomings arise in challenging imaging conditions. The detector is highly sensitive to noise, with two-directional derivatives amplifying Gaussian noise effects and causing rapid declines in repeatability (e.g., from over 80% to under 20% as noise standard deviation increases from 0 to 30). It also degrades in low-contrast or uniformly textured regions, where weak gradients fail to produce distinct corner responses, and is vulnerable to illumination variations, such as multiplicative changes, which can reduce repeatability by up to 40% in structured scenes. Moreover, the original formulation lacks affine invariance, meaning it performs poorly under viewpoint distortions like shearing, necessitating extensions such as Harris-Affine for broader robustness.
+In comparisons with other detectors, the Harris method improves upon earlier approaches like Moravec's by considering gradient changes in all directions rather than discrete 45-degree shifts, yielding greater rotation invariance and reduced directional bias. However, it lags behind scale-invariant methods like SIFT, which offer superior robustness to scale, rotation, and affine transformations at the cost of higher computational demands; Harris achieves faster detection but lower matching correctness in dynamic scenes, such as video frame correspondence for 3D reconstruction. Relative to FAST, Harris provides higher accuracy in distinguishing true corners from edges but is significantly slower, with FAST enabling real-time performance through simplified segment tests while maintaining comparable repeatability in noise-free conditions.
+Benchmark evaluations underscore these trade-offs, with Harris demonstrating 70-90% repeatability in ideal, transformation-free scenarios on standard datasets like the Oxford Affine Covariant Regions, though this falls to 40-60% under scale or illumination perturbations. In contemporary pipelines as of 2025, its standalone use has become outdated for edge cases involving deep learning-based tasks, where hybrid integrationscombining Harris initialization with neural networks for refinementenhance robustness in applications like object tracking amid occlusions.
+
+References
+
+ A COMBINED CORNER AND EDGE DETECTOR - BMVA Archive
+
+ An Analysis and Implementation of the Harris Corner Detector
+
+ Local Image Features
+
+https://scholar.google.com/citations?user=SL_zfpQAAAAJ&hl=en
+
+Harris Corner Detection - OpenCV Documentation
+
+detectHarrisFeatures - Detect corners using HarrisStephens ...
+
+ 7.0 Corner Detection - Carnegie Mellon University
+
+ORB (Oriented FAST and Rotated BRIEF) - OpenCV Documentation
+
+Visual Mapping by a Robot Rover | Semantic Scholar
+
+RGB to Grayscale Conversion - Mustafa Murat ARAT
+
+Color conversions - RGB <-> - OpenCV Documentation
+
+Grayscaling of Images using OpenCV - Python - GeeksforGeeks
+
+None
+
+ Good Features to Track - Duke Computer Science
+
+ Scale & Affine Invariant Interest Point Detectors
+
+https://ieeexplore.ieee.org/document/6643655
+
+Image Stabilization Based on Harris Corners and Optical Flow
+
+Efficient Video Panoramic Image Stitching Based on an Improved ...
+
+3D reconstruction based on SIFT and Harris feature points
+
+ Video Google: A Text Retrieval Approach to Object Matching in Videos
+
+ Evaluation of interest point detectors for Visual SLAM - Uni Freiburg
+
+https://doi.org/10.5201/ipol.2018.229
+
+https://doi.org/10.1016/j.dsp.2021.103364
+
+ A Comparative Study between Moravec and Harris Corner Detection ...
+
+ A Comparison of SIFT and Harris Conner Features for ... - TAU
+ 
+Table of Contents
+ 
+
+ 
+Sign in to contribute
+ 
+Create an account or sign in to suggest articles and edits to Grokipedia.
+ 
+Sign in
+ 
+Suggest an article
+ 
+Know something the world should know? Tell us what to write about.
+ New Article Suggest Edit Topic (optional if you add details) Details (optional if you add a topic) 
+What makes a great suggestion?
+ 
+Specific beats broad "CRISPR" over "Biology"
+ 
+People, events, and breakthroughs are ideal
+ 
+Search first to check if it already exists
+ Cancel Submit Summary Edit content (optional) Supporting sources (optional) 
+Add another source
+ 
+What makes a great edit?
+ 
+Select the wrong text in the article first
+ 
+Add a source link so we can verify
+ 
+One fix per submission is easiest to review
+ Cancel Submit Edit 
+
+ 
+Something went wrong
+ 
+We couldn't submit your suggestion. Please try again.
+ 
+Try again
+ 
+Thank you!
+ 
+Grok will review your suggestion and add the article if it sees fit.
+ 
+View my suggestions
+ 
+Submit another suggestion
